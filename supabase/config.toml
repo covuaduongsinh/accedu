@@ -1,0 +1,30 @@
+# Cấu hình Supabase CLI (supabase start / db reset / gen types)
+project_id = "accedu"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 5000
+
+[db]
+port = 54322
+major_version = 16
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "tauri://localhost", "accedu://"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
