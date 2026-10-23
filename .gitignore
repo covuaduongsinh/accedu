@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+build/
+.turbo/
+coverage/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+apps/mobile/android/
+apps/mobile/ios/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.keystore
+
+# REA raw captures (chứa dữ liệu thật/token phiên) — KHÔNG commit
+research-raw/
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
