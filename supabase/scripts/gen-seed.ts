@@ -22,4 +22,4 @@ on conflict (regime, code) do update set
   normal_side = excluded.normal_side, track_partner = excluded.track_partner, track_item = excluded.track_item;
 `;
 writeFileSync(new URL("../seed.sql", import.meta.url), sql);
-console.log(`seed.sql: ${COA_TT99.length} + ${COA_TT133.length} tài khoản`);
+process.stdout.write(`seed.sql: ${COA_TT99.length} + ${COA_TT133.length} tài khoản\n`);

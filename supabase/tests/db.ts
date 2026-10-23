@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import pg from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 
-export const pool = new pg.Pool({
+export const pool = new Pool({
   host: process.env.PGHOST ?? `${root}.pgdata`,
   port: Number(process.env.PGPORT ?? 54329),
   user: process.env.PGUSER ?? "postgres",
@@ -18,7 +18,7 @@ export async function createUser(email = `${randomUUID()}@test.vn`): Promise<str
 }
 
 /** Chạy truy vấn với tư cách một người dùng đã đăng nhập (role authenticated + JWT sub) — RLS có hiệu lực. */
-export async function asUser<T>(userId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function asUser<T>(userId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
     await c.query("begin");
@@ -37,7 +37,7 @@ export async function asUser<T>(userId: string, fn: (c: pg.PoolClient) => Promis
   }
 }
 
-export async function q<T extends pg.QueryResultRow = Record<string, unknown>>(
+export async function q<T extends QueryResultRow = Record<string, unknown>>(
   userId: string,
   sql: string,
   params: unknown[] = [],

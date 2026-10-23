@@ -1,0 +1,28 @@
+{
+  "name": "@accedu/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@accedu/core": "workspace:*",
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.104.5",
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.104.5",
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
+    "vitest": "5.0.5"
+  }
+}

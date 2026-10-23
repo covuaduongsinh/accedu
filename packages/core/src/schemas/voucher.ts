@@ -36,6 +36,7 @@ export const voucherSchema = z.object({
   currency: z.string().length(3).default("VND"),
   exchangeRate: z.number().positive().default(1),
   headerAccount: accountCode.nullish(),
+  originalDocuments: z.string().max(256).optional(),
   lines: z.array(voucherLineSchema).min(1, "Chứng từ chưa có dòng chi tiết"),
 });
 

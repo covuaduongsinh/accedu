@@ -483,7 +483,7 @@ function build(rows: Array<[string, string]>): CoaAccount[] {
       }
       return { ...a, level };
     })
-    .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+    .toSorted((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
 }
 
 function tt99Rows(): Array<[string, string]> {

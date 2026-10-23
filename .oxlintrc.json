@@ -1,15 +1,52 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "import", "unicorn", "react", "oxc"],
+  "plugins": [
+    "typescript",
+    "import",
+    "unicorn",
+    "react",
+    "oxc"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
   },
   "rules": {
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
     "react/react-in-jsx-scope": "off",
     "unicorn/no-null": "off",
-    "unicorn/filename-case": "off"
+    "unicorn/filename-case": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": [
+          "**/*.css",
+          "@fontsource/**"
+        ]
+      }
+    ],
+    "react/no-unstable-nested-components": [
+      "warn",
+      {
+        "allowAsProps": true
+      }
+    ]
   },
-  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/.expo/**", "**/src-tauri/target/**", "research-raw/**", "**/routeTree.gen.ts", "**/database.types.ts"]
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.expo/**",
+    "**/src-tauri/target/**",
+    "research-raw/**",
+    "**/routeTree.gen.ts",
+    "**/database.types.ts"
+  ]
 }
