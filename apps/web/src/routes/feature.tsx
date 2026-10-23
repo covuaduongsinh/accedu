@@ -3,6 +3,10 @@ import { useParams } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 import type { ComponentType } from "react";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
+import { JobsPage } from "../features/catalogs/JobsPage";
+import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
+import { CompanyPage, PeriodLockCard } from "../features/system/CompanyPage";
+import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
@@ -11,6 +15,16 @@ import { VoucherModule } from "../features/vouchers/VoucherModule";
 import { Card, PageHeader } from "../components/ui";
 
 const PAGES: Record<string, ComponentType> = {
+  "system/company": CompanyPage,
+  "system/users": UsersPage,
+  "system/periods": () => (
+    <div>
+      <PageHeader title="Kỳ kế toán & khóa sổ" />
+      <PeriodLockCard />
+    </div>
+  ),
+  "general/opening-balances": OpeningBalancesPage,
+  "project/jobs": JobsPage,
   "general/accounts": AccountsPage,
   "sales/customers": () => <PartnersPage kind="customer" />,
   "purchase/suppliers": () => <PartnersPage kind="supplier" />,

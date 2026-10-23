@@ -2,6 +2,10 @@ import type { AccountInput, PartnerInput, VoucherInput } from "@accedu/core";
 import type { AccEduClient } from "./client";
 import type {
   AccountRow,
+  JobRow,
+  MemberRow,
+  OpeningBalanceRow,
+  PeriodLockRow,
   JournalRow,
   LedgerRow,
   MyTenantRow,
@@ -130,6 +134,52 @@ export const api = {
     unwrap(await db.rpc("delete_voucher", { p_voucher_id: id }));
   },
 
+  async updateTenant(
+    db: AccEduClient,
+    id: string,
+    patch: Partial<Pick<TenantRow, "name" | "tax_code" | "address" | "phone" | "email" | "start_date">>,
+  ): Promise<TenantRow> {
+    return unwrap(await db.from("tenants").update(patch).eq("id", id).select().single());
+  },
+
+  async members(db: AccEduClient, tenantId: string): Promise<MemberRow[]> {
+    return unwrap(await db.rpc("list_members", { p_tenant: tenantId }));
+  },
+  async setMember(db: AccEduClient, tenantId: string, email: string, role: string): Promise<string> {
+    return unwrap(await db.rpc("set_member", { p_tenant: tenantId, p_email: email, p_role: role }));
+  },
+  async removeMember(db: AccEduClient, tenantId: string, userId: string) {
+    unwrap(await db.rpc("remove_member", { p_tenant: tenantId, p_user: userId }));
+  },
+
+  async openingBalances(db: AccEduClient, tenantId: string): Promise<OpeningBalanceRow[]> {
+    return unwrap(await db.from("opening_balances").select("*").eq("tenant_id", tenantId));
+  },
+  async setOpeningBalances(
+    db: AccEduClient,
+    tenantId: string,
+    rows: Array<{ account: string; partner_id?: string | null; debit: number; credit: number }>,
+  ): Promise<number> {
+    return unwrap(await db.rpc("set_opening_balances", { p_tenant: tenantId, p_rows: rows }));
+  },
+
+  async periodLocks(db: AccEduClient, tenantId: string): Promise<PeriodLockRow[]> {
+    return unwrap(await db.from("period_locks").select("*").eq("tenant_id", tenantId));
+  },
+  async lockPeriod(db: AccEduClient, tenantId: string, until: string, voucherType = "*") {
+    unwrap(await db.rpc("lock_period", { p_tenant: tenantId, p_until: until, p_voucher_type: voucherType }));
+  },
+
+  async jobs(db: AccEduClient, tenantId: string): Promise<JobRow[]> {
+    return unwrap(await db.from("jobs").select("*").eq("tenant_id", tenantId).order("code"));
+  },
+  async saveJob(db: AccEduClient, tenantId: string, j: Omit<Partial<JobRow>, "id" | "tenant_id"> & { code: string; name: string }, id?: string): Promise<JobRow> {
+    const row = { ...j, tenant_id: tenantId };
+    return id
+      ? unwrap(await db.from("jobs").update(row).eq("id", id).select().single())
+      : unwrap(await db.from("jobs").insert(row).select().single());
+  },
+
   async trialBalance(db: AccEduClient, tenantId: string, from: string, to: string, maxLevel = 9): Promise<TrialBalanceRow[]> {
     return unwrap(await db.rpc("rpt_trial_balance", { p_tenant: tenantId, p_from: from, p_to: to, p_max_level: maxLevel }));
   },
@@ -149,5 +199,9 @@ export const qk = {
   partners: (tenantId: string) => ["partners", tenantId] as const,
   vouchers: (tenantId: string, types?: readonly string[]) => ["vouchers", tenantId, ...(types ?? [])] as const,
   voucher: (id: string) => ["voucher", id] as const,
+  members: (tenantId: string) => ["members", tenantId] as const,
+  opening: (tenantId: string) => ["opening", tenantId] as const,
+  locks: (tenantId: string) => ["locks", tenantId] as const,
+  jobs: (tenantId: string) => ["jobs", tenantId] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,
 };

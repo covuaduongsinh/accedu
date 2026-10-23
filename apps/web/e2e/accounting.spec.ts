@@ -98,4 +98,40 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(b.getByRole("gridcell", { name: "Mua bàn cờ cho CLB" })).toBeVisible({ timeout: 10_000 });
     await shot(b, "07-dong-bo-realtime");
   });
+
+  test("số dư đầu kỳ nhập trên lưới, khóa sổ, lớp học", async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/${slug}/general/opening-balances`);
+    const editCell = async (code: string, col: "debit" | "credit", value: string) => {
+      const cell = page.locator(`.ag-row[row-id="${code}"] [col-id="${col}"]`);
+      await cell.scrollIntoViewIfNeeded();
+      await cell.click();
+      await page.keyboard.type(value);
+      await page.keyboard.press("Enter");
+    };
+    await editCell("1111", "debit", "50000000");
+    await expect(page.getByText(/Lệch 50\.000\.000/)).toBeVisible();
+    // Lưới ảo hóa hàng: cuộn xuống để AG Grid dựng hàng 4111
+    await page.locator('.ag-row[row-id="1111"]').hover();
+    for (let i = 0; i < 10 && !(await page.locator('.ag-row[row-id="4111"]').count()); i++) await page.mouse.wheel(0, 800);
+    await editCell("4111", "credit", "50000000");
+    await expect(page.getByText("Cân: Nợ = Có")).toBeVisible();
+    await page.getByRole("button", { name: "Lưu số dư" }).click();
+    await expect(page.getByText(/Đã lưu số dư đầu kỳ \(2 tài khoản\)/)).toBeVisible();
+    await shot(page, "08-so-du-dau-ky");
+
+    await page.goto(`/${slug}/project/jobs`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await page.getByLabel("Mã", { exact: true }).fill("TOT-K12");
+    await page.getByLabel("Tên", { exact: true }).fill("Lớp Tốt K12 — sáng thứ 7");
+    await page.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByRole("gridcell", { name: "Lớp Tốt K12 — sáng thứ 7" })).toBeVisible();
+
+    await page.goto(`/${slug}/system/periods`);
+    page.once("dialog", (d) => void d.accept());
+    await page.getByLabel("Khóa số liệu đến ngày").fill("2026-01-31");
+    await page.getByRole("button", { name: "Khóa sổ" }).click();
+    await expect(page.getByText(/đang khóa đến hết ngày/)).toBeVisible();
+    await expect(page.getByText("31/01/2026").first()).toBeVisible();
+  });
 });

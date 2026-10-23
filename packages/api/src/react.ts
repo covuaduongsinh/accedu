@@ -101,6 +101,26 @@ export function useVoucherAction(tenantId: string) {
   });
 }
 
+export function useMembers(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.members(tenantId ?? ""), queryFn: () => api.members(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useOpeningBalances(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.opening(tenantId ?? ""), queryFn: () => api.openingBalances(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function usePeriodLocks(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.locks(tenantId ?? ""), queryFn: () => api.periodLocks(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useJobs(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.jobs(tenantId ?? ""), queryFn: () => api.jobs(db, tenantId as string), enabled: !!tenantId });
+}
+
 export function useTrialBalance(tenantId: string | undefined, from: string, to: string, maxLevel = 9) {
   const db = useDb();
   return useQuery({
@@ -160,6 +180,16 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "partners", filter }, () => {
         void qc.invalidateQueries({ queryKey: qk.partners(tenantId) });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs", filter }, () => {
+        void qc.invalidateQueries({ queryKey: qk.jobs(tenantId) });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "opening_balances", filter }, () => {
+        void qc.invalidateQueries({ queryKey: qk.opening(tenantId) });
+        void qc.invalidateQueries({ queryKey: ["report", tenantId] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "period_locks", filter }, () => {
+        void qc.invalidateQueries({ queryKey: qk.locks(tenantId) });
       })
       .subscribe((status) => {
         setState(status === "SUBSCRIBED" ? "live" : status === "CLOSED" || status === "CHANNEL_ERROR" ? "offline" : "connecting");

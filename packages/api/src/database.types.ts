@@ -118,6 +118,46 @@ export type VoucherLineRow = {
   unit_price: Numeric | null;
 };
 
+export type JobRow = {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  kind: "project" | "class" | "course" | "event" | "contract";
+  group_code: string | null;
+  partner_id: string | null;
+  start_date: DateStr | null;
+  end_date: DateStr | null;
+  budget: Numeric | null;
+  is_active: boolean;
+};
+
+export type OpeningBalanceRow = {
+  id: string;
+  tenant_id: string;
+  account: string;
+  partner_id: string | null;
+  job_id: string | null;
+  debit: Numeric;
+  credit: Numeric;
+};
+
+export type PeriodLockRow = {
+  tenant_id: string;
+  voucher_type: string;
+  locked_until: DateStr;
+  locked_by: string | null;
+  locked_at: Timestamp;
+};
+
+export type MemberRow = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  role: MyTenantRow["role"];
+  created_at: Timestamp;
+};
+
 export type MyTenantRow = {
   id: string;
   slug: string;
@@ -177,6 +217,9 @@ export type Database = {
       partners: Table<PartnerRow, Partial<PartnerRow> & Pick<PartnerRow, "tenant_id" | "code" | "name">>;
       vouchers: Table<VoucherRow>;
       voucher_lines: Table<VoucherLineRow>;
+      jobs: Table<JobRow, Partial<JobRow> & Pick<JobRow, "tenant_id" | "code" | "name">>;
+      opening_balances: Table<OpeningBalanceRow>;
+      period_locks: Table<PeriodLockRow>;
     };
     Views: {
       my_tenants: { Row: MyTenantRow; Relationships: [] };
@@ -191,6 +234,13 @@ export type Database = {
       unpost_voucher: { Args: { p_voucher_id: string }; Returns: undefined };
       delete_voucher: { Args: { p_voucher_id: string }; Returns: undefined };
       lock_period: { Args: { p_tenant: string; p_until: string; p_voucher_type?: string }; Returns: undefined };
+      list_members: { Args: { p_tenant: string }; Returns: MemberRow[] };
+      set_member: { Args: { p_tenant: string; p_email: string; p_role: string }; Returns: string };
+      remove_member: { Args: { p_tenant: string; p_user: string }; Returns: undefined };
+      set_opening_balances: {
+        Args: { p_tenant: string; p_rows: Array<{ account: string; partner_id?: string | null; debit: number; credit: number }> };
+        Returns: number;
+      };
       rpt_trial_balance: {
         Args: { p_tenant: string; p_from: string; p_to: string; p_max_level?: number };
         Returns: TrialBalanceRow[];
