@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321 ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.217-15-160-118.sslip.io wss://api.217-15-160-118.sslip.io http://localhost:8000 ws://localhost:8000 ipc: http://ipc.localhost"
     }
   },
   "bundle": {

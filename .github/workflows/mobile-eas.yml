@@ -1,6 +1,6 @@
 name: Mobile build (EAS)
 
-# Cần secret EXPO_TOKEN (expo.dev → Access tokens) và biến SUPABASE_URL/SUPABASE_ANON_KEY.
+# Cần secret EXPO_TOKEN (expo.dev → Access tokens). Biến ACCEDU_API_URL (tùy chọn) đổi địa chỉ API.
 on:
   workflow_dispatch:
     inputs:
@@ -27,6 +27,5 @@ jobs:
       - name: EAS build
         working-directory: apps/mobile
         env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_URL: ${{ vars.ACCEDU_API_URL || 'https://api.217-15-160-118.sslip.io' }}
         run: eas build --platform ${{ inputs.platform }} --profile preview --non-interactive --no-wait

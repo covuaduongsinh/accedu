@@ -131,3 +131,20 @@ Thư viện: `jose` 6, `@node-rs/argon2` 2, `pg` 8, `ws` 8, `zod` 4, `pino`.
 - **Let's Encrypt giới hạn số chứng chỉ cấp cho `sslip.io`:** Caddy tự chuyển sang ZeroSSL. Về lâu dài nên dùng tên miền riêng.
 - **Tự viết phần Auth:** chỉ làm phạm vi tối thiểu (mật khẩu + refresh); dùng thư viện chuẩn (argon2id, jose); có test phát hiện dùng lại token; PostgreSQL không mở cổng ra Internet.
 - **Đăng nhập SSH bằng `root`:** giai đoạn sau nên tạo user `deploy` và tắt đăng nhập bằng mật khẩu.
+
+## Kết quả thực hiện (23/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| CSDL nền tảng (`platform/db/00-platform.sql`, migration 6) | Xong | `pnpm db:test` 30/30 |
+| `apps/server` (auth GoTrue, realtime, API quản trị, CLI) | Xong | `pnpm --filter @accedu/server test` 15/15 |
+| Client (realtime WebSocket, đổi mật khẩu lần đầu, tạo tài khoản, bỏ đăng ký) | Xong | `@accedu/api` 8/8 (gồm 6 test realtime: nối lại, đồng bộ bù, xác thực lại) |
+| Docker Compose + Caddy + sao lưu | Xong | Chạy toàn bộ trong Docker từ CSDL trống: migrate → E2E 6/6, sao lưu tạo file `.sql.gz` |
+| CI | Xong | Job `web-e2e` dựng nền tảng bằng Docker Compose (build image server) thay cho `supabase start` |
+| Workflow triển khai VPS | Xong, chờ secret | Bỏ qua kèm cảnh báo khi chưa có `VPS_SSH_KEY` |
+
+**Điều chỉnh so với kế hoạch:**
+- Image server được **build ngay trên VPS** từ mã nguồn (gói bằng `git archive`, chép qua `scp`), không đẩy lên GHCR. Lý do: bớt một chỗ phải cấp quyền (package registry), mã nguồn công khai trên repo nên không có gì cần giấu, build có cache nên lần sau chỉ mất vài giây.
+- Bốn job `build/inspect/deploy/smoke` gộp thành 2 job: `test` (CSDL + server) → `deploy` (kiểm tra chỉ đọc → triển khai → smoke test). Bước kiểm tra vẫn dừng toàn bộ nếu cổng 80/443 bị dịch vụ khác chiếm.
+- UFW: không tự bật. Nếu UFW đang bật thì chỉ mở thêm 80/443.
+- `workflow_dispatch` chỉ dùng được khi workflow có trên nhánh mặc định (`main`). Trước khi merge, chạy lại workflow bằng nút *Re-run* sau khi thêm secret.

@@ -1,10 +1,34 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 
 const SHOTS = process.env.E2E_SHOTS;
 const stamp = Date.now().toString(36);
-const email = `ketoan-${stamp}@duongsinh.test`;
+const email = `chu-${stamp}@duongsinh.test`;
+const tempPassword = "TamThoi2026";
 const password = "VuiTriTue@2026";
 const slug = `ds-${stamp}`;
+const staffEmail = `ketoan-${stamp}@duongsinh.test`;
+const cli = fileURLToPath(new URL("../../server/src/cli.ts", import.meta.url));
+
+/** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng CLI máy chủ với mật khẩu tạm */
+test.beforeAll(() => {
+  const dbUrl = process.env.E2E_DATABASE_ADMIN_URL;
+  if (!dbUrl) throw new Error("Cần E2E_DATABASE_ADMIN_URL (postgres://postgres:…@127.0.0.1:55432/accedu)");
+  execFileSync(
+    process.execPath,
+    [cli, "create-owner", "--email", email, "--name", "Kế toán trưởng Dương Sinh", "--tenant-slug", `goc-${stamp}`, "--tenant-name", "Đơn vị gốc E2E"],
+    { env: { ...process.env, DATABASE_ADMIN_URL: dbUrl, OWNER_PASSWORD: tempPassword }, stdio: "inherit" },
+  );
+});
+
+async function changeTempPassword(page: Page, newPassword: string) {
+  await expect(page.getByText("Lần đầu đăng nhập")).toBeVisible();
+  await page.getByLabel(/^Mật khẩu mới/).fill(newPassword);
+  await page.getByLabel("Nhập lại mật khẩu mới").fill(newPassword);
+  await page.getByRole("button", { name: "Lưu mật khẩu mới" }).click();
+  await expect(page.getByText("Chọn đơn vị làm việc")).toBeVisible();
+}
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
@@ -19,15 +43,14 @@ async function signIn(page: Page) {
 }
 
 test.describe.serial("Luồng kế toán cơ bản", () => {
-  test("đăng ký, tạo đơn vị với hệ thống tài khoản TT133", async ({ page }) => {
+  test("đăng nhập lần đầu bắt đổi mật khẩu, tạo đơn vị với hệ thống tài khoản TT133", async ({ page }) => {
     await page.goto("/login");
+    await expect(page.getByText(/Liên hệ quản trị đơn vị/)).toBeVisible();
     await shot(page, "01-dang-nhap");
-    await page.getByRole("button", { name: /Chưa có tài khoản/ }).click();
-    await page.getByLabel("Họ và tên").fill("Kế toán Dương Sinh");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: "Đăng ký" }).click();
-    await expect(page.getByText("Chọn đơn vị làm việc")).toBeVisible();
+    await page.getByLabel("Mật khẩu").fill(tempPassword);
+    await page.getByRole("button", { name: "Đăng nhập" }).click();
+    await changeTempPassword(page, password);
 
     await page.getByLabel("Tên đơn vị").fill("Công ty CP Cờ vua Dương Sinh");
     await page.getByLabel("Mã truy cập (đường dẫn)").fill(slug);
@@ -97,6 +120,29 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     // Thiết bị B không tải lại trang vẫn thấy phiếu chi mới
     await expect(b.getByRole("gridcell", { name: "Mua bàn cờ cho CLB" })).toBeVisible({ timeout: 10_000 });
     await shot(b, "07-dong-bo-realtime");
+  });
+
+  test("quản trị tạo tài khoản kế toán; kế toán đăng nhập và đổi mật khẩu tạm", async ({ page, browser }) => {
+    await signIn(page);
+    await page.goto(`/${slug}/system/users`);
+    await page.getByLabel("Email", { exact: true }).fill(staffEmail);
+    await page.getByLabel("Họ và tên").fill("Kế toán viên E2E");
+    await page.getByRole("button", { name: "Tạo / thêm" }).click();
+    const issued = page.getByRole("status").filter({ hasText: staffEmail });
+    await expect(issued).toBeVisible();
+    const temp = (await issued.locator("code").textContent())?.trim() ?? "";
+    expect(temp).toMatch(/^[A-Za-z]{6}\d{4}$/);
+    await expect(page.getByRole("cell", { name: staffEmail })).toBeVisible();
+    await shot(page, "09-tao-tai-khoan");
+
+    const staff = await browser.newPage();
+    await staff.goto("/login");
+    await staff.getByLabel("Email").fill(staffEmail);
+    await staff.getByLabel("Mật khẩu").fill(temp);
+    await staff.getByRole("button", { name: "Đăng nhập" }).click();
+    await changeTempPassword(staff, "KeToan2026");
+    await expect(staff.getByText(`/${slug.toUpperCase()} · TT133`)).toBeVisible();
+    await staff.close();
   });
 
   test("số dư đầu kỳ nhập trên lưới, khóa sổ, lớp học", async ({ page }) => {

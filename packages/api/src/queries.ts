@@ -1,5 +1,5 @@
 import type { AccountInput, PartnerInput, VoucherInput } from "@accedu/core";
-import type { AccEduClient } from "./client";
+import { platformFetch, type AccEduClient } from "./client";
 import type {
   AccountRow,
   JobRow,
@@ -150,6 +150,25 @@ export const api = {
   },
   async removeMember(db: AccEduClient, tenantId: string, userId: string) {
     unwrap(await db.rpc("remove_member", { p_tenant: tenantId, p_user: userId }));
+  },
+  /** Quản trị tạo tài khoản mới với mật khẩu tạm (bắt đổi ở lần đăng nhập đầu); email đã có thì chỉ gán vai trò */
+  async createUser(
+    db: AccEduClient,
+    input: { tenantId: string; email: string; fullName: string; password: string; role: string },
+  ): Promise<{ user_id: string; created: boolean }> {
+    const { data } = await platformFetch<{ user_id: string; created: boolean }>(db, "/users", {
+      tenant_id: input.tenantId,
+      email: input.email,
+      full_name: input.fullName,
+      password: input.password,
+      role: input.role,
+    });
+    return data;
+  },
+  /** Đổi mật khẩu của chính mình (đăng xuất mọi thiết bị khác) */
+  async changePassword(db: AccEduClient, password: string) {
+    const { error } = await db.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
   },
 
   async openingBalances(db: AccEduClient, tenantId: string): Promise<OpeningBalanceRow[]> {

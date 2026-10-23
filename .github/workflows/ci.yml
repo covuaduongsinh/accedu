@@ -27,13 +27,15 @@ jobs:
         run: pnpm --filter @accedu/core --filter @accedu/api test
       - name: Test CSDL (Postgres 16 local + migration + RLS)
         run: pnpm db:test
+      - name: Test AccEdu server (auth, realtime, quản trị)
+        run: pnpm --filter @accedu/server test
       - name: Seed khớp packages/core
         run: |
           node supabase/scripts/gen-seed.ts
           git diff --exit-code supabase/seed.sql
 
   web-e2e:
-    name: Web build + E2E (Supabase local)
+    name: Web build + E2E (AccEdu Platform trong Docker)
     runs-on: ubuntu-24.04
     needs: check
     steps:
@@ -44,18 +46,32 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.121.0
-      - name: Khởi động Supabase local
-        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,storage-api,postgres-meta
-      - name: Cấu hình web
+      - name: Khởi động AccEdu Platform (build image server)
+        working-directory: platform
+        env:
+          API_DOMAIN: ":80"
+          HTTP_PORT: "8000"
+          HTTPS_PORT: "8443"
+          CORS_ORIGIN_REGEX: "^http://localhost:5173$"
         run: |
-          eval "$(supabase status -o env)"
-          printf 'VITE_SUPABASE_URL=%s\nVITE_SUPABASE_ANON_KEY=%s\n' "$API_URL" "$ANON_KEY" > apps/web/.env.local
+          ./scripts/bootstrap-env.sh
+          docker compose --env-file .env -f docker-compose.yml -f compose.ci.yml up -d --build db migrate rest server caddy
+          for i in $(seq 60); do curl -fsS http://localhost:8000/healthz && break; sleep 2; done
+          echo
+          curl -fsS http://localhost:8000/auth/v1/settings
+          docker compose --env-file .env -f docker-compose.yml -f compose.ci.yml logs --no-log-prefix migrate
+      - name: Cấu hình web
+        run: echo 'VITE_API_URL=http://localhost:8000' > apps/web/.env.local
       - run: pnpm --filter @accedu/web build
       - run: pnpm --filter @accedu/web exec playwright install --with-deps chromium
-      - run: pnpm --filter @accedu/web test:e2e
+      - name: E2E (chủ sở hữu tạo bằng CLI, đồng bộ 2 thiết bị)
+        run: |
+          set -a; . platform/.env; set +a
+          E2E_DATABASE_ADMIN_URL="postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:55432/accedu" pnpm --filter @accedu/web test:e2e
+      - name: Log nền tảng
+        if: failure()
+        working-directory: platform
+        run: docker compose --env-file .env -f docker-compose.yml -f compose.ci.yml logs --tail 200
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -77,8 +93,7 @@ jobs:
       - name: Export Android bundle
         working-directory: apps/mobile
         env:
-          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci
+          EXPO_PUBLIC_API_URL: https://api.example.invalid
           CI: 1
         run: npx expo export --platform android --output-dir dist-android
 

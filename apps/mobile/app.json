@@ -15,10 +15,6 @@
       "adaptiveIcon": { "foregroundImage": "./assets/icon.png", "backgroundColor": "#2B3990" }
     },
     "plugins": ["expo-router", "expo-secure-store"],
-    "experiments": { "typedRoutes": true },
-    "extra": {
-      "supabaseUrl": "",
-      "supabaseAnonKey": ""
-    }
+    "experiments": { "typedRoutes": true }
   }
 }

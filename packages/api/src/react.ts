@@ -2,8 +2,11 @@ import type { VoucherInput } from "@accedu/core";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import type { AccEduClient } from "./client";
+import { realtimeOf, type AccEduClient } from "./client";
 import { api, qk } from "./queries";
+import type { ChangeEvent, SyncState } from "./realtime";
+
+export type { SyncState } from "./realtime";
 
 const ClientContext = createContext<AccEduClient | null>(null);
 
@@ -154,11 +157,10 @@ function invalidateLedger(qc: QueryClient, tenantId: string, voucherId?: string)
   if (voucherId) void qc.invalidateQueries({ queryKey: qk.voucher(voucherId) });
 }
 
-export type SyncState = "connecting" | "live" | "offline";
-
 /**
  * Đồng bộ thời gian thực giữa web / desktop / mobile: khi bất kỳ thiết bị nào thay đổi
  * chứng từ hoặc danh mục của đơn vị, mọi thiết bị khác tự làm mới dữ liệu liên quan.
+ * Sự kiện chỉ mang tên bảng + id; dữ liệu được tải lại qua REST nên RLS vẫn áp dụng.
  */
 export function useRealtimeSync(tenantId: string | undefined): SyncState {
   const db = useDb();
@@ -167,37 +169,41 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
 
   useEffect(() => {
     if (!tenantId) return;
-    const filter = `tenant_id=eq.${tenantId}`;
-    const channel = db
-      .channel(`tenant:${tenantId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vouchers", filter }, (payload) => {
-        const id = (payload.new as { id?: string })?.id ?? (payload.old as { id?: string })?.id;
-        invalidateLedger(qc, tenantId, id);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "accounts", filter }, () => {
-        void qc.invalidateQueries({ queryKey: qk.accounts(tenantId) });
-        void qc.invalidateQueries({ queryKey: ["report", tenantId] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "partners", filter }, () => {
-        void qc.invalidateQueries({ queryKey: qk.partners(tenantId) });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "jobs", filter }, () => {
-        void qc.invalidateQueries({ queryKey: qk.jobs(tenantId) });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "opening_balances", filter }, () => {
-        void qc.invalidateQueries({ queryKey: qk.opening(tenantId) });
-        void qc.invalidateQueries({ queryKey: ["report", tenantId] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "period_locks", filter }, () => {
-        void qc.invalidateQueries({ queryKey: qk.locks(tenantId) });
-      })
-      .subscribe((status) => {
-        setState(status === "SUBSCRIBED" ? "live" : status === "CLOSED" || status === "CHANNEL_ERROR" ? "offline" : "connecting");
-      });
-    return () => {
-      void db.removeChannel(channel);
-    };
+    return realtimeOf(db).subscribe(tenantId, (ev) => applyChange(qc, tenantId, ev), setState);
   }, [db, qc, tenantId]);
 
   return state;
+}
+
+function applyChange(qc: QueryClient, tenantId: string, ev: ChangeEvent) {
+  const inv = (queryKey: readonly unknown[]) => void qc.invalidateQueries({ queryKey });
+  switch (ev.table) {
+    case "vouchers":
+      return invalidateLedger(qc, tenantId, ev.id ?? undefined);
+    case "accounts":
+      inv(qk.accounts(tenantId));
+      return inv(["report", tenantId]);
+    case "partners":
+      return inv(qk.partners(tenantId));
+    case "jobs":
+      return inv(qk.jobs(tenantId));
+    case "opening_balances":
+      inv(qk.opening(tenantId));
+      return inv(["report", tenantId]);
+    case "period_locks":
+      return inv(qk.locks(tenantId));
+    case "memberships":
+      inv(qk.members(tenantId));
+      return inv(qk.tenants());
+    case "tenants":
+      inv(qk.tenants());
+      return inv(["tenant"]);
+    case "*":
+      // Vừa nối lại sau khi mất kết nối: làm mới mọi dữ liệu của đơn vị
+      inv(qk.tenants());
+      inv(["tenant"]);
+      return void qc.invalidateQueries({ predicate: (q) => q.queryKey.includes(tenantId) || q.queryKey[0] === "voucher" });
+    default:
+      return;
+  }
 }

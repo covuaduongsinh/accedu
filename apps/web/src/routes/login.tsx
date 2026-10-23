@@ -11,10 +11,8 @@ const t = getDictionary("vi");
 export function LoginPage() {
   const db = useDb();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -22,17 +20,13 @@ export function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res =
-      mode === "signin"
-        ? await db.auth.signInWithPassword({ email, password })
-        : await db.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+    const res = await db.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (res.error) {
-      setError(mode === "signin" && /Invalid login/i.test(res.error.message) ? t.auth.invalid : friendlyError(res.error));
+      setError(/Invalid login/i.test(res.error.message) ? t.auth.invalid : friendlyError(res.error));
       return;
     }
-    if (res.data.session) await navigate({ to: "/" });
-    else setError("Đã tạo tài khoản — kiểm tra email để xác nhận rồi đăng nhập.");
+    await navigate({ to: "/" });
   }
 
   return (
@@ -48,12 +42,7 @@ export function LoginPage() {
           </div>
         </div>
         <div className="space-y-3 p-6">
-          <h1 className="text-base font-semibold text-navy-700">{mode === "signin" ? t.auth.signIn : "Tạo tài khoản"}</h1>
-          {mode === "signup" ? (
-            <Field label="Họ và tên">
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
-            </Field>
-          ) : null}
+          <h1 className="text-base font-semibold text-navy-700">{t.auth.signIn}</h1>
           <Field label={t.auth.email}>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           </Field>
@@ -63,21 +52,14 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete="current-password"
             />
           </Field>
           {error ? <p className="rounded bg-red-50 px-2 py-1.5 text-sm text-danger">{error}</p> : null}
           <Button type="submit" className="w-full justify-center py-2" disabled={busy}>
-            {busy ? t.common.loading : mode === "signin" ? t.auth.signIn : "Đăng ký"}
+            {busy ? t.common.loading : t.auth.signIn}
           </Button>
-          <button
-            type="button"
-            className="w-full text-center text-xs text-navy-500 hover:underline"
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          >
-            {mode === "signin" ? "Chưa có tài khoản? Đăng ký" : "Đã có tài khoản? Đăng nhập"}
-          </button>
+          <p className="text-center text-xs text-muted">Chưa có tài khoản? Liên hệ quản trị đơn vị để được cấp.</p>
         </div>
         <div className="border-t border-line bg-canvas px-6 py-2 text-center text-[11px] text-muted">
           {brand.owner} — “{brand.slogan}”

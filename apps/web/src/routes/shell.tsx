@@ -2,7 +2,7 @@ import { useRealtimeSync, useTenant, useTenants } from "@accedu/api/react";
 import { MODULES, searchFeatures } from "@accedu/core";
 import { getDictionary } from "@accedu/i18n";
 import { Link, Navigate, Outlet, useNavigate, useParams } from "@tanstack/react-router";
-import { Cloud, CloudOff, Home, LogOut, Search } from "lucide-react";
+import { Cloud, CloudOff, Home, KeyRound, LogOut, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDb } from "@accedu/api/react";
 import { Empty } from "../components/ui";
@@ -66,6 +66,9 @@ export function AppShell() {
               </span>
               <Link to="/$tenant" params={{ tenant: ctx.slug }} className="flex items-center gap-1 hover:text-gold-300">
                 <Home size={14} /> Trang chính
+              </Link>
+              <Link to="/doi-mat-khau" className="flex items-center gap-1 hover:text-gold-300" title="Đổi mật khẩu">
+                <KeyRound size={14} />
               </Link>
               <button type="button" className="flex items-center gap-1 hover:text-gold-300" onClick={() => void db.auth.signOut()}>
                 <LogOut size={14} /> {t.auth.signOut}

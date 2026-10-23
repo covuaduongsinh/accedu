@@ -10,3 +10,4 @@ export * from "./accounting/modules";
 export * from "./schemas/voucher";
 export * from "./schemas/catalog";
 export * from "./accounting/coa";
+export * from "./auth/password";

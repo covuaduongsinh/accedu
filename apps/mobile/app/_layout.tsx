@@ -12,8 +12,8 @@ export default function RootLayout() {
   if (!db) {
     return (
       <View style={[s.screen, s.content, { justifyContent: "center" }]}>
-        <Text style={s.title}>Chưa cấu hình Supabase</Text>
-        <Text style={s.subtitle}>Tạo apps/mobile/.env.local với EXPO_PUBLIC_SUPABASE_URL và EXPO_PUBLIC_SUPABASE_ANON_KEY.</Text>
+        <Text style={s.title}>Chưa cấu hình AccEdu Platform</Text>
+        <Text style={s.subtitle}>Tạo apps/mobile/.env.local với EXPO_PUBLIC_API_URL=https://api.&lt;tên miền&gt;.</Text>
       </View>
     );
   }
@@ -31,6 +31,7 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" options={{ title: "AccEdu" }} />
           <Stack.Screen name="login" options={{ title: "Đăng nhập", headerShown: false }} />
+          <Stack.Screen name="change-password" options={{ title: "Đổi mật khẩu", headerShown: false }} />
           <Stack.Screen name="[tenant]" options={{ headerShown: false }} />
         </Stack>
       </QueryClientProvider>
