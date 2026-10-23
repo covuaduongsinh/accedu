@@ -112,10 +112,23 @@ Web được làm đầy đủ ở mọi phase. Desktop tự có nhờ dùng chu
 | **P4** Bán hàng / Mua hàng / Công nợ | Hóa đơn, phân bổ thanh toán, tuổi nợ, bảng kê thuế, import XML hóa đơn đầu vào | 4 tuần |
 | **P5** Tồn kho | Nhập/xuất/chuyển kho, giá vốn bình quân (tức thời và cuối kỳ), nhập–xuất–tồn, thẻ kho | 3 tuần |
 | **P6** TSCĐ + CCDC | Tăng/giảm tài sản, khấu hao đường thẳng, phân bổ CCDC, tự sinh chứng từ | 2 tuần |
-| **P7** Giá thành + Cuối kỳ | Giá thành theo vụ việc/sản phẩm, kết chuyển 911, chênh lệch tỷ giá | 3 tuần |
+| **P7** Dự án/vụ việc + Cuối kỳ | Vụ việc, hợp đồng, khế ước vay; phân bổ định kỳ, kết chuyển 911, chênh lệch tỷ giá (gói FAO của Dương Sinh không có Giá thành sản xuất) | 3 tuần |
 | **P8** BCTC + Thuế + Hóa đơn điện tử | Mẫu biểu B01–B03 và thuyết minh, 01/GTGT XML, adapter nhà cung cấp hóa đơn điện tử | 4 tuần |
 | **P9** Riêng cho Dương Sinh + AI | Học phí, lớp (vụ việc), lương HLV, doanh thu nhận trước 3387; AI đọc hóa đơn và hỏi đáp | 3 tuần |
 | **P10** Phát hành | Bộ cài Windows/mac, CH Play/App Store, chuyển dữ liệu từ FAO (Excel), sẵn sàng SaaS (đăng ký, gói cước) | 3 tuần |
+
+## 6b. Điều chỉnh sau P0 (khảo sát FAO ngày 23/10/2026)
+
+Chi tiết: [`docs/research/fao/99-gap-analysis.md`](../research/fao/99-gap-analysis.md).
+
+- FAO của Dương Sinh có **600 chức năng / 10 phân hệ**: Hệ thống, Tổng hợp, Tiền, Bán hàng, Mua hàng, Tồn kho, **Dự án**, Tài sản, Công cụ, Trợ giúp. Không có Giá thành sản xuất, nên P7 đổi thành Dự án/vụ việc + Cuối kỳ.
+- Giữ các quy ước FAO để kế toán chuyển sang dễ dàng: quyển chứng từ, ngày lập ≠ ngày hạch toán, trạng thái 0/1/2 (chỉ trạng thái "chuyển sổ cái" mới lên sổ), nguyên tệ + quy đổi, đơn vị cơ sở, phân bổ thanh toán theo hóa đơn ngay trên dòng phiếu thu/chi.
+- Bổ sung backlog:
+  - P3: kết nối ngân hàng, khế ước vay.
+  - P4: đơn hàng, hóa đơn điều chỉnh/trả lại, quản lý hóa đơn đầu vào (cảnh báo doanh nghiệp rủi ro thuế).
+  - P5: kiểm kê, giá nhập trước xuất trước (FIFO).
+  - P2: hình thức Chứng từ ghi sổ, nhập từ Excel trên mọi danh mục/chứng từ.
+- Kiến trúc: học cách FAO mô tả form/lưới bằng metadata, nhưng làm bằng schema TypeScript dùng chung trong `packages/core`.
 
 ## 7. Phần thực thi ngay sau khi Thầy duyệt
 

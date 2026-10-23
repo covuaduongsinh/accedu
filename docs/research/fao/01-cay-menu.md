@@ -1,0 +1,716 @@
+# FAO — Cây menu đầy đủ (bản DUONGSINH, khảo sát 23/10/2026)
+
+> Nguồn: REA `capture-browser-scenario` → API `MenuExtenderService.asmx/GetMenuItem` (type 0), tài khoản ADMIN, đơn vị CTY.
+> Tên trang `.aspx` chỉ dùng để tham chiếu màn hình khi khảo sát; AccEdu không dùng lại.
+
+## Thống kê
+
+| Phân hệ | Số chức năng |
+|---|---|
+| Hệ thống | 43 |
+| Tổng hợp | 113 |
+| Tiền | 55 |
+| Bán hàng | 121 |
+| Mua hàng | 101 |
+| Tồn kho | 71 |
+| Dự án | 14 |
+| Tài sản | 44 |
+| Công cụ | 34 |
+| Trợ giúp | 4 |
+| **Tổng** | **600** |
+
+## Hệ thống
+
+- Tổng quan — `dashboard.aspx`
+- Chọn ngày làm việc — `smngaylv.aspx`
+- Tỷ giá quy đổi ngoại tệ — `smtgnt.aspx`
+- Khai báo thông tin theo đơn vị cơ sở — `unitdefining.aspx`
+- Danh mục quyển chứng từ — `smnk.aspx`
+- Danh mục tiền tệ — `smnt.aspx`
+- Danh mục đơn vị cơ sở — `gldvcs.aspx`
+- Danh mục bộ phận — `smbp.aspx`
+- Thông tin chữ ký...
+  - Danh mục loại thông tin chữ ký — `dmttckloai.aspx`
+  - Khai báo thông tin người ký — `dmttckct.aspx`
+- Người sử dụng
+  - Khai báo người sử dụng — `user.aspx`
+  - Phân quyền truy cập — `allowright.aspx`
+  - Phân quyền truy cập theo đơn vị cơ sở — `unitright.aspx`
+  - Giới hạn địa chỉ truy cập — `blacklistip.aspx`
+  - Giới hạn địa chỉ truy cập của người sử dụng — `allowuserip.aspx`
+  - Danh sách người sử dụng đang thực hiện chương trình — `activeusers.aspx`
+  - Nhật ký người sử dụng — `errorlog.aspx`
+  - Nhật ký hệ thống — `syslog.aspx`
+- Bảo trì số liệu
+  - Khóa số liệu — `smnamks.aspx`
+  - Khóa số liệu theo chứng từ — `smctks.aspx`
+  - Kiểm tra kết chuyển chứng từ — `rpt_errorvoucher.aspx`
+  - Kiểm tra số liệu giữa sổ tài khoản và sổ kho — `rpt_ktslstkvsk.aspx`
+  - Kiểm tra số liệu giữa sổ tài khoản và sổ thuế — `rpt_ktslstkvst.aspx`
+  - Kiểm tra nhập liệu trên sổ tài khoản và sổ kho — `rpt_ktnlstkvsk.aspx`
+  - Kiểm tra số dư tài khoản — `rpt_ktsdtk.aspx`
+  - Kiểm tra khai báo mẫu báo cáo tình hình tài chính — `rpt_ktkbbcdkt.aspx`
+- Khai báo các màn hình nhập chứng từ — `smct.aspx`
+- Khai báo sử dụng quyển chứng từ — `smctnk.aspx`
+- Khai báo mẫu quyển chứng từ — `smnkt.aspx`
+- Cập nhật lại số chứng từ... — `dlsct.aspx`
+- Xóa nhiều chứng từ... — `xdlct.aspx`
+- Khai báo các tham số tùy chọn — `smoptions.aspx`
+- Tiện ích
+  - Khai báo màn hình tổng quan — `dbi.aspx`
+  - Thông tin báo cáo... — `kbmsmi.aspx`
+  - Khai báo đổi mã, gộp mã — `kbdmgm.aspx`
+  - Quản lý chức năng — `qlcn.aspx`
+  - Chọn giao diện... — `sminterface.aspx`
+  - Khai báo kiểu hiển thị chức năng — `smmenuconfig.aspx`
+  - Khai báo giao diện... — `smlayoutconfig.aspx`
+  - Danh mục địa chỉ khách hàng — `rpt_arkh0.aspx`
+  - Khai báo thông tin thư điện tử — `kbtttdt.aspx`
+- Khai báo ngày bắt đầu của năm tài chính — `smnamdn.aspx`
+- Khai báo ngày bắt đầu nhập liệu — `smnamnl.aspx`
+
+## Tổng hợp
+
+- Phiếu kế toán tổng hợp — `glctpk1.aspx`
+- Chuyển các giao dịch vào sổ cái — `glpost.aspx`
+- Bút toán tự động cuối kỳ
+  - Bút toán phân bổ định kỳ — `glctpbky.aspx`
+  - Bút toán phân bổ tự động — `glctpb.aspx`
+  - Bút toán kết chuyển tự động — `glctkc.aspx`
+  - Cập nhật tỷ giá đánh giá — `glcntgdg.aspx`
+  - Bút toán chênh lệch tỷ giá — `glctcltg.aspx`
+  - Bảng bút toán phân bổ định kỳ — `rpt_btpbdk.aspx`
+  - In các bút toán tự động — `rpt_inbttd.aspx`
+- Bút toán hủy — `glctpkh.aspx`
+- In phiếu kế toán tổng hợp — `rpt_glctpk1.aspx`
+- Sổ sách nhật ký chung
+  - Sổ nhật ký chung — `rpt_glso2.aspx`
+  - Sổ nhật ký thu tiền — `rpt_glso3c.aspx`
+  - Sổ nhật ký chi tiền — `rpt_glso3d.aspx`
+  - Sổ nhật ký mua hàng — `rpt_glso3a.aspx`
+  - Sổ nhật ký bán hàng — `rpt_glso3b.aspx`
+  - Sổ cái của một tài khoản — `rpt_glso1a.aspx`
+  - Sổ chi tiết của một tài khoản — `rpt_glsocttk.aspx`
+  - Sổ tổng hợp chữ T của một tài khoản — `rpt_glth1.aspx`
+  - Sổ cái lên cho nhiều tài khoản — `rpt_glso1t.aspx`
+  - Sổ chi tiết lên cho nhiều tài khoản — `rpt_glsocttkt.aspx`
+  - Sổ tổng hợp chữ T lên cho nhiều tài khoản — `rpt_glth1t.aspx`
+- Sổ sách chứng từ ghi sổ
+  - Đăng ký số chứng từ ghi sổ — `glctgs.aspx`
+  - Sổ đăng ký chứng từ ghi sổ — `rpt_glsoso2.aspx`
+  - Bảng tổng hợp chứng từ/sổ chi tiết — `rpt_glgsso3.aspx`
+  - Chứng từ ghi sổ — `rpt_glgsso4.aspx`
+  - Sổ cái của một tài khoản — `rpt_glsoso5.aspx`
+  - Sổ cái lên cho nhiều tài khoản — `rpt_glgsso5.aspx`
+- Lọc tìm số liệu
+  - Bảng kê chứng từ — `rpt_glbk1.aspx`
+  - Bảng kê chứng từ theo khách hàng, vụ việc, tiểu khoản, tk đối ứng — `rpt_glbk2.aspx`
+  - Tổng hợp phát sinh theo khách hàng, vụ việc, tiểu khoản, tk đối ứng — `rpt_glbk3.aspx`
+  - Tổng hợp phát sinh theo tài khoản, tài khoản đối ứng — `rpt_glth9.aspx`
+  - Bảng cân đối số phát sinh các tiểu khoản của một tài khoản — `rpt_glcd2.aspx`
+  - Báo cáo số dư tài khoản — `rpt_glsd1.aspx`
+  - Truy vấn số liệu chứng từ — `qptTransactionList.aspx`
+- Báo cáo tài chính
+  - Bảng cân đối phát sinh các tài khoản — `rpt_glcd1d.aspx`
+  - Truy vấn số dư, phát sinh các tài khoản — `qptTrialBalance.aspx`
+  - Báo cáo tình hình tài chính — `rpt_gltc1.aspx`
+  - Báo cáo kết quả sản xuất kinh doanh — `rpt_gltc2.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp trực tiếp — `rpt_gltc5.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp gián tiếp — `rpt_gltc6.aspx`
+  - Thuyết minh tài chính — `rpt_gltctm.aspx`
+- Báo cáo quản trị
+  - Báo cáo tình hình tài chính cho nhiều kỳ — `rpt_gltc1t.aspx`
+  - Báo cáo kết quả hoạt động kinh doanh cho nhiều kỳ — `rpt_gltc2t.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp trực tiếp cho nhiều kỳ — `rpt_gltc5t.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp gián tiếp cho nhiều kỳ — `rpt_gltc6t.aspx`
+- Danh mục tài khoản — `gltk.aspx`
+- Thuế
+  - Bảng kê hóa đơn, chứng từ hàng hóa, dịch vụ mua vào — `rpt_glthue1.aspx`
+  - Bảng kê hóa đơn, chứng từ hàng hóa, dịch vụ mua vào được hoàn thuế — `rpt_glthue2.aspx`
+  - Bảng kê hóa đơn, chứng từ hàng hóa, dịch vụ bán ra — `rpt_glthue2a.aspx`
+  - Bảng tổng hợp hàng hóa, dịch vụ giảm thuế giá trị gia tăng — `rpt_thgtgtgt.aspx`
+  - Tờ khai thuế GTGT — `rpt_glthue3.aspx`
+  - Bảng kê hóa đơn, chứng từ hàng hóa, dịch vụ mua vào cho dự án đầu tư — `rpt_glthue1b.aspx`
+  - Tờ khai thuế GTGT dành cho dự án đầu tư — `rpt_glthue3_28da.aspx`
+  - Sổ theo dõi thuế GTGT được hoàn lại — `rpt_glso1b.aspx`
+  - Sổ theo dõi thuế GTGT được miễn giảm — `rpt_glso1c.aspx`
+  - Bảng kê thu mua hàng hóa, dịch vụ mua vào không có hóa đơn — `rpt_glthue2b.aspx`
+  - Tờ khai thuế thu nhập doanh nghiệp tạm tính — `rpt_rptax01.aspx`
+  - Tờ khai quyết toán thuế thu nhập doanh nghiệp — `rpt_glthueqttn.aspx`
+  - Phụ lục kết quả hoạt động kinh doanh — `rpt_glthuepl01.aspx`
+  - Báo cáo tình hình thực hiện nghĩa vụ với nhà nước — `rpt_thnvnn.aspx`
+  - Vào các hóa đơn GTGT đầu vào — `apctgt.aspx`
+  - Vào các hóa đơn GTGT đầu ra — `arctgt.aspx`
+- Quản trị phí
+  - Bảng kê chứng từ theo mã phí — `rpt_gldtbkb.aspx`
+  - Bảng kê chứng từ theo bộ phận — `rpt_gldtbkc.aspx`
+  - Báo cáo tổng hợp chi phí trong kỳ — `rpt_glbccp1ky.aspx`
+  - Báo cáo tổng hợp chi phí so sánh giữa hai kỳ — `rpt_glbcss2ky.aspx`
+  - Báo cáo tổng hợp chi phí cho nhiều kỳ — `rpt_glbcthcpKy.aspx`
+  - Báo cáo tổng hợp chi phí xoay theo cột — `v20glbccpth.aspx`
+  - Báo cáo tổng hợp chi phí trong kỳ theo đơn vị cơ sở — `rpt_glbccp1kydvcs.aspx`
+  - Báo cáo tổng hợp chi phí so sánh giữa hai kỳ theo đơn vị cơ sở — `rpt_glbcss2kydvcs.aspx`
+  - Danh mục phí — `cophi.aspx`
+  - Danh mục nhóm phí — `conhphi.aspx`
+- Khai báo
+  - Khai báo các bút toán phân bổ định kỳ — `glpbky.aspx`
+  - Khai báo các bút toán phân bổ tự động — `glpb.aspx`
+  - Khai báo các bút toán kết chuyển tự động — `glkc.aspx`
+  - Khai báo chi tiết bút toán kết chuyển — `glctdtkc.aspx`
+  - Khai báo các bút toán chênh lệch tỷ giá — `glcltg.aspx`
+  - Khai báo thông tin bộ phận, mã phí cho tài khoản — `gltkbpp.aspx`
+  - Khai báo diễn giải chứng từ tự động — `gldgct.aspx`
+  - Danh mục tỉnh/thành — `hrProvinceCity.aspx`
+  - Danh mục phường/xã — `hrdmpx.aspx`
+  - Danh mục thuế suất thuế GTGT — `arthue.aspx`
+  - Danh mục thuế suất thuế nhập khẩu — `pothuenk.aspx`
+  - Danh mục thuế suất thuế tiêu thụ đặc biệt — `pothuettdb.aspx`
+  - Danh mục tính chất thuế — `aptcthue.aspx`
+  - Khai báo ký hiệu mẫu số hóa đơn — `VoucherTemplate.aspx`
+  - Phân tích tổng hợp tình hình kinh doanh — `smbcform.aspx`
+  - Danh mục địa điểm kinh doanh — `dmddkd.aspx`
+  - Khai báo ngầm định địa điểm theo người sử dụng — `kbnddd.aspx`
+- Tạo mẫu báo cáo
+  - Báo cáo tình hình tài chính — `rpgltc1.aspx`
+  - Báo cáo kết quả hoạt động kinh doanh — `rpgltc2.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp trực tiếp — `rpgltc5.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp gián tiếp — `rpgltc6.aspx`
+  - Thuyết minh tài chính — `rpgltctm.aspx`
+  - Khai báo tham số mẫu báo cáo — `rpsnkqd.aspx`
+  - Tờ khai thuế GTGT — `rpglthue3_28.aspx`
+  - Tờ khai thuế GTGT dành cho dự án đầu tư — `rpglthue3_28da.aspx`
+  - Tờ khai thuế thu nhập doanh nghiệp tạm tính — `rptax01.aspx`
+  - Tờ khai quyết toán thuế thu nhập doanh nghiệp — `rpglthueqttn.aspx`
+  - Phụ lục kết quả hoạt động kinh doanh — `rpglthuepl01.aspx`
+  - Báo cáo tình hình thực hiện nghĩa vụ với nhà nước — `rpthnvnn.aspx`
+- Điều chỉnh số liệu báo cáo
+  - Tờ khai thuế giá trị gia tăng — `glthue3.aspx`
+  - Tờ khai thuế GTGT dành cho dự án đầu tư — `glthue3_28da.aspx`
+  - Tờ khai thuế bảo vệ môi trường — `dcsltktmt.aspx`
+  - Tờ khai thuế thu nhập doanh nghiệp tạm tính — `tax01.aspx`
+  - Tờ khai quyết toán thuế thu nhập doanh nghiệp — `glthueqttn.aspx`
+  - Phụ lục kết quả kinh doanh — `glthuepl01.aspx`
+  - Tờ khai quyết toán thuế TNCN hộ kinh doanh, cá nhân kinh doanh — `glthuetncnhkd.aspx`
+- Số dư đầu kỳ...
+  - Vào số dư đầu kỳ các tài khoản — `glsd0.aspx`
+  - Điều chỉnh số dư đầu kỳ các tài khoản — `gldcsd0.aspx`
+  - Bút toán điều chỉnh số dư đầu năm — `glctpk0.aspx`
+  - Chuyển số dư của các tài khoản sang năm sau — `glsdkc.aspx`
+
+## Tiền
+
+- Giấy báo có — `cactbc1.aspx`
+- Giấy báo nợ — `cactbn1.aspx`
+- Phiếu thu tiền mặt — `cactpt1.aspx`
+- Phiếu chi tiền mặt — `cactpc1.aspx`
+- Kết nối ngân hàng...
+  - Đăng nhập ngân hàng điện tử — `cadnnhdt.aspx`
+  - Chuyển giao dịch vào ngân hàng — `cacgdnh.aspx`
+  - Điều chỉnh giấy báo nợ — `cadcunc.aspx`
+  - Sao kê tài khoản ngân hàng — `casktk.aspx`
+  - Báo cáo tình trạng giao dịch ngân hàng — `rpt_cabcttgdnh.aspx`
+  - Báo cáo số dư tài khoản ngân hàng — `rpt_cabcsdtknh.aspx`
+  - Khai báo thông tin kết nối ngân hàng — `cakbttkn.aspx`
+  - Khai báo kết nối ngân hàng theo người sử dụng — `cadmtknhnsd.aspx`
+  - Khai báo thông tin tài khoản ngân hàng theo người sử dụng — `cakbtknhnsd.aspx`
+  - Khai báo mã ngân hàng (Citad) — `cadmcitadnh.aspx`
+  - Khai báo quyền thay đổi thông tin — `gntdtt.aspx`
+  - Khai báo người thay đổi thông tin — `gnnsdtdtt.aspx`
+- Tạo phiếu thu từ hóa đơn — `glpttd.aspx`
+- Tạo phiếu chi từ hóa đơn — `glpctd.aspx`
+- In nhiều chứng từ...
+  - Giấy báo có — `rpt_cactbc1.aspx`
+  - Giấy báo nợ — `rpt_cactbn1.aspx`
+  - Phiếu thu tiền mặt — `rpt_cactpt1.aspx`
+  - Phiếu chi tiền mặt — `rpt_cactpc1.aspx`
+- Tỷ giá ghi sổ — `gltinhtggs.aspx`
+- Tính tỷ giá theo phương pháp trung bình di động — `gltinhtggs2.aspx`
+- Sổ quỹ — `rpt_glso4.aspx`
+- Sổ quỹ theo từng ngày — `rpt_glso5.aspx`
+- Bảng cân đối phát sinh theo ngày của một tài khoản — `rpt_glcd3.aspx`
+- Sổ nhật ký thu tiền — `rpt_glso3c.aspx`
+- Sổ nhật ký chi tiền — `rpt_glso3d.aspx`
+- Sổ kế toán chi tiết quỹ tiền mặt — `rpt_glctqtm.aspx`
+- Sổ tiền gửi ngân hàng — `rpt_gltgnh.aspx`
+- Báo cáo số dư tại quỹ và ngân hàng — `rpt_glsd2.aspx`
+- Báo cáo tiền vay
+  - Bảng kê danh sách các khế ước — `rpt_glbkkuvay.aspx`
+  - Bảng kê chứng từ theo khế ước — `rpt_gldtbka.aspx`
+  - Bảng cân đối phát sinh theo khế ước — `rpt_gldtcd.aspx`
+  - Bảng kê tính lãi chi tiết theo khế ước — `rpt_khbktl.aspx`
+  - Báo cáo chi tiết tình hình tiền vay — `rpt_kubccttv.aspx`
+  - Báo cáo tổng hợp tình hình tiền vay — `rpt_kubcthtv.aspx`
+  - Sổ chi tiết tiền vay — `rpt_artv.aspx`
+- Báo cáo...
+  - Bảng tỷ giá ghi sổ trung bình tháng — `rpt_gltggs.aspx`
+  - Bảng kê chứng từ áp tỷ giá ghi sổ trung bình tháng — `rpt_glbktggs.aspx`
+  - Bảng chứng minh tỷ giá ghi sổ trung bình tháng — `rpt_glcmtggs.aspx`
+  - Bảng tỷ giá ghi sổ trung bình di động theo ngày — `rpt_gltggstn.aspx`
+  - Bảng kê chứng từ áp tỷ giá ghi sổ trung bình di động theo ngày — `rpt_glbktggstn.aspx`
+  - Bảng chứng minh tỷ giá ghi sổ trung bình di động theo ngày — `rpt_glcmtggstn.aspx`
+  - Bảng cân đối phát sinh các tài khoản — `rpt_glcd1d.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp trực tiếp — `rpt_gltc5.aspx`
+  - Báo cáo lưu chuyển tiền tệ theo phương pháp gián tiếp — `rpt_gltc6.aspx`
+- Danh mục khế ước — `coku.aspx`
+- Danh mục tài khoản ngân hàng — `catknh.aspx`
+- Danh mục...
+  - Danh mục ngân hàng — `canh.aspx`
+  - Danh mục phí ngân hàng — `cacpnh.aspx`
+  - Khai báo mẫu ủy nhiệm chi — `camauunc.aspx`
+- Số dư đầu kỳ...
+  - Vào số dư đầu kỳ khế ước — `cokusd0.aspx`
+  - Kết chuyển số dư khế ước sang năm sau — `gldtsdkc.aspx`
+
+## Bán hàng
+
+- Đơn hàng...
+  - Đơn hàng bán — `soctdxa.aspx`
+  - Bảng kê đơn hàng bán — `rpt_arbkdhb.aspx`
+  - Báo cáo so sánh kế hoạch và thực hiện đơn hàng bán — `rpt_arbcsskhvthdhb.aspx`
+  - Báo cáo tình trạng đơn hàng — `rpt_sobk7.aspx`
+  - Đóng đơn hàng — `soclose.aspx`
+- Hóa đơn bán hàng — `socthda.aspx`
+- Hóa đơn dịch vụ — `arcthd1.aspx`
+- Chứng từ phải thu khác, chứng từ bù trừ công nợ — `arcthd9.aspx`
+- Bút toán điều chỉnh giảm công nợ — `cactpt2.aspx`
+- Hóa đơn điều chỉnh, giảm giá...
+  - Hóa đơn điều chỉnh giá hàng bán — `arcthd4.aspx`
+  - Hóa đơn điều chỉnh giá dịch vụ — `arcthd6.aspx`
+  - Hóa đơn giảm giá hàng hóa - dịch vụ — `arcthd2.aspx`
+- Hàng bán trả lại...
+  - Phiếu nhập hàng bán trả lại — `socthdf.aspx`
+  - Hóa đơn dịch vụ trả lại — `arcthd3.aspx`
+- Hóa đơn điện tử...
+  - Phát hành hóa đơn điện tử — `cnhddt.aspx`
+  - Phát hành hóa đơn điện tử theo gói — `cnhddta.aspx`
+  - Chuyển đổi hóa đơn — `cdhddt.aspx`
+  - Hóa đơn điều chỉnh thông tin — `socthd5.aspx`
+  - Cập nhật hóa đơn thay thế — `cnhdtt.aspx`
+  - Hóa đơn thay thế khác — `socthd7.aspx`
+  - Bỏ ghi sổ, hạch toán của hóa đơn điện tử — `bgshddt.aspx`
+  - Xác nhận thanh toán hóa đơn — `tthddt.aspx`
+  - Báo cáo tình trạng hóa đơn — `bctthddt.aspx`
+  - Danh sách hóa đơn chưa đăng ký — `rpt_hddtcxt.aspx`
+  - Kiểm tra trạng thái hóa đơn — `bckttthddt.aspx`
+  - Kiểm tra trạng thái hóa đơn theo gói — `bckttthddta.aspx`
+  - Báo cáo hóa đơn điều chỉnh, thay thế — `rpt_bcdctthddt.aspx`
+  - Báo cáo hóa đơn hủy — `rpt_bchhddt.aspx`
+  - Khai báo phát hành hóa đơn — `dmnkhddt.aspx`
+  - Khai báo hình thức thanh toán — `dmhttthddt.aspx`
+  - Khai báo sử dụng hàng hóa đặc trưng — `smkbsdhhdt.aspx`
+  - Danh sách hóa đơn đã phát hành — `dshddt.aspx`
+  - Báo cáo đối chiếu sổ thuế và hóa đơn đầu ra — `rpt_dcstvhddr.aspx`
+  - Cập nhật mã khách hàng cho hóa đơn đã phát hành — `dskhhddt.aspx`
+  - Cập nhật mã hàng hóa, dịch vụ cho hóa đơn đã phát hành — `dsvthddt.aspx`
+  - Khai báo tài khoản kết nối — `tkhddt.aspx`
+  - Khai báo tài khoản kết nối theo đơn vị — `kbtkhddtdv.aspx`
+  - Khai báo tài khoản kết nối theo người sử dụng — `tkhddttnsd.aspx`
+  - Khai báo hình thức ký số theo kết nối — `kbkysohddt.aspx`
+  - Khai báo kiểu phát hành hóa đơn theo kết nối — `kieuphhddt.aspx`
+  - Khai báo sử dụng quyết định, thông tư mới theo đơn vị — `dmdvcstt.aspx`
+- Quản lý hóa đơn...
+  - Hóa đơn điều chỉnh thông tin — `socthd5.aspx`
+  - Hủy bỏ hóa đơn — `cnhhd.aspx`
+  - Cập nhật kết quả hủy hóa đơn — `cnkqhhd.aspx`
+  - Cập nhật mất, cháy, hỏng hóa đơn — `cnmchhd.aspx`
+  - Cập nhật lại tình trạng in hóa đơn — `cnlttihd.aspx`
+  - Báo cáo tình hình sử dụng hóa đơn — `rpt_thsdhd.aspx`
+  - Báo cáo kiểm tra số chứng từ — `rpt_ktsoct.aspx`
+  - Khai báo thông tin tổ chức theo đơn vị — `kbtttctdvcs.aspx`
+  - Vào số tồn hóa đơn đầu kỳ — `sthd.aspx`
+- Phân bổ thu tiền hàng cho các hóa đơn — `cactpt0.aspx`
+- Xử lý...
+  - Phân bổ thu tiền hàng tự động cho các hóa đơn — `arpbhd.aspx`
+  - Tạo chứng từ phân bổ... — `arpbhd2.aspx`
+  - Tất toán cho các hóa đơn — `artthd.aspx`
+  - Tạo chứng từ tất toán... — `arttnhd.aspx`
+  - Đánh giá chênh lệch tỷ giá cho các hóa đơn — `arctcltg.aspx`
+  - Tính lại tổng số tiền đã thu của các hóa đơn — `arttsd13.aspx`
+- In nhiều chứng từ...
+  - Hóa đơn bán hàng — `rpt_socthda.aspx`
+  - Hóa đơn dịch vụ — `rpt_arcthd1.aspx`
+- Báo cáo bán hàng
+  - Bảng kê hóa đơn bán hàng — `rpt_sobk1.aspx`
+  - Bảng kê hóa đơn bán hàng, dịch vụ — `rpt_sobk1t.aspx`
+  - Bảng kê hóa đơn của một mặt hàng — `rpt_sobk2.aspx`
+  - Bảng kê hóa đơn hàng bán bị trả lại — `rpt_sobk1f.aspx`
+  - Bảng kê hóa đơn nhóm theo khách hàng — `rpt_sobk3.aspx`
+  - Bảng kê hóa đơn nhóm theo vụ việc — `rpt_sobk5.aspx`
+  - Bảng kê hóa đơn nhóm theo dạng xuất bán — `rpt_sobk6.aspx`
+  - Bảng kê hóa đơn của một khách hàng theo mặt hàng — `rpt_sobk4.aspx`
+  - Báo cáo bán hàng chi tiết theo mặt hàng — `rpt_soth1a.aspx`
+  - Báo cáo bán hàng theo khách hàng, nhân viên, hợp đồng, vụ việc, nhập xuất — `rpt_soth2.aspx`
+  - Báo cáo tổng hợp tiêu thụ theo giá bán — `rpt_soth6.aspx`
+  - Báo cáo tổng hợp hàng bán thuần — `rpt_sothbh.aspx`
+  - Báo cáo tổng hợp hàng bán bị trả lại — `rpt_soth1f.aspx`
+  - Báo cáo bán hàng nhóm theo 2 chỉ tiêu — `rpt_soth3.aspx`
+  - Báo cáo lợi nhuận theo mặt hàng — `rpt_soth1b.aspx`
+  - Báo cáo lợi nhuận theo khách hàng — `rpt_sobclnkh.aspx`
+  - Phân tích bán hàng theo khách hàng — `rpt_sobcbhkh.aspx`
+  - Phân tích bán hàng theo mặt hàng — `rpt_sobcbhvt.aspx`
+  - Phân tích bán hàng theo thời gian — `rpt_soth4.aspx`
+  - Phân tích bán hàng nhiều kỳ — `rpt_soth5.aspx`
+  - Phân tích bán hàng nhiều kỳ theo 2 chỉ tiêu — `rpt_soth7.aspx`
+  - Truy vấn số liệu bán hàng — `qptSalesInvoiceList.aspx`
+- Báo cáo công nợ khách hàng
+  - Sổ chi tiết công nợ của một khách hàng — `rpt_arso1a.aspx`
+  - Bảng cân đối phát sinh công nợ của một tài khoản — `rpt_arcd1.aspx`
+  - Bảng cân đối phát sinh công nợ trên nhiều tài khoản — `rpt_arcd2.aspx`
+  - Báo cáo số dư công nợ — `rpt_arsd1.aspx`
+  - Sổ tổng hợp công nợ chữ T của một khách hàng — `rpt_glth2.aspx`
+  - Sổ đối chiếu công nợ của một khách hàng — `rpt_arsodccna.aspx`
+  - Bảng xác nhận công nợ của một khách hàng — `rpt_arbxncna.aspx`
+  - Sổ chi tiết công nợ lên cho nhiều khách hàng — `rpt_arso1t.aspx`
+  - Sổ đối chiếu công nợ lên cho nhiều khách hàng — `rpt_arsodccnt.aspx`
+  - Bảng xác nhận công nợ lên cho nhiều khách hàng — `rpt_arbxncnt.aspx`
+- Báo cáo công nợ hóa đơn
+  - Bảng kê công nợ phải thu theo hóa đơn — `rpt_arttbk1.aspx`
+  - Bảng kê chi tiết thu tiền của các hóa đơn — `rpt_arttbk2.aspx`
+  - Bảng kê chi tiết thu tiền của các hóa đơn có CLTG — `rpt_arttbk4.aspx`
+  - Bảng kê công nợ của các hóa đơn theo hạn thanh toán — `rpt_arttbk3.aspx`
+  - Báo cáo các hóa đơn sắp đến hạn thanh toán — `rpt_arttbk5.aspx`
+- Báo cáo hợp đồng
+  - Bảng kê chứng từ theo hợp đồng — `rpt_gldtbkd.aspx`
+  - Sổ chi tiết hợp đồng — `rpt_arso11.aspx`
+  - Bảng cân đối phát sinh theo hợp đồng — `rpt_gldtcdhd.aspx`
+  - Báo cáo số dư hợp đồng — `rpt_gldtsdhd.aspx`
+- Báo cáo...
+  - Bảng kê hóa đơn dịch vụ — `rpt_arbk1.aspx`
+  - Bảng kê hóa đơn dịch vụ bị trả lại — `rpt_arbk1f.aspx`
+  - Sổ chi tiết bán hàng — `rpt_arctbh.aspx`
+- Đồ thị phân tích bán hàng — `saleschart.aspx`
+- Danh mục khách hàng — `arkh.aspx`
+- Danh mục...
+  - Danh mục loại giá bán — `soloaigia2.aspx`
+  - Danh mục phân nhóm khách hàng — `arnhkh.aspx`
+  - Danh mục thanh toán — `artt.aspx`
+  - Danh mục hợp đồng — `cohd.aspx`
+  - Danh mục nhóm hợp đồng — `conhhd.aspx`
+  - Danh mục nhân viên bán hàng — `arnvbh.aspx`
+  - Danh mục địa chỉ giao hàng — `sodc.aspx`
+  - Danh mục hình thức vận chuyển — `sohtvc.aspx`
+  - Danh mục mẫu thư — `sodmmauthu.aspx`
+- Cập nhật giá bán — `sogia2.aspx`
+- Số dư đầu kỳ...
+  - Vào số dư công nợ đầu kỳ — `arsd0.aspx`
+  - Vào số dư đầu kỳ của các hóa đơn — `arcttt.aspx`
+  - Vào số dư đầu kỳ hợp đồng — `cohdsd0.aspx`
+  - Vào chứng từ thanh toán đầu kỳ cho các hóa đơn — `arvcttt.aspx`
+  - Điều chỉnh số dư công nợ đầu kỳ — `ardcsd0.aspx`
+  - Kết chuyển số dư hợp đồng sang năm sau — `arsdkc.aspx`
+
+## Mua hàng
+
+- Đơn hàng...
+  - Đơn hàng mua trong nước — `poctpo1.aspx`
+  - Đơn hàng nhập khẩu — `poctpo2.aspx`
+  - Bảng kê đơn hàng mua — `rpt_apbkdhm.aspx`
+  - Báo cáo so sánh kế hoạch và thực hiện đơn hàng mua — `rpt_apbcsskhvthdhm.aspx`
+  - Báo cáo tình trạng đơn hàng — `rpt_prbk2.aspx`
+  - Đóng đơn hàng — `poduyet4.aspx`
+- Hóa đơn mua hàng trong nước — `poctpna.aspx`
+- Hóa đơn mua hàng nhập khẩu — `poctpnb.aspx`
+- Hóa đơn mua hàng dịch vụ — `apctpn1.aspx`
+- Hóa đơn nhập mua - xuất thẳng — `poctpng.aspx`
+- Phiếu nhập chi phí mua hàng — `poctpnc.aspx`
+- Phiếu thanh toán tạm ứng — `apctpn2.aspx`
+- Chứng từ phải trả khác, chứng từ bù trừ công nợ — `apctpn9.aspx`
+- Bút toán điều chỉnh giảm công nợ — `cactpc2.aspx`
+- Phiếu nhập điều chỉnh giá hàng mua — `poctpne.aspx`
+- Phiếu xuất trả lại nhà cung cấp — `poctpxc.aspx`
+- Hóa đơn dịch vụ trả lại nhà cung cấp — `poctpxd.aspx`
+- Phân bổ tiền hàng trả cho các hóa đơn — `cactpc0.aspx`
+- Xử lý...
+  - Phân bổ trả tiền hàng tự động cho các hóa đơn — `appbhd.aspx`
+  - Tạo chứng từ phân bổ... — `appbhd2.aspx`
+  - Tất toán cho các hóa đơn — `aptthd.aspx`
+  - Tạo chứng từ tất toán... — `apttnhd.aspx`
+  - Đánh giá chênh lệch tỷ giá cho các hóa đơn — `apctcltg.aspx`
+  - Tính lại tổng số tiền đã trả cho các hóa đơn — `apttsd13.aspx`
+- Hóa đơn đầu vào
+  - Danh sách hóa đơn đầu vào — `qlhddv.aspx`
+  - Khai báo nhóm cho thuế suất thuế GTGT — `kbnhomthue.aspx`
+  - Khai báo thông tin thư điện tử nhận hóa đơn — `kbtttdtnhd.aspx`
+  - Khai báo chứng từ cho hóa đơn đầu vào — `kbctchddv.aspx`
+  - Danh sách hóa đơn xử lý lỗi — `dshdl.aspx`
+  - Cập nhật mã nhà cung cấp cho hóa đơn đầu vào — `dsnccdv.aspx`
+  - Cập nhật mã hàng hóa, dịch vụ cho hóa đơn đầu vào — `dsvtdv.aspx`
+  - Cập nhật thông tin mã hàng theo nhà cung cấp — `cnttmhncc.aspx`
+  - Báo cáo đối chiếu hóa đơn đầu vào và sổ thuế — `rpt_dchddvvst.aspx`
+  - Báo cáo đối chiếu sổ thuế và hóa đơn đầu vào — `rpt_dcstvhddv.aspx`
+  - Danh sách doanh nghiệp rủi ro thuế — `dsdnrr.aspx`
+  - Danh sách hóa đơn đầu vào thuộc các doanh nghiệp rủi ro thuế — `dshddvtcdnrrt.aspx`
+  - Khai báo tham số ngầm định theo người sử dụng — `kbtsnd.aspx`
+- In nhiều chứng từ...
+  - Hóa đơn mua hàng trong nước — `rpt_poctpna.aspx`
+  - Hóa đơn mua hàng nhập khẩu — `rpt_poctpnb.aspx`
+  - Hóa đơn mua hàng dịch vụ — `rpt_apctpn1.aspx`
+  - Hóa đơn nhập mua - xuất thẳng — `rpt_poctpng.aspx`
+  - Phiếu nhập chi phí mua hàng — `rpt_poctpnc.aspx`
+- Báo cáo mua hàng
+  - Bảng kê hóa đơn mua hàng — `rpt_pobkmh.aspx`
+  - Bảng kê hóa đơn mua hàng, dịch vụ — `rpt_pobk1t.aspx`
+  - Bảng kê phiếu nhập của một vật tư — `rpt_pobk2.aspx`
+  - Bảng kê phiếu xuất trả lại nhà cung cấp — `rpt_pobk1f.aspx`
+  - Bảng kê phiếu nhập nhóm theo nhà cung cấp — `rpt_pobk3.aspx`
+  - Bảng kê phiếu nhập nhóm theo mặt hàng — `rpt_pobk4.aspx`
+  - Bảng kê phiếu nhập nhóm theo vụ việc — `rpt_pobk5.aspx`
+  - Bảng kê phiếu nhập nhóm theo dạng nhập — `rpt_pobk6.aspx`
+  - Bảng kê phiếu nhập nhóm theo tài khoản đối ứng — `rpt_pobk7.aspx`
+  - Báo cáo giá trị hàng nhập theo ncc, hợp đồng, vụ việc, mã nhập xuất — `rpt_poth2b.aspx`
+  - Tổng hợp hàng nhập mua — `rpt_poth1.aspx`
+  - Tổng hợp hàng xuất trả lại nhà cung cấp — `rpt_poth1f.aspx`
+  - Bảng kê chi phí mua hàng — `rpt_pobkcpmh.aspx`
+  - Tổng hợp chi phí mua hàng — `rpt_pothcpmh.aspx`
+  - Bảng kê phiếu nhập chưa có hóa đơn — `rpt_pobkpncchd.aspx`
+  - Báo cáo hàng nhập nhóm theo 2 chỉ tiêu — `rpt_poth3.aspx`
+  - Phân tích mua hàng theo nhà cung cấp — `rpt_pobcmhkh.aspx`
+  - Phân tích mua hàng theo mặt hàng — `rpt_pobcmhvt.aspx`
+  - Phân tích mua hàng theo thời gian — `rpt_poth4.aspx`
+  - Phân tích mua hàng nhiều kỳ — `rpt_poth5.aspx`
+  - Phân tích mua hàng nhiều kỳ theo 2 chỉ tiêu — `rpt_poth7.aspx`
+  - Phân tích số liệu mua hàng — `QueryPurchasingInformation.aspx`
+- Báo cáo công nợ nhà cung cấp
+  - Sổ chi tiết công nợ của một nhà cung cấp — `rpt_arso1b.aspx`
+  - Bảng cân đối phát sinh công nợ của một tài khoản — `rpt_apcd1.aspx`
+  - Bảng cân đối phát sinh công nợ trên nhiều tài khoản — `rpt_arcd2.aspx`
+  - Báo cáo số dư công nợ — `rpt_apsd1.aspx`
+  - Sổ tổng hợp công nợ chữ T của một nhà cung cấp — `rpt_glth3.aspx`
+  - Sổ đối chiếu công nợ của một nhà cung cấp — `rpt_arsodccnb.aspx`
+  - Bảng xác nhận công nợ của một nhà cung cấp — `rpt_arbxncnb.aspx`
+  - Sổ chi tiết công nợ lên cho nhiều nhà cung cấp — `rpt_apso1t.aspx`
+  - Sổ đối chiếu công nợ lên cho nhiều nhà cung cấp — `rpt_apsodccnt.aspx`
+  - Bảng xác nhận công nợ lên cho nhiều nhà cung cấp — `rpt_apbxncnt.aspx`
+- Báo cáo công nợ hóa đơn
+  - Bảng kê công nợ phải trả theo hóa đơn — `rpt_apttbk1.aspx`
+  - Bảng kê chi tiết trả tiền cho các hóa đơn — `rpt_apttbk2.aspx`
+  - Bảng kê chi tiết trả tiền của các hóa đơn có CLTG — `rpt_apttbk4.aspx`
+  - Bảng kê công nợ của các hóa đơn theo hạn thanh toán — `rpt_apttbk3.aspx`
+  - Báo cáo các hóa đơn sắp đến hạn thanh toán — `rpt_apttbk5.aspx`
+- Báo cáo hợp đồng
+  - Bảng kê chứng từ theo hợp đồng — `rpt_gldtbkd.aspx`
+  - Sổ chi tiết hợp đồng — `rpt_arso11.aspx`
+  - Bảng cân đối phát sinh theo hợp đồng — `rpt_gldtcdhd.aspx`
+  - Báo cáo số dư hợp đồng — `rpt_gldtsdhd.aspx`
+- Báo cáo...
+  - Bảng kê hóa đơn dịch vụ — `rpt_apbkmh.aspx`
+  - Bảng kê hóa đơn dịch vụ trả lại nhà cung cấp — `rpt_apbk1f.aspx`
+- Đồ thị phân tích mua hàng — `purchasingchart.aspx`
+- Danh mục nhà cung cấp — `arkh.aspx`
+- Danh mục...
+  - Danh mục phân nhóm nhà cung cấp — `arnhkh.aspx`
+  - Danh mục thanh toán — `artt.aspx`
+  - Danh mục hợp đồng — `cohd.aspx`
+  - Danh mục nhóm hợp đồng — `conhhd.aspx`
+  - Danh mục chi phí — `pocp.aspx`
+  - Danh mục nhân viên mua hàng — `ponvmh.aspx`
+  - Danh mục địa chỉ nhận hàng — `sodckh.aspx`
+  - Danh mục hình thức vận chuyển — `sohtvc.aspx`
+- Số dư đầu kỳ...
+  - Vào số dư công nợ đầu kỳ — `arsd0.aspx`
+  - Vào số dư đầu kỳ của các hóa đơn — `apcttt.aspx`
+  - Vào số dư đầu kỳ hợp đồng — `cohdsd0.aspx`
+  - Vào chứng từ thanh toán đầu kỳ cho các hóa đơn — `apvcttt.aspx`
+  - Điều chỉnh số dư công nợ đầu kỳ — `ardcsd0.aspx`
+  - Kết chuyển số dư hợp đồng sang năm sau — `arsdkc.aspx`
+
+## Tồn kho
+
+- Phiếu nhập kho — `inctpnd.aspx`
+- Phiếu xuất kho — `inctpxa.aspx`
+- Phiếu xuất điều chuyển — `inctpxb.aspx`
+- Phiếu nhập điều chuyển — `inctpnf.aspx`
+- Hóa đơn điện tử...
+  - Phát hành phiếu xuất — `cnpxk.aspx`
+  - Chuyển đổi phiếu xuất — `cdpxhddt.aspx`
+  - Phiếu xuất điều chỉnh thông tin — `inctpx5.aspx`
+  - Cập nhật phiếu xuất thay thế — `cnpxtt.aspx`
+  - Báo cáo tình trạng xác thực chứng từ — `bctthddtk.aspx`
+  - Kiểm tra tình trạng phát hành — `bckttthddtk.aspx`
+  - Báo cáo phiếu xuất điều chỉnh, thay thế — `rpt_bcdcttpxdt.aspx`
+  - Báo cáo phiếu xuất hủy — `rpt_bchhddt2.aspx`
+- Xuất kho tự động
+  - Tạo phiếu xuất kho tự động — `inpxnvltd.aspx`
+  - Khai báo vật tư xuất kho tự động — `dmvtxktd.aspx`
+  - Khai báo thông tin xuất kho tự động — `dmxknvltd.aspx`
+- In nhiều chứng từ...
+  - Phiếu nhập kho — `rpt_inctpnd.aspx`
+  - Phiếu xuất kho — `rpt_inctpxa.aspx`
+  - Phiếu xuất điều chuyển — `rpt_inctpxb.aspx`
+  - Phiếu nhập điều chuyển — `rpt_inctpnf.aspx`
+- Tính giá trung bình — `ingiatb.aspx`
+- Tính giá trung bình di động theo ngày — `ingiatbtn.aspx`
+- Tính giá nhập trước xuất trước — `ingiantxt.aspx`
+- Tính lại tồn kho tức thời — `insd13.aspx`
+- Báo cáo hàng nhập
+  - Bảng kê phiếu nhập — `rpt_pobk1.aspx`
+  - Báo cáo giá trị hàng nhập theo nhà cung cấp — `rpt_poth2.aspx`
+  - Báo cáo hàng nhập nhóm theo 2 chỉ tiêu — `rpt_inth3a.aspx`
+  - Tổng hợp hàng nhập kho — `rpt_inth1a.aspx`
+- Báo cáo hàng xuất
+  - Bảng kê phiếu xuất — `rpt_inbk1.aspx`
+  - Báo cáo giá trị hàng xuất theo khách hàng — `rpt_inth2.aspx`
+  - Báo cáo hàng xuất nhóm theo 2 chỉ tiêu — `rpt_inth3b.aspx`
+  - Báo cáo tình hình xuất nhập điều chuyển kho — `rpt_whpxndc.aspx`
+  - Tổng hợp hàng xuất kho — `rpt_inth1b.aspx`
+- Báo cáo hàng tồn
+  - Thẻ kho/Sổ chi tiết vật tư — `rpt_inso1.aspx`
+  - Thẻ kho/Sổ chi tiết lên cho nhiều vật tư — `rpt_inso1t.aspx`
+  - Sổ chi tiết vật tư — `rpt_inso1c.aspx`
+  - Bảng tổng hợp chi tiết vật tư — `rpt_incdctvt.aspx`
+  - Báo cáo tồn kho — `rpt_insd2.aspx`
+  - Báo cáo tồn theo kho — `rpt_insd.aspx`
+  - Tổng hợp nhập xuất tồn — `rpt_incd1.aspx`
+  - Tổng hợp nhập xuất tồn theo kho — `rpt_incd2.aspx`
+  - Báo động tồn kho vật tư — `rpt_insda.aspx`
+  - Báo cáo tồn kho theo định mức — `rpt_inbctktdm.aspx`
+  - Bảng giá trung bình tháng — `rpt_ingiatbt.aspx`
+  - Báo cáo tồn kho theo phiếu nhập — `rpt_insd4.aspx`
+  - Báo cáo vật tư NTXT xuất âm kho — `rpt_ntxtamkho.aspx`
+- Phân tích số liệu tồn kho — `QueryInventoryInformation.aspx`
+- Kiểm kê...
+  - Phiếu yêu cầu kiểm kê — `kkyc.aspx`
+  - Tạo số liệu kiểm kê — `kkss.aspx`
+  - Lấy số liệu kiểm kê — `kklsl.aspx`
+  - Kiểm tra đối chiếu số liệu — `rpt_kkktdcsl.aspx`
+  - Điều chỉnh số liệu — `kkdcsl.aspx`
+  - Tạo phiếu chênh lệch kiểm kê tự động — `inctcltd.aspx`
+  - Khai báo thông tin nhập xuất chênh lệch kiểm kê tự động — `dmclkktd.aspx`
+  - Danh sách vật tư chưa kiểm kê — `rpt_dsvtckk.aspx`
+  - Báo cáo tình hình kiểm kê — `rpt_bcthkk.aspx`
+  - Báo cáo kết quả kiểm kê — `rpt_bckqkk.aspx`
+  - Khóa số liệu kiểm kê — `kkksl.aspx`
+- Danh mục hàng hóa, vật tư — `invt.aspx`
+- Danh mục...
+  - Danh mục loại vật tư — `inloaivt.aspx`
+  - Danh mục phân nhóm hàng hóa, vật tư — `innhvt.aspx`
+  - Danh mục đơn vị tính — `indvt.aspx`
+  - Danh mục kho hàng — `inkho.aspx`
+  - Danh mục nhóm kho hàng — `innhkho.aspx`
+  - Danh mục nhập xuất/lý do — `ponx.aspx`
+  - Danh mục mã giao dịch — `inmagd.aspx`
+- Khai báo...
+  - Khai báo về kho để tính giá NTXT — `inkhontxt.aspx`
+  - Khai báo về chứng từ để tính giá NTXT — `smctntxt.aspx`
+- Số dư đầu kỳ...
+  - Vào tồn kho đầu kỳ — `inlosd0.aspx`
+  - Vào chi tiết tồn kho nhập trước xuất trước — `inntxt.aspx`
+  - Điều chỉnh số dư tồn kho đầu năm — `inctpv0.aspx`
+  - Chuyển tồn kho sang năm sau — `insdkc.aspx`
+
+## Dự án
+
+- Danh mục công trình, vụ việc — `covv.aspx`
+- Danh mục phân nhóm công trình, vụ việc — `conhvv.aspx`
+- Bảng kê chứng từ theo công trình, vụ việc — `rpt_covvbk2.aspx`
+- Bảng cân đối phát sinh của các công trình, vụ việc — `rpt_covvcd1.aspx`
+- Bảng cân đối phát sinh của các công trình, vụ việc lên cho nhiều tài khoản — `rpt_covvcd1ntk.aspx`
+- Sổ chi tiết công trình, vụ việc — `rpt_coso1.aspx`
+- Báo cáo số dư công trình, vụ việc — `rpt_cosd1.aspx`
+- Báo cáo...
+  - Bảng kê chứng từ NVL theo công trình, vụ việc — `rpt_covvbk1.aspx`
+  - Bảng kê chi phí NVL theo công trình, vụ việc — `rpt_covvbkcp1.aspx`
+  - Tổng hợp số phát sinh theo công trình, vụ việc — `rpt_covvth2.aspx`
+  - Tổng hợp số phát sinh NVL theo công trình, vụ việc — `rpt_covvth1.aspx`
+  - Tổng hợp chi phí NVL theo công trình, vụ việc — `rpt_covvthcp1.aspx`
+- Vào số dư đầu kỳ các công trình, vụ việc — `covvsd0.aspx`
+- Kết chuyển số dư của các công trình, vụ việc sang năm sau — `cosdkc.aspx`
+
+## Tài sản
+
+- Tài sản cố định — `factts1.aspx`
+- Danh mục...
+  - Danh mục loại TSCĐ — `faloaits.aspx`
+  - Danh mục phân loại TSCĐ — `dmplts.aspx`
+  - Danh mục nguồn vốn — `fanv.aspx`
+  - Danh mục nhóm TSCĐ — `fanhts.aspx`
+  - Danh mục lý do tăng giảm TSCĐ — `fatgts.aspx`
+  - Danh mục bộ phận sử dụng TSCĐ — `fabpts.aspx`
+  - Khai báo thông tin ngầm định tạo TSCĐ — `kbttndts.aspx`
+- Cập nhật sản lượng thực hiện của TSCĐ — `faqty.aspx`
+- Điều chỉnh giá trị TSCĐ — `fatgng.aspx`
+- Điều chuyển bộ phận sử dụng TSCĐ — `fadcbp.aspx`
+- Tính khấu hao tài sản cố định — `fatinhkh.aspx`
+- Điều chỉnh khấu hao tháng — `fasuakh.aspx`
+- Xóa khấu hao tài sản cố định — `faxoakh.aspx`
+- Bút toán phân bổ khấu hao TSCĐ — `fabtpb.aspx`
+- Báo cáo kiểm kê TSCĐ
+  - Danh mục TSCĐ — `rpt_fatsin.aspx`
+  - Báo cáo chi tiết TSCĐ — `rpt_fabcctts.aspx`
+  - Báo cáo chi tiết TSCĐ theo nguồn vốn — `rpt_fabctsnv.aspx`
+  - Báo cáo tổng hợp TSCĐ — `rpt_fathts.aspx`
+  - Bảng kê TSCĐ hết khấu hao còn sử dụng — `rpt_fabkhkh.aspx`
+  - Bảng kê TSCĐ chuyển bộ phận sử dụng — `rpt_fabkdcbp.aspx`
+  - Thẻ TSCĐ — `rpt_fathets.aspx`
+  - Thẻ TSCĐ lên cho nhiều tài sản — `rpt_fathetss.aspx`
+  - Sổ TSCĐ — `rpt_fasots.aspx`
+  - Biên bản giao nhận TSCĐ — `rpt_fabbgnts.aspx`
+  - Biên bản bàn giao TSCĐ sửa chữa lớn hoàn thành — `rpt_fabbg.aspx`
+  - Biên bản đánh giá lại TSCĐ — `rpt_fabbdglts.aspx`
+  - Biên bản thanh lý TSCĐ — `rpt_fabbtlts.aspx`
+- Báo cáo tăng giảm TSCĐ
+  - Báo cáo chi tiết tăng/giảm TSCĐ — `rpt_fabccttg.aspx`
+  - Báo cáo chi tiết tăng TSCĐ theo nguồn vốn — `rpt_fabctangctnv.aspx`
+  - Báo cáo chi tiết tình hình tăng giảm TSCĐ — `rpt_fabctg.aspx`
+  - Báo cáo tổng hợp tình hình tăng giảm TSCĐ — `rpt_faththtgts.aspx`
+- Báo cáo khấu hao TSCĐ
+  - Bảng tính khấu hao TSCĐ — `rpt_fabckh.aspx`
+  - Bảng tính khấu hao TSCĐ theo nguồn vốn — `rpt_fabckhnv.aspx`
+  - Bảng chi tiết phân bổ khấu hao TSCĐ — `rpt_fapbtsd.aspx`
+  - Bảng phân bổ khấu hao TSCĐ — `rpt_fapbts.aspx`
+  - Bảng phân bổ khấu hao TSCĐ theo bộ phận — `rpt_fapbtsbp.aspx`
+  - Bảng tổng hợp trích khấu hao TSCĐ — `rpt_fabcthkh.aspx`
+  - Bảng tính khấu hao TSCĐ nhiều kỳ — `rpt_fabckhnk.aspx`
+  - Bảng tính khấu hao TSCĐ vượt mức — `rpt_fabckhvm.aspx`
+- Khai báo giảm TSCĐ — `fagiamts.aspx`
+- Khai báo tạm dừng khấu hao TSCĐ — `fatdkh.aspx`
+- Khai báo thôi khấu hao TSCĐ — `fathoikh.aspx`
+- Khai báo hệ số phân bổ khấu hao TSCĐ — `fahspb.aspx`
+
+## Công cụ
+
+- Công cụ dụng cụ — `fxctcc1.aspx`
+- Danh mục...
+  - Danh mục loại CCDC — `tsloaicc.aspx`
+  - Danh mục phân loại CCDC — `tsploaicc.aspx`
+  - Danh mục nhóm CCDC — `tsnhcc.aspx`
+  - Danh mục lý do tăng giảm CCDC — `tstgcc.aspx`
+  - Danh mục bộ phận sử dụng CCDC — `tsbpcc.aspx`
+  - Khai báo thông tin ngầm định tạo CCDC — `tskbttnd.aspx`
+- Cập nhật giá trị cho CCDC tạo từ chứng từ hạch toán — `tscngt.aspx`
+- Điều chỉnh giá trị CCDC — `fxtgng.aspx`
+- Điều chuyển bộ phận sử dụng CCDC — `tsdcbp.aspx`
+- Tính chi phí phân bổ công cụ dụng cụ — `fxtinhpb.aspx`
+- Điều chỉnh phân bổ tháng CCDC — `tssuapb.aspx`
+- Xóa phân bổ công cụ dụng cụ — `fxxoapb.aspx`
+- Bút toán phân bổ CCDC — `fxbtpb.aspx`
+- Báo cáo kiểm kê CCDC
+  - Danh mục CCDC — `rpt_tsccin.aspx`
+  - Báo cáo chi tiết CCDC — `rpt_tsbcctcc.aspx`
+  - Bảng kê CCDC hết phân bổ còn sử dụng — `rpt_tsbkhpb.aspx`
+  - Bảng kê CCDC chuyển bộ phận sử dụng — `rpt_tsbkdcbp.aspx`
+  - Thẻ CCDC — `rpt_tsthecc.aspx`
+  - Thẻ CCDC lên cho nhiều công cụ — `rpt_tstheccs.aspx`
+  - Sổ CCDC — `rpt_tssocc.aspx`
+  - Biên bản giao nhận CCDC — `rpt_tsbbgncc.aspx`
+  - Biên bản thanh lý CCDC — `rpt_tsbbtlcc.aspx`
+- Báo cáo tăng giảm CCDC
+  - Báo cáo chi tiết tăng/giảm CCDC — `rpt_tsbccttg.aspx`
+  - Báo cáo chi tiết tình hình tăng giảm CCDC — `rpt_tsbctg.aspx`
+- Báo cáo phân bổ CCDC
+  - Bảng tính chi phí phân bổ CCDC — `rpt_tsbcpb.aspx`
+  - Bảng chi tiết phân bổ chi phí CCDC — `rpt_tspbccd.aspx`
+  - Bảng phân bổ chi phí CCDC — `rpt_tspbcc.aspx`
+  - Bảng phân bổ chi phí CCDC theo bộ phận — `rpt_tspbccbp.aspx`
+  - Bảng tính chi phí phân bổ CCDC nhiều kỳ — `rpt_tsbcpbnk.aspx`
+- Khai báo giảm CCDC — `tsgiamcc.aspx`
+- Khai báo thôi phân bổ — `tsthoipb.aspx`
+- Khai báo hỏng CCDC — `fxhongcc.aspx`
+- Khai báo hệ số phân bổ CCDC — `tshspb.aspx`
+
+## Trợ giúp
+
+- Hướng dẫn sử dụng chương trình — `help.aspx`
+- Phim (Video) hướng dẫn sử dụng — `videohelp.aspx`
+- Cộng đồng hỗ trợ qua mạng xã hội Facebook — `https://www.facebook.com/groups/fastaccountingonline`
+- Thông tin sản phẩm — `about.aspx`
