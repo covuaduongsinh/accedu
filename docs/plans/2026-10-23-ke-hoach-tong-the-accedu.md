@@ -1,5 +1,7 @@
 # Kế hoạch AccEdu: phần mềm kế toán đám mây cho web, desktop và mobile, mô phỏng Fast Accounting Online
 
+> **Tiến độ:** P0–P2 đã xong (xem [2026-10-23-tien-do-p0-p2.md](2026-10-23-tien-do-p0-p2.md)).
+
 ## 1. Bối cảnh
 
 Hiện Dương Sinh đang dùng **Fast Accounting Online (FAO)** tại `https://e6.faonline.vn/DUONGSINH`. Đây là phần mềm kế toán đám mây của công ty FAST, gồm phân hệ Hệ thống và 9 phân hệ nghiệp vụ: Tổng hợp, Tiền, Bán hàng, Mua hàng, Tồn kho, Tài sản cố định (TSCĐ), Công cụ dụng cụ (CCDC), Giá thành, Thuế/Báo cáo tài chính (BCTC).
