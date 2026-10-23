@@ -1,6 +1,7 @@
 import type { VoucherInput } from "@accedu/core";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 import type { AccEduClient } from "./client";
 import { api, qk } from "./queries";
 
@@ -14,6 +15,18 @@ export function useDb(): AccEduClient {
   const db = useContext(ClientContext);
   if (!db) throw new Error("Thiếu AccEduProvider");
   return db;
+}
+
+/** Phiên đăng nhập hiện tại; undefined = đang kiểm tra (dùng cho mobile và các vỏ khác). */
+export function useSession(): Session | null | undefined {
+  const db = useDb();
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  useEffect(() => {
+    void db.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = db.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => data.subscription.unsubscribe();
+  }, [db]);
+  return session;
 }
 
 export function useTenants() {

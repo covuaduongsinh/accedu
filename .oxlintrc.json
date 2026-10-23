@@ -29,7 +29,8 @@
       {
         "allow": [
           "**/*.css",
-          "@fontsource/**"
+          "@fontsource/**",
+          "react-native-url-polyfill/**"
         ]
       }
     ],
@@ -37,6 +38,14 @@
       "warn",
       {
         "allowAsProps": true
+      }
+    ],
+    "react/style-prop-object": [
+      "warn",
+      {
+        "allow": [
+          "StatusBar"
+        ]
       }
     ]
   },
@@ -47,6 +56,8 @@
     "**/src-tauri/target/**",
     "research-raw/**",
     "**/routeTree.gen.ts",
-    "**/database.types.ts"
+    "**/database.types.ts",
+    "**/dist-android/**",
+    "**/target/**"
   ]
 }

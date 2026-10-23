@@ -40,3 +40,5 @@ Thumbs.db
 .pgdata/
 apps/web/test-results/
 apps/web/playwright-report/
+apps/mobile/dist-android/
+apps/mobile/.env.local

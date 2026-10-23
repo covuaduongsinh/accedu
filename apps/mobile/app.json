@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "AccEdu",
+    "slug": "accedu",
+    "scheme": "accedu",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "primaryColor": "#2B3990",
+    "splash": { "backgroundColor": "#2B3990", "image": "./assets/icon.png", "resizeMode": "contain" },
+    "ios": { "bundleIdentifier": "vn.duongsinh.accedu", "supportsTablet": true },
+    "android": {
+      "package": "vn.duongsinh.accedu",
+      "adaptiveIcon": { "foregroundImage": "./assets/icon.png", "backgroundColor": "#2B3990" }
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true },
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    }
+  }
+}
