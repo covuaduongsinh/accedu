@@ -88,6 +88,6 @@ describe("realtime NOTIFY", () => {
     const v = events.filter((e) => e.table === "vouchers");
     expect(v.length).toBeGreaterThan(0);
     expect(v[0]?.tenant).toBe(tenant);
-    expect(Object.keys(v[0] ?? {}).sort()).toEqual(["id", "op", "table", "tenant"]);
+    expect(Object.keys(v[0] ?? {}).toSorted()).toEqual(["id", "op", "table", "tenant"]);
   });
 });

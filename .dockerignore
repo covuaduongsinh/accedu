@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.turbo
+.git
+.pgdata
+research-raw
+apps/web
+apps/mobile
+apps/desktop
+packages
+docs
+tools

@@ -119,6 +119,21 @@ begin
                             'user_created', v_user_created, 'tenant_created', v_tenant_created);
 end $$;
 
+-- Realtime kiểm tra quyền theo dõi đơn vị (accedu_server không bỏ qua RLS — dùng hàm có phạm vi hẹp)
+create or replace function platform.is_member(p_tenant uuid, p_user uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.memberships where tenant_id = p_tenant and user_id = p_user)
+$$;
+
+-- Cập nhật họ tên hiển thị khi người dùng sửa hồ sơ qua /auth/v1/user
+create or replace function platform.set_full_name(p_user uuid, p_full_name text)
+returns void language sql security definer set search_path = '' as $$
+  insert into public.profiles (user_id, full_name) values (p_user, nullif(trim(p_full_name), ''))
+  on conflict (user_id) do update set full_name = excluded.full_name, updated_at = now()
+$$;
+
+revoke execute on function platform.is_member(uuid, uuid) from public;
+revoke execute on function platform.set_full_name(uuid, text) from public;
 revoke execute on function platform.create_user(uuid, uuid, text, text, text, text) from public;
 revoke execute on function platform.bootstrap_owner(text, text, text, text, text, text, date) from public;
 
@@ -128,6 +143,7 @@ begin
     grant usage on schema platform to accedu_server;
     grant execute on function platform.create_user(uuid, uuid, text, text, text, text) to accedu_server;
     grant execute on function platform.bootstrap_owner(text, text, text, text, text, text, date) to accedu_server;
-    grant select on public.memberships to accedu_server;
+    grant execute on function platform.is_member(uuid, uuid) to accedu_server;
+    grant execute on function platform.set_full_name(uuid, text) to accedu_server;
   end if;
 end $$;

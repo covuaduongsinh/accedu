@@ -1,0 +1,66 @@
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# API_DOMAIN: tên miền thật (HTTPS tự động) hoặc ":8000" khi chạy local/CI (HTTP)
+{$API_DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 10MB
+	}
+
+	# CORS cho web (Vercel), desktop (Tauri) và dev local
+	@cors header_regexp Origin {$CORS_ORIGIN_REGEX}
+	header @cors {
+		defer
+		Access-Control-Allow-Origin "{http.request.header.Origin}"
+		Access-Control-Allow-Headers "authorization, apikey, content-type, x-client-info, prefer, accept-profile, content-profile, range, range-unit, x-accedu-platform, x-supabase-api-version"
+		Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		Access-Control-Expose-Headers "content-range, content-location, x-total-count"
+		Access-Control-Max-Age "86400"
+		Vary "Origin"
+	}
+	@preflight {
+		method OPTIONS
+		header_regexp Origin {$CORS_ORIGIN_REGEX}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Khóa anon công khai không phải JWT: bỏ đi để PostgREST chạy role anon
+	@anon header Authorization "Bearer {$ANON_KEY}"
+	request_header @anon -Authorization
+
+	# Preflight trả lời tại Caddy (handle đầu tiên — các handle loại trừ nhau theo thứ tự)
+	handle @preflight {
+		respond 204
+	}
+	handle_path /rest/v1/* {
+		reverse_proxy {$REST_UPSTREAM:rest:3000} {
+			# CORS chỉ do Caddy quyết định theo danh sách Origin
+			header_down -Access-Control-*
+		}
+	}
+	handle /auth/v1/* {
+		reverse_proxy {$SERVER_UPSTREAM:server:8080}
+	}
+	handle /platform/v1/* {
+		reverse_proxy {$SERVER_UPSTREAM:server:8080}
+	}
+	handle /realtime/v1/* {
+		reverse_proxy {$SERVER_UPSTREAM:server:8080}
+	}
+	handle /healthz {
+		reverse_proxy {$SERVER_UPSTREAM:server:8080}
+	}
+	handle {
+		respond "AccEdu Platform" 200
+	}
+}

@@ -1,0 +1,15 @@
+# Chạy local/dev: server AccEdu chạy trực tiếp trên máy (pnpm --filter @accedu/server dev),
+# CSDL + PostgREST + Caddy chạy trong Docker. Dùng:
+#   docker compose --env-file .env -f docker-compose.yml -f compose.dev.yml up -d db rest caddy
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
+  rest:
+    depends_on: !reset []
+  caddy:
+    environment:
+      SERVER_UPSTREAM: host.docker.internal:${SERVER_PORT:-8080}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: !reset [rest]
