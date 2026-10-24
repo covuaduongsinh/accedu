@@ -58,7 +58,8 @@ jobs:
     environment: SUPABASE_URL
     env:
       SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://supabaseaccedu.dsc.edu.vn' }}
-      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      # Giá trị thô; bước "Kiểm tra cấu hình" bỏ khoảng trắng/xuống dòng rồi đặt SUPABASE_ANON_KEY cho các bước sau
+      SUPABASE_ANON_KEY_RAW: ${{ vars.SUPABASE_ANON_KEY }}
     steps:
       - name: Kiểm tra cấu hình
         id: cfg
@@ -75,10 +76,16 @@ jobs:
           echo "Secret  ACCEDU_OWNER_EMAIL     $(mark "$HAS_OWNER_EMAIL")"
           echo "Secret  ACCEDU_OWNER_PASSWORD  $(mark "$HAS_OWNER_PASSWORD")"
           echo "Biến    SUPABASE_URL           $(mark "$HAS_URL_VAR")"
-          echo "Biến    SUPABASE_ANON_KEY      $(mark "$([ -n "$SUPABASE_ANON_KEY" ] && echo true)")"
+          echo "Biến    SUPABASE_ANON_KEY      $(mark "$([ -n "$SUPABASE_ANON_KEY_RAW" ] && echo true)")"
           echo "Biến    SUPABASE_COMPOSE_DIR   $(mark "$HAS_COMPOSE_DIR")"
           echo "(Đặt ở Settings → Environments → SUPABASE_URL, hoặc Settings → Secrets and variables → Actions → mục Repository;"
           echo " không phải Codespaces hay Dependabot.)"
+          # Anon key là JWT — không bao giờ có khoảng trắng; dán từ tin nhắn hay bị xuống dòng giữa chừng
+          SUPABASE_ANON_KEY=$(printf '%s' "$SUPABASE_ANON_KEY_RAW" | tr -d '[:space:]')
+          if [ "$SUPABASE_ANON_KEY" != "$SUPABASE_ANON_KEY_RAW" ]; then
+            echo "::notice::Biến SUPABASE_ANON_KEY có xuống dòng/khoảng trắng — đã tự bỏ (nên sửa lại biến cho liền một dòng)"
+          fi
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
           if [ "$HAS_KEY" != "true" ]; then
             echo "::warning::Chưa có secret VPS_SSH_KEY — bỏ qua triển khai. Thêm secret rồi chạy lại workflow."
             echo "skip=true" >> "$GITHUB_OUTPUT"

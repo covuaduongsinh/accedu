@@ -30,7 +30,9 @@ echo "Functions: ${FN_C:-(không có)}  →  ${FN_DIR:-(không thấy thư mục
 probe=${FN_C:-$DB_C}
 key=$(container_env "$probe" SUPABASE_ANON_KEY)
 if [ -n "$key" ] && [ -n "${SUPABASE_ANON_KEY:-}" ] && [ "$key" != "$SUPABASE_ANON_KEY" ]; then
+  fp() { printf '%s' "$1" | sha256sum | cut -c1-12; }
   echo "✗ Anon key của stack này KHÁC SUPABASE_ANON_KEY — có thể đang trỏ nhầm sang Supabase của dự án khác. Dừng."
+  echo "  dấu vân tay (sha256): stack $(fp "$key") — biến Actions $(fp "$SUPABASE_ANON_KEY")"
   exit 3
 fi
 [ -n "$key" ] && echo "✓ Anon key khớp với $SUPABASE_URL"
