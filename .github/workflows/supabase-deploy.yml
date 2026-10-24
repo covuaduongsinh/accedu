@@ -177,8 +177,10 @@ jobs:
           base="$SUPABASE_URL"
           curl -fsS "$base/rest/v1/currencies?select=code&limit=1" -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" | grep -q VND
-          curl -fsS "$base/auth/v1/settings" -H "apikey: $SUPABASE_ANON_KEY" | grep -q '"disable_signup":true' \
-            || { echo "::error::Đăng ký tự do đang BẬT — đặt DISABLE_SIGNUP=true trong .env của Supabase AccEdu"; exit 1; }
+          settings=$(curl -fsS "$base/auth/v1/settings" -H "apikey: $SUPABASE_ANON_KEY")
+          echo "auth/v1/settings: $(grep -o '"disable_signup":[a-z]*' <<<"$settings"), email: $(grep -o '"email":[a-z]*' <<<"$settings" | head -1)"
+          grep -q '"disable_signup":true' <<<"$settings" \
+            || { echo "::error::Đăng ký tự do đang BẬT — đặt DISABLE_SIGNUP=true cho stack Supabase AccEdu (Dokploy → Environment) rồi Redeploy"; exit 1; }
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/admin-users" \
             -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
           [ "$code" = 401 ] || { echo "::error::Edge Function admin-users trả $code (mong đợi 401)"; exit 1; }

@@ -37,6 +37,15 @@ if [ -n "$key" ] && [ -n "${SUPABASE_ANON_KEY:-}" ] && [ "$key" != "$SUPABASE_AN
 fi
 [ -n "$key" ] && echo "✓ Anon key khớp với $SUPABASE_URL"
 
+# Cấu hình đăng ký của GoTrue đang chạy thật trong container (không phải giá trị trong .env)
+AUTH_C=""
+[ -n "${SUPABASE_COMPOSE_DIR:-}" ] && AUTH_C=$(container_in "$SUPABASE_COMPOSE_DIR" 'supabase/gotrue:')
+if [ -n "$AUTH_C" ]; then
+  echo "Auth:      $AUTH_C — GOTRUE_DISABLE_SIGNUP=$(container_env "$AUTH_C" GOTRUE_DISABLE_SIGNUP)," \
+       "GOTRUE_EXTERNAL_EMAIL_ENABLED=$(container_env "$AUTH_C" GOTRUE_EXTERNAL_EMAIL_ENABLED)" \
+       "(khởi động lúc $(docker inspect -f '{{.State.StartedAt}}' "$AUTH_C" | cut -c1-19))"
+fi
+
 public_tables=$(psql_db -At -c "select count(*) from pg_tables where schemaname = 'public'") ||
   { echo "✗ Không truy vấn được CSDL trong $DB_C"; exit 4; }
 accedu_applied=no
