@@ -12,8 +12,8 @@ export default function RootLayout() {
   if (!db) {
     return (
       <View style={[s.screen, s.content, { justifyContent: "center" }]}>
-        <Text style={s.title}>Chưa cấu hình AccEdu Platform</Text>
-        <Text style={s.subtitle}>Tạo apps/mobile/.env.local với EXPO_PUBLIC_API_URL=https://api.&lt;tên miền&gt;.</Text>
+        <Text style={s.title}>Chưa cấu hình Supabase</Text>
+        <Text style={s.subtitle}>Tạo apps/mobile/.env.local với EXPO_PUBLIC_SUPABASE_URL và EXPO_PUBLIC_SUPABASE_ANON_KEY.</Text>
       </View>
     );
   }

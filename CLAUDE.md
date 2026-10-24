@@ -1,6 +1,6 @@
 # AccEdu — quy ước dự án
 
-Phần mềm kế toán đám mây của Công ty CP Cờ vua Dương Sinh (web + desktop + mobile, đồng bộ qua Supabase).
+Phần mềm kế toán đám mây của Công ty CP Cờ vua Dương Sinh (web + desktop + mobile, đồng bộ qua Supabase tự host riêng: `https://supabaseaccedu.dsc.edu.vn`).
 Kế hoạch tổng thể: `docs/plans/2026-10-23-ke-hoach-tong-the-accedu.md`.
 
 ## Quy ước bắt buộc
@@ -18,6 +18,8 @@ Kế hoạch tổng thể: `docs/plans/2026-10-23-ke-hoach-tong-the-accedu.md`.
 - Monorepo pnpm + Turborepo. `apps/web` (Vite + React + TanStack), `apps/desktop` (Tauri 2 bọc `apps/web/dist`),
   `apps/mobile` (Expo). Code dùng chung ở `packages/*`.
 - Backend Supabase: schema ở `supabase/migrations`, mọi bảng nghiệp vụ có `tenant_id` + RLS.
+  Đưa lên VPS bằng workflow `supabase-deploy` (SSH, `supabase/deploy/*.sh`) — không áp migration thủ công.
+- Đăng ký tự do tắt; tài khoản do quản trị tạo qua Edge Function `supabase/functions/admin-users`.
 - Logic ghi sổ (`post_voucher`) và báo cáo là hàm SQL — client không tự tính sổ.
 - Chế độ kế toán: TT99/2025 (thay TT200) và TT133/2016, chọn theo đơn vị.
 

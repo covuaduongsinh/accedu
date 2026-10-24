@@ -17,7 +17,7 @@ export default function Tenants() {
   const tenants = useTenants();
   const db = useDb();
   if (session === null) return <Redirect href="/login" />;
-  if (session?.user.app_metadata?.must_change_password === true) return <Redirect href="/change-password" />;
+  if (session?.user.user_metadata?.must_change_password === true) return <Redirect href="/change-password" />;
   return (
     <View style={s.screen}>
       <FlatList

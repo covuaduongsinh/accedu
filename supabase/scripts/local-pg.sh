@@ -30,7 +30,7 @@ reset() {
   start
   psql -q -v ON_ERROR_STOP=1 -c "drop database if exists accedu_test" -c "create database accedu_test"
   export PGDATABASE=accedu_test
-  psql -q -v ON_ERROR_STOP=1 -f "$ROOT/platform/db/00-platform.sql"
+  psql -q -v ON_ERROR_STOP=1 -f "$ROOT/supabase/tests/stubs/supabase.sql"
   for f in "$ROOT"/supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 -f "$f"; done
   psql -q -v ON_ERROR_STOP=1 -f "$ROOT/supabase/seed.sql"
   echo "Đã tạo lại CSDL accedu_test"

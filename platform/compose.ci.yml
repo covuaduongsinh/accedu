@@ -1,6 +1,0 @@
-# CI / E2E: chạy toàn bộ nền tảng trong Docker (build image server) và mở cổng CSDL cho CLI tạo tài khoản thử.
-#   docker compose --env-file .env -f docker-compose.yml -f compose.ci.yml up -d --build db migrate rest server caddy
-services:
-  db:
-    ports:
-      - "127.0.0.1:${DB_PORT:-55432}:5432"

@@ -18,7 +18,7 @@ import { useSession } from "./lib/session";
 /** Tài khoản đang dùng mật khẩu tạm thì phải đổi trước khi vào bất kỳ màn hình nào */
 function RootGate() {
   const session = useSession();
-  if (session?.user.app_metadata?.must_change_password === true) return <ChangePasswordPage forced />;
+  if (session?.user.user_metadata?.must_change_password === true) return <ChangePasswordPage forced />;
   return <Outlet />;
 }
 

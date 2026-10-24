@@ -1,5 +1,7 @@
 # Kế hoạch: AccEdu Platform tự xây (thay Supabase cloud), triển khai lên VPS Contabo, web trên Vercel
 
+> **Đã thay thế (24/10/2026)** bởi [P1c — Supabase tự host riêng cho AccEdu](2026-10-24-P1c-supabase-tu-host.md). Thầy đã dựng Supabase trên VPS nên phần nền tảng tự xây (apps/server, platform/) được gỡ khỏi nhánh; mã vẫn còn trong lịch sử git (commit `97db523`).
+
 ## Context
 
 Thầy đã duyệt đưa AccEdu lên dùng thật. Khi kiểm tra tài khoản Supabase thì gặp vướng mắc:

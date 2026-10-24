@@ -1,0 +1,167 @@
+name: Supabase deploy (VPS)
+
+# Đưa migration + seed + Edge Function của AccEdu lên Supabase tự host (https://supabaseaccedu.dsc.edu.vn) qua SSH.
+# Cần (Settings → Secrets and variables → Actions):
+#   Secrets:   VPS_SSH_KEY (khóa riêng OpenSSH, không passphrase)
+#              ACCEDU_OWNER_EMAIL, ACCEDU_OWNER_PASSWORD (chủ sở hữu lần đầu — bắt đổi mật khẩu khi đăng nhập)
+#   Variables: SUPABASE_URL, SUPABASE_ANON_KEY (khóa công khai — dùng để xác nhận đúng stack),
+#              SUPABASE_COMPOSE_DIR (thư mục docker compose của stack AccEdu trên VPS; chưa biết thì chạy một lần,
+#              bước kiểm tra sẽ liệt kê), VPS_HOST (mặc định 217.15.160.118), VPS_USER (mặc định root), VPS_PORT (22)
+#   Tùy chọn:  SUPABASE_DB_CONTAINER / SUPABASE_FUNCTIONS_CONTAINER nếu stack không chạy bằng docker compose
+# Chưa có VPS_SSH_KEY thì workflow bỏ qua (cảnh báo), không lỗi.
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - supabase/migrations/**
+      - supabase/seed.sql
+      - supabase/functions/**
+      - supabase/deploy/**
+      - .github/workflows/supabase-deploy.yml
+  workflow_dispatch:
+    inputs:
+      inspect_only:
+        description: "Chỉ kiểm tra máy chủ (không triển khai)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://supabaseaccedu.dsc.edu.vn' }}
+  SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+
+jobs:
+  test:
+    name: Test CSDL + script triển khai
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:test
+      - run: shellcheck -S error supabase/deploy/*.sh
+
+  deploy:
+    name: Kiểm tra VPS → migration → Edge Function → chủ sở hữu → smoke test
+    runs-on: ubuntu-24.04
+    needs: test
+    timeout-minutes: 20
+    steps:
+      - name: Kiểm tra cấu hình
+        id: cfg
+        env:
+          HAS_KEY: ${{ secrets.VPS_SSH_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::warning::Chưa có secret VPS_SSH_KEY — bỏ qua triển khai. Thêm secret rồi chạy lại workflow."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Chưa có biến SUPABASE_ANON_KEY (anon key của Supabase AccEdu)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.cfg.outputs.skip != 'true'
+
+      - name: Cấu hình SSH
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ vars.VPS_HOST || '217.15.160.118' }}
+          VPS_USER: ${{ vars.VPS_USER || 'root' }}
+          VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          # Khóa dán từ Notepad có thể mang \r — bỏ đi
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_vps
+          chmod 600 ~/.ssh/id_vps
+          ssh-keygen -y -P '' -f ~/.ssh/id_vps > /dev/null \
+            || { echo "::error::VPS_SSH_KEY sai định dạng hoặc có passphrase"; exit 1; }
+          ssh-keyscan -T 20 -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $VPS_PORT
+            IdentityFile ~/.ssh/id_vps
+            IdentitiesOnly yes
+            ServerAliveInterval 30
+            ConnectTimeout 20
+          EOF
+          ssh vps 'echo "Đã kết nối $(hostname) — $(whoami)"'
+
+      - name: Chép script + mã nguồn CSDL lên VPS
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          SUPABASE_COMPOSE_DIR: ${{ vars.SUPABASE_COMPOSE_DIR }}
+          SUPABASE_DB_CONTAINER: ${{ vars.SUPABASE_DB_CONTAINER }}
+          SUPABASE_FUNCTIONS_CONTAINER: ${{ vars.SUPABASE_FUNCTIONS_CONTAINER }}
+        run: |
+          stage=$(mktemp -d)
+          mkdir -p "$stage/migrations" "$stage/functions"
+          cp supabase/deploy/*.sh "$stage/"
+          cp supabase/migrations/*.sql "$stage/migrations/"
+          cp supabase/seed.sql "$stage/"
+          cp -r supabase/functions/*/ "$stage/functions/"
+          {
+            printf 'SUPABASE_URL=%q\n' "$SUPABASE_URL"
+            printf 'SUPABASE_ANON_KEY=%q\n' "$SUPABASE_ANON_KEY"
+            printf 'SUPABASE_COMPOSE_DIR=%q\n' "$SUPABASE_COMPOSE_DIR"
+            printf 'SUPABASE_DB_CONTAINER=%q\n' "$SUPABASE_DB_CONTAINER"
+            printf 'SUPABASE_FUNCTIONS_CONTAINER=%q\n' "$SUPABASE_FUNCTIONS_CONTAINER"
+            printf 'TENANT_SLUG=%q\n' duongsinh
+            printf 'TENANT_NAME=%q\n' "Công ty CP Cờ vua Dương Sinh"
+            printf 'TENANT_REGIME=%q\n' TT99
+            printf 'TENANT_START=%q\n' 2026-01-01
+            printf 'OWNER_NAME=%q\n' "Phùng Đức Tường"
+          } > "$stage/deploy.conf"
+          ssh vps 'rm -rf /tmp/accedu-deploy && install -m 700 -d /tmp/accedu-deploy'
+          scp -q -r "$stage"/* vps:/tmp/accedu-deploy/
+          rm -rf "$stage"
+
+      - name: Kiểm tra máy chủ (chỉ đọc)
+        if: steps.cfg.outputs.skip != 'true'
+        run: ssh vps 'bash /tmp/accedu-deploy/inspect.sh'
+
+      - name: Triển khai
+        if: steps.cfg.outputs.skip != 'true' && !inputs.inspect_only
+        env:
+          OWNER_EMAIL: ${{ secrets.ACCEDU_OWNER_EMAIL }}
+          OWNER_PASSWORD: ${{ secrets.ACCEDU_OWNER_PASSWORD }}
+        run: |
+          if [ -n "$OWNER_EMAIL" ] && [ -n "$OWNER_PASSWORD" ]; then
+            printf 'OWNER_EMAIL=%q\nOWNER_PASSWORD=%q\n' "$OWNER_EMAIL" "$OWNER_PASSWORD" |
+              ssh vps 'umask 077; cat > /tmp/accedu-deploy/owner.env'
+          else
+            echo "::notice::Chưa có ACCEDU_OWNER_EMAIL/ACCEDU_OWNER_PASSWORD — bỏ qua tạo chủ sở hữu"
+          fi
+          ssh vps 'bash /tmp/accedu-deploy/deploy.sh'
+
+      - name: Smoke test qua HTTPS
+        if: steps.cfg.outputs.skip != 'true' && !inputs.inspect_only
+        run: |
+          base="$SUPABASE_URL"
+          curl -fsS "$base/rest/v1/currencies?select=code&limit=1" -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" | grep -q VND
+          curl -fsS "$base/auth/v1/settings" -H "apikey: $SUPABASE_ANON_KEY" | grep -q '"disable_signup":true' \
+            || { echo "::error::Đăng ký tự do đang BẬT — đặt DISABLE_SIGNUP=true trong .env của Supabase AccEdu"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/admin-users" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
+          [ "$code" = 401 ] || { echo "::error::Edge Function admin-users trả $code (mong đợi 401)"; exit 1; }
+          echo "✓ $base: REST (bảng tiền tệ), auth (tắt đăng ký), Edge Function admin-users"
+
+      - name: Dọn
+        if: always()
+        run: |
+          ssh vps 'rm -rf /tmp/accedu-deploy' 2>/dev/null || true
+          rm -rf ~/.ssh/id_vps

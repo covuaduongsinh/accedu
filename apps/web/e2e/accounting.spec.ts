@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 
 const SHOTS = process.env.E2E_SHOTS;
@@ -9,17 +8,28 @@ const tempPassword = "TamThoi2026";
 const password = "VuiTriTue@2026";
 const slug = `ds-${stamp}`;
 const staffEmail = `ketoan-${stamp}@duongsinh.test`;
-const cli = fileURLToPath(new URL("../../server/src/cli.ts", import.meta.url));
 
-/** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng CLI máy chủ với mật khẩu tạm */
-test.beforeAll(() => {
-  const dbUrl = process.env.E2E_DATABASE_ADMIN_URL;
-  if (!dbUrl) throw new Error("Cần E2E_DATABASE_ADMIN_URL (postgres://postgres:…@127.0.0.1:55432/accedu)");
-  execFileSync(
-    process.execPath,
-    [cli, "create-owner", "--email", email, "--name", "Kế toán trưởng Dương Sinh", "--tenant-slug", `goc-${stamp}`, "--tenant-name", "Đơn vị gốc E2E"],
-    { env: { ...process.env, DATABASE_ADMIN_URL: dbUrl, OWNER_PASSWORD: tempPassword }, stdio: "inherit" },
-  );
+/** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng GoTrue admin API (như workflow triển khai) + app.bootstrap_owner */
+test.beforeAll(async () => {
+  const url = process.env.E2E_SUPABASE_URL;
+  const serviceKey = process.env.E2E_SERVICE_ROLE_KEY;
+  const dbUrl = process.env.E2E_DB_URL;
+  if (!url || !serviceKey || !dbUrl) throw new Error("Cần E2E_SUPABASE_URL, E2E_SERVICE_ROLE_KEY, E2E_DB_URL (lấy từ `supabase status -o env`)");
+  const res = await fetch(`${url}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: "Kế toán trưởng Dương Sinh", must_change_password: true },
+    }),
+  });
+  const user = (await res.json()) as { id?: string; msg?: string };
+  if (!res.ok || !user.id) throw new Error(`Tạo chủ sở hữu lỗi: ${res.status} ${user.msg ?? ""}`);
+  execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-qc", `select app.bootstrap_owner('${user.id}', 'goc-${stamp}', 'Đơn vị gốc E2E')`], {
+    stdio: "inherit",
+  });
 });
 
 async function changeTempPassword(page: Page, newPassword: string) {

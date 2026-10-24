@@ -2,11 +2,8 @@ import type { VoucherInput } from "@accedu/core";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { realtimeOf, type AccEduClient } from "./client";
+import type { AccEduClient } from "./client";
 import { api, qk } from "./queries";
-import type { ChangeEvent, SyncState } from "./realtime";
-
-export type { SyncState } from "./realtime";
 
 const ClientContext = createContext<AccEduClient | null>(null);
 
@@ -157,10 +154,16 @@ function invalidateLedger(qc: QueryClient, tenantId: string, voucherId?: string)
   if (voucherId) void qc.invalidateQueries({ queryKey: qk.voucher(voucherId) });
 }
 
+export type SyncState = "connecting" | "live" | "offline";
+
+/** Bảng được theo dõi (đều nằm trong publication supabase_realtime) */
+const SYNC_TABLES = ["vouchers", "accounts", "partners", "jobs", "opening_balances", "period_locks", "memberships"] as const;
+
 /**
- * Đồng bộ thời gian thực giữa web / desktop / mobile: khi bất kỳ thiết bị nào thay đổi
- * chứng từ hoặc danh mục của đơn vị, mọi thiết bị khác tự làm mới dữ liệu liên quan.
- * Sự kiện chỉ mang tên bảng + id; dữ liệu được tải lại qua REST nên RLS vẫn áp dụng.
+ * Đồng bộ thời gian thực giữa web / desktop / mobile qua Supabase Realtime: khi bất kỳ thiết bị nào
+ * thay đổi chứng từ hoặc danh mục của đơn vị, mọi thiết bị khác tự làm mới dữ liệu liên quan.
+ * Dữ liệu được tải lại qua REST nên RLS vẫn áp dụng. Kênh nối lại sau khi mất kết nối thì làm mới
+ * toàn bộ dữ liệu của đơn vị để bù các thay đổi bị lỡ.
  */
 export function useRealtimeSync(tenantId: string | undefined): SyncState {
   const db = useDb();
@@ -169,17 +172,40 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
 
   useEffect(() => {
     if (!tenantId) return;
-    return realtimeOf(db).subscribe(tenantId, (ev) => applyChange(qc, tenantId, ev), setState);
+    const filter = `tenant_id=eq.${tenantId}`;
+    let channel = db.channel(`tenant:${tenantId}`);
+    for (const table of SYNC_TABLES) {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table, filter }, (payload) => {
+        const row = (payload.new ?? payload.old) as { id?: string } | null;
+        applyChange(qc, tenantId, table, row?.id ?? null);
+      });
+    }
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "tenants", filter: `id=eq.${tenantId}` }, () =>
+      applyChange(qc, tenantId, "tenants", null),
+    );
+    let wasLive = false;
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        if (wasLive) applyChange(qc, tenantId, "*", null);
+        wasLive = true;
+        setState("live");
+      } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setState("offline");
+      }
+    });
+    return () => {
+      void db.removeChannel(channel);
+    };
   }, [db, qc, tenantId]);
 
   return state;
 }
 
-function applyChange(qc: QueryClient, tenantId: string, ev: ChangeEvent) {
+function applyChange(qc: QueryClient, tenantId: string, table: string, id: string | null) {
   const inv = (queryKey: readonly unknown[]) => void qc.invalidateQueries({ queryKey });
-  switch (ev.table) {
+  switch (table) {
     case "vouchers":
-      return invalidateLedger(qc, tenantId, ev.id ?? undefined);
+      return invalidateLedger(qc, tenantId, id ?? undefined);
     case "accounts":
       inv(qk.accounts(tenantId));
       return inv(["report", tenantId]);

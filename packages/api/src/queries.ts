@@ -1,5 +1,5 @@
 import type { AccountInput, PartnerInput, VoucherInput } from "@accedu/core";
-import { platformFetch, type AccEduClient } from "./client";
+import type { AccEduClient } from "./client";
 import type {
   AccountRow,
   JobRow,
@@ -156,18 +156,22 @@ export const api = {
     db: AccEduClient,
     input: { tenantId: string; email: string; fullName: string; password: string; role: string },
   ): Promise<{ user_id: string; created: boolean }> {
-    const { data } = await platformFetch<{ user_id: string; created: boolean }>(db, "/users", {
-      tenant_id: input.tenantId,
-      email: input.email,
-      full_name: input.fullName,
-      password: input.password,
-      role: input.role,
+    const { data, error } = await db.functions.invoke<{ user_id: string; created: boolean }>("admin-users", {
+      body: { tenant_id: input.tenantId, email: input.email, full_name: input.fullName, password: input.password, role: input.role },
     });
+    if (error) {
+      // Lỗi HTTP từ function: lấy thông điệp tiếng Việt trong body
+      const ctx = (error as { context?: Response }).context;
+      const body = ctx ? ((await ctx.json().catch(() => null)) as { message?: string } | null) : null;
+      throw new Error(body?.message ?? error.message);
+    }
+    if (!data) throw new Error("Máy chủ không trả kết quả");
     return data;
   },
-  /** Đổi mật khẩu của chính mình (đăng xuất mọi thiết bị khác) */
+  /** Đổi mật khẩu của chính mình: gỡ cờ bắt đổi mật khẩu tạm, đăng xuất các thiết bị khác */
   async changePassword(db: AccEduClient, password: string) {
-    const { error } = await db.auth.updateUser({ password });
+    const { error } = await db.auth.updateUser({ password, data: { must_change_password: false } });
+    if (!error) await db.auth.signOut({ scope: "others" });
     if (error) throw new Error(error.message);
   },
 

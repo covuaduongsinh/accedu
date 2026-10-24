@@ -23,8 +23,17 @@ enabled = true
 enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173", "tauri://localhost", "accedu://"]
-enable_signup = true
+# Tài khoản do quản trị tạo (Edge Function admin-users) — giống DISABLE_SIGNUP=true trên máy chủ
+enable_signup = false
 
 [auth.email]
+# Giữ bật: đây là công tắc của cả phương thức đăng nhập email (tắt thì không ai đăng nhập được)
 enable_signup = true
 enable_confirmations = false
+
+[edge_runtime]
+enabled = true
+
+# Function tự kiểm tra JWT của người gọi (để preflight CORS không bị chặn)
+[functions.admin-users]
+verify_jwt = false
