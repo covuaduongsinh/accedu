@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["VITE_*", "EXPO_PUBLIC_*"],
       "outputs": ["dist/**"]
     },
     "typecheck": {
