@@ -172,3 +172,21 @@ Phần còn giữ lại từ P1b gồm: bỏ nút đăng ký, bắt đổi mật
 **Lưu ý cấu hình Supabase AccEdu trên VPS** (rút ra khi chạy thử):
 - `DISABLE_SIGNUP=true` (tắt đăng ký tự do) nhưng **giữ `ENABLE_EMAIL_SIGNUP=true`**: biến này là công tắc của cả phương thức đăng nhập email; tắt thì không ai đăng nhập được.
 - Container `functions` cần ra Internet (tải `npm:@supabase/supabase-js` lần đầu).
+
+## Đã chạy thật (24/10/2026)
+
+| Thành phần | Địa chỉ / vị trí | Kiểm chứng |
+|---|---|---|
+| Web (production) | https://accedu.vercel.app — dự án Vercel `accedu`, build từ nhánh `claude/beautiful-pascal-y8xgxa` | Deploy `READY`, Vite build thành công |
+| Supabase AccEdu | https://supabaseaccedu.dsc.edu.vn — stack Dokploy `compose-hack-auxiliary-program-rxaj2l` trên VPS Contabo | Workflow `Supabase deploy (VPS)` run 40110075121 xanh |
+| CSDL | 6 migration + seed hệ thống tài khoản TT99/TT133; đơn vị `duongsinh` (TT99, từ 01/01/2026) | Ghi vết trong `supabase_migrations.schema_migrations`; chạy lại không đổi gì |
+| Đăng nhập | Chủ sở hữu `duongsinhchess@gmail.com` (mật khẩu tạm, bắt đổi lần đầu); `disable_signup: true` | Smoke test: REST trả `VND`, đăng ký tự do tắt, function không token → 401 |
+| Edge Function | `admin-users` trong `…/files/volumes/functions` | Smoke test 401 khi không có token |
+
+**Bài học khi triển khai lần đầu:**
+- Secret/biến GitHub của AccEdu nằm trong Environment `SUPABASE_URL` → job `deploy` khai báo `environment: SUPABASE_URL`.
+- Dán anon key từ tin nhắn bị xuống dòng giữa JWT → workflow tự bỏ khoảng trắng; nên sửa biến cho liền một dòng.
+- Dokploy: đổi biến môi trường phải bấm **Deploy** (tạo lại container), Restart giữ biến cũ. Bước kiểm tra in `GOTRUE_DISABLE_SIGNUP` và giờ khởi động container auth để phát hiện.
+- Dokploy chạy compose trong `…/<app>/code`; `SUPABASE_COMPOSE_DIR` khớp cả thư mục cha.
+- VPS 7,8 GB RAM, còn ~1,9 GB trống khi chạy 2 stack Supabase → nên tắt `analytics`/`vector`/`imgproxy` của stack AccEdu hoặc nâng RAM.
+- Vercel: Production Branch của dự án vẫn là `main` (chỉ có LICENSE) → đổi sang nhánh làm việc hoặc merge vào `main`.
