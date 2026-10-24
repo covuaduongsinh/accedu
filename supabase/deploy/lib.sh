@@ -9,8 +9,10 @@ stacks() { # Liệt kê mọi Postgres của Supabase đang chạy: tên contain
 }
 
 container_in() { # container_in DIR IMAGE_REGEX → tên container đầu tiên khớp
+  # Khớp đúng thư mục hoặc thư mục con (Dokploy chạy compose trong …/<app>/code)
+  local d=${1%/}
   docker ps --format '{{.Names}}\t{{.Image}}\t{{.Label "com.docker.compose.project.working_dir"}}' |
-    awk -F'\t' -v d="$1" -v r="$2" '$3 == d && $2 ~ r {print $1; exit}'
+    awk -F'\t' -v d="$d" -v r="$2" '($3 == d || index($3, d "/") == 1) && $2 ~ r {print $1; exit}'
 }
 
 resolve_stack() { # đặt DB_C, FN_C, FN_DIR

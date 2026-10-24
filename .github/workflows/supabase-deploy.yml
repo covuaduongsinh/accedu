@@ -2,6 +2,7 @@ name: Supabase deploy (VPS)
 
 # Đưa migration + seed + Edge Function của AccEdu lên Supabase tự host (https://supabaseaccedu.dsc.edu.vn) qua SSH.
 # Cần (Settings → Secrets and variables → Actions):
+# (đặt trong Environment "SUPABASE_URL" hoặc ở cấp Repository)
 #   Secrets:   VPS_SSH_KEY (khóa riêng OpenSSH, không passphrase)
 #              ACCEDU_OWNER_EMAIL, ACCEDU_OWNER_PASSWORD (chủ sở hữu lần đầu — bắt đổi mật khẩu khi đăng nhập)
 #   Variables: SUPABASE_URL, SUPABASE_ANON_KEY (khóa công khai — dùng để xác nhận đúng stack),
@@ -32,10 +33,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://supabaseaccedu.dsc.edu.vn' }}
-  SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-
 jobs:
   test:
     name: Test CSDL + script triển khai
@@ -56,6 +53,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: test
     timeout-minutes: 20
+    # Secret/biến của AccEdu đặt trong Environment "SUPABASE_URL" (Settings → Environments);
+    # biến cấp Repository cùng tên vẫn dùng được (Environment ghi đè nếu trùng)
+    environment: SUPABASE_URL
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://supabaseaccedu.dsc.edu.vn' }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
     steps:
       - name: Kiểm tra cấu hình
         id: cfg
@@ -74,8 +77,8 @@ jobs:
           echo "Biến    SUPABASE_URL           $(mark "$HAS_URL_VAR")"
           echo "Biến    SUPABASE_ANON_KEY      $(mark "$([ -n "$SUPABASE_ANON_KEY" ] && echo true)")"
           echo "Biến    SUPABASE_COMPOSE_DIR   $(mark "$HAS_COMPOSE_DIR")"
-          echo "(Phải đặt ở Settings → Secrets and variables → Actions → tab Secrets/Variables → mục Repository,"
-          echo " không phải Environment, Codespaces hay Dependabot.)"
+          echo "(Đặt ở Settings → Environments → SUPABASE_URL, hoặc Settings → Secrets and variables → Actions → mục Repository;"
+          echo " không phải Codespaces hay Dependabot.)"
           if [ "$HAS_KEY" != "true" ]; then
             echo "::warning::Chưa có secret VPS_SSH_KEY — bỏ qua triển khai. Thêm secret rồi chạy lại workflow."
             echo "skip=true" >> "$GITHUB_OUTPUT"
