@@ -1,0 +1,32 @@
+name: Mobile build (EAS)
+
+# Cần secret EXPO_TOKEN (expo.dev → Access tokens) và biến SUPABASE_URL / SUPABASE_ANON_KEY (Actions variables).
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "android | ios | all"
+        default: android
+        required: true
+
+jobs:
+  eas:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: EAS build
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://supabaseaccedu.dsc.edu.vn' }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: eas build --platform ${{ inputs.platform }} --profile preview --non-interactive --no-wait

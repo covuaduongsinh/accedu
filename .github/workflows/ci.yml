@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint · typecheck · unit · CSDL
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Test core & api
+        run: pnpm --filter @accedu/core --filter @accedu/api test
+      - name: Test CSDL (Postgres 16 local + migration + RLS)
+        run: pnpm db:test
+      - name: Seed khớp packages/core
+        run: |
+          node supabase/scripts/gen-seed.ts
+          git diff --exit-code supabase/seed.sql
+
+  web-e2e:
+    name: Web build + E2E (Supabase local)
+    runs-on: ubuntu-24.04
+    needs: check
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+      - name: Khởi động Supabase local (có edge-runtime cho function admin-users)
+        run: supabase start -x studio,imgproxy,logflare,vector,supavisor,mailpit,storage-api,postgres-meta
+      - name: Cấu hình web + E2E
+        run: |
+          eval "$(supabase status -o env)"
+          printf 'VITE_SUPABASE_URL=%s\nVITE_SUPABASE_ANON_KEY=%s\n' "$API_URL" "$ANON_KEY" > apps/web/.env.local
+          {
+            echo "E2E_SUPABASE_URL=$API_URL"
+            echo "E2E_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "E2E_DB_URL=$DB_URL"
+          } >> "$GITHUB_ENV"
+      - run: pnpm --filter @accedu/web build
+      - run: pnpm --filter @accedu/web exec playwright install --with-deps chromium
+      - name: E2E (chủ sở hữu tạo bằng admin API, tạo tài khoản qua Edge Function, đồng bộ 2 thiết bị)
+        run: pnpm --filter @accedu/web test:e2e
+      - name: Log Supabase
+        if: failure()
+        run: |
+          docker ps -a
+          docker logs supabase_edge_runtime_accedu --tail 100 || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: apps/web/test-results
+
+  mobile:
+    name: Mobile bundle (Expo)
+    runs-on: ubuntu-24.04
+    needs: check
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Export Android bundle
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci
+          CI: 1
+        run: npx expo export --platform android --output-dir dist-android
+
+  desktop-check:
+    name: Desktop (cargo check)
+    runs-on: ubuntu-24.04
+    needs: check
+    steps:
+      - uses: actions/checkout@v5
+      - name: Thư viện hệ thống Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libxdo-dev libssl-dev libayatana-appindicator3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml

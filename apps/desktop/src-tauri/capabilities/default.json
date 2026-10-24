@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Quyền mặc định cho cửa sổ chính AccEdu",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "dialog:default",
+    "dialog:allow-save",
+    "fs:default",
+    "window-state:default"
+  ]
+}

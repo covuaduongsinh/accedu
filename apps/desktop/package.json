@@ -1,0 +1,17 @@
+{
+  "name": "@accedu/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AccEdu desktop (Windows/macOS/Linux) — vỏ Tauri 2 dùng chung giao diện apps/web",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "tauri icon ../web/public/logo.svg",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}
