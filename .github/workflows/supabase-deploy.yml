@@ -61,7 +61,21 @@ jobs:
         id: cfg
         env:
           HAS_KEY: ${{ secrets.VPS_SSH_KEY != '' }}
+          HAS_OWNER_EMAIL: ${{ secrets.ACCEDU_OWNER_EMAIL != '' }}
+          HAS_OWNER_PASSWORD: ${{ secrets.ACCEDU_OWNER_PASSWORD != '' }}
+          HAS_URL_VAR: ${{ vars.SUPABASE_URL != '' }}
+          HAS_COMPOSE_DIR: ${{ vars.SUPABASE_COMPOSE_DIR != '' }}
         run: |
+          # Chỉ in có/không — không bao giờ in giá trị
+          mark() { [ "$1" = true ] && echo "✓ có" || echo "✗ chưa thấy"; }
+          echo "Secret  VPS_SSH_KEY            $(mark "$HAS_KEY")"
+          echo "Secret  ACCEDU_OWNER_EMAIL     $(mark "$HAS_OWNER_EMAIL")"
+          echo "Secret  ACCEDU_OWNER_PASSWORD  $(mark "$HAS_OWNER_PASSWORD")"
+          echo "Biến    SUPABASE_URL           $(mark "$HAS_URL_VAR")"
+          echo "Biến    SUPABASE_ANON_KEY      $(mark "$([ -n "$SUPABASE_ANON_KEY" ] && echo true)")"
+          echo "Biến    SUPABASE_COMPOSE_DIR   $(mark "$HAS_COMPOSE_DIR")"
+          echo "(Phải đặt ở Settings → Secrets and variables → Actions → tab Secrets/Variables → mục Repository,"
+          echo " không phải Environment, Codespaces hay Dependabot.)"
           if [ "$HAS_KEY" != "true" ]; then
             echo "::warning::Chưa có secret VPS_SSH_KEY — bỏ qua triển khai. Thêm secret rồi chạy lại workflow."
             echo "skip=true" >> "$GITHUB_OUTPUT"
