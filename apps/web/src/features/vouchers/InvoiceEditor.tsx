@@ -1,11 +1,12 @@
 import { friendlyError, fromVoucherRow, type ItemRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
-import { useAccounts, useItems, useJobs, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
+import { useAccounts, useInvoicePayments, useItems, useJobs, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
 import {
   VAT_CODES,
   amountInWords,
   buildLedgerEntries,
   computeInvoiceLine,
   formatAmount,
+  formatDateVN,
   invoiceDefaults,
   invoiceTotals,
   isInvoiceType,
@@ -530,6 +531,8 @@ function InvoiceForm({
         </table>
       </div>
 
+      {id ? <InvoicePayments invoiceId={id} total={totals.total} sale={sale} posted={status === "posted"} /> : null}
+
       <div className="flex justify-end gap-2 border-t border-line pt-3">
         <Button variant="secondary" onClick={onClose}>
           Đóng
@@ -548,5 +551,54 @@ function InvoiceForm({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Tình hình thanh toán của hóa đơn: các phiếu thu/chi đã chọn trừ vào hóa đơn (chỉ phiếu đã ghi sổ được tính) */
+function InvoicePayments({ invoiceId, total, sale, posted }: { invoiceId: string; total: number; sale: boolean; posted: boolean }) {
+  const { tenant } = useTenantCtx();
+  const payments = useInvoicePayments(tenant.id, invoiceId);
+  const rows = payments.data ?? [];
+  if (!posted && !rows.length) return null;
+  const paid = rows.filter((r) => r.vouchers?.status === "posted").reduce((s, r) => s + Number(r.amount), 0);
+  const verb = sale ? "thu" : "trả";
+  return (
+    <section aria-label="Tình hình thanh toán" className="rounded-md border border-line p-3 text-sm">
+      <div className="flex flex-wrap gap-4">
+        <span>
+          Đã {verb}: <b className="num" data-testid="invoice-paid">{formatAmount(paid)}</b>
+        </span>
+        <span>
+          Còn phải {verb}:{" "}
+          <b className={`num ${total - paid > 0 ? "text-danger" : "text-success"}`} data-testid="invoice-remaining">
+            {formatAmount(total - paid)}
+          </b>
+        </span>
+      </div>
+      {rows.length ? (
+        <table className="mt-2 w-full text-xs">
+          <thead className="text-muted">
+            <tr>
+              <th className="text-left">Ngày</th>
+              <th className="text-left">Phiếu {verb} tiền</th>
+              <th className="text-left">Trạng thái</th>
+              <th className="text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.voucher_id}-${r.line_no}`} className="border-t border-line">
+                <td>{formatDateVN(r.vouchers?.posting_date)}</td>
+                <td>{r.vouchers?.number}</td>
+                <td>{r.vouchers ? <Badge tone={STATUS_BADGE[r.vouchers.status].tone}>{STATUS_BADGE[r.vouchers.status].label}</Badge> : null}</td>
+                <td className="num text-right">{formatAmount(Number(r.amount))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="mt-1 text-xs text-muted">Chưa có phiếu {verb} tiền nào trừ vào hóa đơn này — lập phiếu {sale ? "thu" : "chi"} và chọn hóa đơn ở cột “Trừ hóa đơn”.</div>
+      )}
+    </section>
   );
 }

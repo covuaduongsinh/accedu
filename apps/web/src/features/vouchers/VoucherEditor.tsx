@@ -1,13 +1,14 @@
 import { friendlyError, fromVoucherRow, type AccountRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
 import { useAccounts, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
-import { amountInWords, buildLedgerEntries, formatAmount, parseAmount, todayVN, type VoucherInput } from "@accedu/core";
-import { Plus, Save, Send, Trash2 } from "lucide-react";
+import { SETTLEMENT_ACCOUNT, amountInWords, buildLedgerEntries, formatAmount, parseAmount, paymentSide, todayVN, type VoucherInput } from "@accedu/core";
+import { FileCheck2, Plus, Save, Send, Trash2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Empty, Field, Input } from "../../components/ui";
 import { platform } from "../../lib/supabase";
 import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, type VoucherUiConfig } from "./config";
+import { InvoiceSelect, SettlePanel, invoiceLabel, type SettleResult } from "./SettlePanel";
 
 interface LineDraft {
   key: string;
@@ -17,6 +18,10 @@ interface LineDraft {
   amount: string;
   description: string;
   partnerCode: string;
+  /** Hóa đơn mà dòng thu/chi trừ vào */
+  invoiceId: string;
+  /** Dòng sinh từ "Thu/chi theo hóa đơn" — thay lại khi phân bổ lần nữa */
+  auto?: boolean;
 }
 
 interface HeaderDraft {
@@ -32,7 +37,7 @@ interface HeaderDraft {
 }
 
 let seq = 0;
-const newLine = (): LineDraft => ({ key: `l${++seq}`, account: "", debit: "", credit: "", amount: "", description: "", partnerCode: "" });
+const newLine = (): LineDraft => ({ key: `l${++seq}`, account: "", debit: "", credit: "", amount: "", description: "", partnerCode: "", invoiceId: "" });
 
 interface Initial {
   header: HeaderDraft;
@@ -88,6 +93,7 @@ function initialFromVoucher(row: VoucherWithLines, partners: PartnerRow[], cfg: 
         amount: cfg.style === "pair" ? formatAmount(l.amount) : "",
         description: l.description ?? "",
         partnerCode: codeOf(l.partnerId),
+        invoiceId: l.invoiceId ?? "",
       };
     }),
   };
@@ -120,6 +126,10 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
 
   const status = initial.status;
   const readOnly = status === "posted" || status === "cancelled" || role === "viewer";
+  // Phiếu thu (PT, BC) trừ vào hóa đơn bán, phiếu chi (PC, BN) trừ vào hóa đơn mua
+  const side = cfg.style === "pair" ? paymentSide(cfg.type) : null;
+  const [settling, setSettling] = useState(false);
+  const headerPartner = partnerByCode.get(header.partnerCode.trim());
 
   function toInput(): VoucherInput & { id?: string; version?: number } {
     const partner = partnerByCode.get(header.partnerCode.trim());
@@ -145,6 +155,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
             lineNo: i + 1,
             description: l.description || header.description,
             partnerId: lp?.id ?? partner?.id ?? null,
+            ...(side && l.invoiceId ? { invoiceId: l.invoiceId } : {}),
           };
           if (cfg.style === "pair") {
             const amount = parseAmount(l.amount) ?? 0;
@@ -182,6 +193,27 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
 
   const setLine = (key: string, patch: Partial<LineDraft>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  /** Đưa kết quả phân bổ vào phiếu: mỗi hóa đơn một dòng, phần thừa thành dòng trả trước không gắn hóa đơn */
+  function applySettle(r: SettleResult) {
+    if (!side || !headerPartner) return;
+    const verb = side === "receivable" ? "Thu" : "Trả";
+    const keep = lines.filter((l) => l.account.trim() && !l.invoiceId && !l.auto);
+    const generated: LineDraft[] = r.allocations.map((a) => ({
+      ...newLine(),
+      account: a.invoice.account,
+      amount: String(a.amount),
+      invoiceId: a.invoice.id,
+      description: `${verb} tiền hóa đơn ${invoiceLabel(a.invoice)}`,
+      auto: true,
+    }));
+    if (r.leftover > 0) {
+      generated.push({ ...newLine(), account: SETTLEMENT_ACCOUNT[side], amount: String(r.leftover), description: `${verb} trước — ${headerPartner.name}`, auto: true });
+    }
+    setLines([...keep, ...generated]);
+    if (!header.description.trim()) setHeader((h) => ({ ...h, description: `${verb} tiền ${headerPartner.name}` }));
+    setSettling(false);
+  }
 
   return (
     <div className="space-y-3" onKeyDown={(e) => {
@@ -255,6 +287,10 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
         </Field>
       </div>
 
+      {settling && side && headerPartner ? (
+        <SettlePanel side={side} partner={headerPartner} postingDate={header.postingDate} onApply={applySettle} onClose={() => setSettling(false)} />
+      ) : null}
+
       <div className="overflow-x-auto rounded-md border border-line">
         <table className="w-full text-sm">
           <thead className="bg-navy-50 text-xs text-navy-700">
@@ -263,6 +299,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
               <th className="w-40 px-2 text-left">{cfg.style === "pair" ? cfg.lineAccountLabel : "Tài khoản"}</th>
               <th className="px-2 text-left">Tên tài khoản</th>
               <th className="w-32 px-2 text-left">Mã khách</th>
+              {side ? <th className="w-64 px-2 text-left">Trừ hóa đơn</th> : null}
               {cfg.style === "pair" ? (
                 <th className="w-40 px-2 text-right">Số tiền</th>
               ) : (
@@ -280,12 +317,29 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
               <tr key={l.key} className="border-t border-line">
                 <td className="px-2 text-muted">{i + 1}</td>
                 <td className="px-1 py-1">
-                  <Input list={`${listId}-acc`} value={l.account} disabled={readOnly} aria-label={`Tài khoản dòng ${i + 1}`} onChange={(e) => setLine(l.key, { account: e.target.value })} />
+                  <Input list={`${listId}-acc`} value={l.account} disabled={readOnly} aria-label={`Tài khoản dòng ${i + 1}`} onChange={(e) => setLine(l.key, { account: e.target.value, invoiceId: "" })} />
                 </td>
                 <td className="px-2 text-xs text-muted">{byCode.get(l.account)?.name}</td>
                 <td className="px-1">
-                  <Input list={`${listId}-partner`} value={l.partnerCode} disabled={readOnly} onChange={(e) => setLine(l.key, { partnerCode: e.target.value })} />
+                  <Input list={`${listId}-partner`} value={l.partnerCode} disabled={readOnly} onChange={(e) => setLine(l.key, { partnerCode: e.target.value, invoiceId: "" })} />
                 </td>
+                {side ? (
+                  <td className="px-1">
+                    {byCode.get(l.account.trim())?.track_partner ? (
+                      <InvoiceSelect
+                        side={side}
+                        partnerId={(partnerByCode.get(l.partnerCode.trim()) ?? headerPartner)?.id}
+                        account={l.account.trim()}
+                        value={l.invoiceId}
+                        disabled={readOnly}
+                        label={`Hóa đơn dòng ${i + 1}`}
+                        onChange={(invoiceId) => setLine(l.key, { invoiceId })}
+                      />
+                    ) : (
+                      <span className="px-1 text-xs text-muted">—</span>
+                    )}
+                  </td>
+                ) : null}
                 {cfg.style === "pair" ? (
                   <td className="px-1">
                     <AmountInput value={l.amount} disabled={readOnly} label={`Số tiền dòng ${i + 1}`} onChange={(v) => setLine(l.key, { amount: v })} />
@@ -329,6 +383,15 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
           {!readOnly ? (
             <Button variant="ghost" icon={<Plus size={14} />} onClick={() => setLines([...lines, newLine()])}>
               Thêm dòng
+            </Button>
+          ) : null}
+          {!readOnly && side ? (
+            <Button
+              variant="ghost"
+              icon={<FileCheck2 size={14} />}
+              onClick={() => (headerPartner ? setSettling(true) : toast.error(`Nhập ${cfg.partnerLabel.toLowerCase()} trước khi ${side === "receivable" ? "thu" : "chi"} theo hóa đơn`))}
+            >
+              {side === "receivable" ? "Thu theo hóa đơn" : "Chi theo hóa đơn"}
             </Button>
           ) : null}
           {!preview.ok && lines.some((l) => l.account) ? (

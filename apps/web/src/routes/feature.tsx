@@ -13,6 +13,7 @@ import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
 import { PartnerBalancesPage, PartnerLedgerPage } from "../features/reports/PartnerReports";
+import { AgingPage, VatListingPage } from "../features/reports/SettlementReports";
 import { TrialBalancePage } from "../features/reports/TrialBalancePage";
 import { VoucherModule } from "../features/vouchers/VoucherModule";
 import { Card, PageHeader } from "../components/ui";
@@ -42,6 +43,10 @@ const PAGES: Record<string, ComponentType> = {
   "sales/receivable-summary": () => <PartnerBalancesPage side="receivable" />,
   "purchase/payable-ledger": () => <PartnerLedgerPage side="payable" />,
   "purchase/payable-summary": () => <PartnerBalancesPage side="payable" />,
+  "sales/aging": () => <AgingPage side="receivable" />,
+  "purchase/aging": () => <AgingPage side="payable" />,
+  "general/vat-out": () => <VatListingPage direction="out" />,
+  "general/vat-in": () => <VatListingPage direction="in" />,
   "cash/receipts": () => <VoucherModule type="PT" />,
   "cash/payments": () => <VoucherModule type="PC" />,
   "cash/bank-credits": () => <VoucherModule type="BC" />,

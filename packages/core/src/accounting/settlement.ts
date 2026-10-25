@@ -48,7 +48,7 @@ export function allocateFifo(amount: number, invoices: readonly OpenInvoiceRef[]
   const queue = invoices
     .filter((i) => i.remaining > 0)
     .map((i, idx) => ({ i, idx }))
-    .sort((a, b) => agingBaseDate(a.i).localeCompare(agingBaseDate(b.i)) || (a.i.postingDate ?? "").localeCompare(b.i.postingDate ?? "") || a.idx - b.idx);
+    .toSorted((a, b) => agingBaseDate(a.i).localeCompare(agingBaseDate(b.i)) || (a.i.postingDate ?? "").localeCompare(b.i.postingDate ?? "") || a.idx - b.idx);
   const allocations: Allocation[] = [];
   for (const { i } of queue) {
     if (rest <= 0) break;
