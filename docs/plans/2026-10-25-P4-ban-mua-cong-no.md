@@ -156,3 +156,15 @@ P4 làm thành **3 đợt**. Mỗi đợt là 1 PR riêng, CI xanh thì merge. N
   - **P4b:** phiếu thu trừ vào HDV, tuổi nợ còn 0; bảng kê bán ra.
   - **P4c:** kéo thả XML mẫu → tạo HDM nháp → ghi sổ.
 - Mỗi đợt: `pnpm check`, `pnpm db:test`, E2E local, `cargo check`. Sau đó push → PR → CI 4/4 + `supabase-deploy` xanh → merge → kiểm tra Vercel production READY → báo Thầy (kèm ảnh chụp màn hình).
+
+## Kết quả đợt P4a (25/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Migration 0008: cột hóa đơn và thuế; `save_voucher` kiểm tra thuế, tính hạn thanh toán; `post_voucher` sinh bút toán thuế; chặn nhập trùng hóa đơn mua | Xong | Test CSDL `invoices.test.ts`: HDV KCT, HDB 10%, HDM, HMV, PC có thuế 8%, các trường hợp thuế sai, trùng hóa đơn |
+| `rpt_partner_ledger`, `rpt_partner_balances` | Xong | Test: dư đầu kỳ + phát sinh = dư cuối kỳ; tổng hợp phải thu/phải trả |
+| `import_items` + mẫu Excel danh mục hàng hóa | Xong | Test CSDL + test core (mã thuế `10%` / `0.08` / `KCT`, loại hàng, TK) |
+| Core: tính hóa đơn, TK mặc định theo TT99/TT133, vế thuế trong `buildLedgerEntries` | Xong | 13 test mới; thuộc tính Nợ = Có = tiền hàng + thuế |
+| Web: form hóa đơn, danh mục hàng hóa, sổ và tổng hợp công nợ | Xong | E2E 9/9 trên Supabase local: hóa đơn học phí KCT, hóa đơn bán sách 5%, sổ công nợ 6.252.000 |
+
+Tổng số test: core 95, api 3, CSDL 47, E2E 9.
