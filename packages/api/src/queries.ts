@@ -2,7 +2,9 @@ import type { AccountImportRow, AccountInput, ItemImportRow, ItemInput, OpeningI
 import type { AccEduClient } from "./client";
 import type {
   AccountRow,
+  AgingRow,
   ImportResult,
+  InvoicePaymentRow,
   ItemRow,
   JobRow,
   MemberRow,
@@ -11,11 +13,13 @@ import type {
   JournalRow,
   LedgerRow,
   MyTenantRow,
+  OpenInvoiceRow,
   PartnerBalanceRow,
   PartnerLedgerRow,
   PartnerRow,
   TenantRow,
   TrialBalanceRow,
+  VatListingRow,
   VoucherRow,
 } from "./database.types";
 import { toVoucherPayload, type VoucherWithLines } from "./mappers";
@@ -269,6 +273,36 @@ export const api = {
   },
   async partnerBalances(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<PartnerBalanceRow[]> {
     return unwrap(await db.rpc("rpt_partner_balances", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));
+  },
+  /** Hóa đơn đã ghi sổ còn nợ; includePaid: cả hóa đơn đã trả đủ */
+  async openInvoices(
+    db: AccEduClient,
+    tenantId: string,
+    side: "receivable" | "payable",
+    opts: { partnerId?: string | null; asOf?: string | null; includePaid?: boolean } = {},
+  ): Promise<OpenInvoiceRow[]> {
+    return unwrap(
+      await db.rpc("open_invoices", {
+        p_tenant: tenantId,
+        p_side: side,
+        p_partner: opts.partnerId ?? null,
+        p_as_of: opts.asOf ?? null,
+        p_include_paid: opts.includePaid ?? false,
+      }),
+    );
+  },
+  async aging(db: AccEduClient, tenantId: string, side: "receivable" | "payable", asOf: string, account?: string): Promise<AgingRow[]> {
+    return unwrap(await db.rpc("rpt_aging", { p_tenant: tenantId, p_side: side, p_as_of: asOf, p_account: account || null }));
+  },
+  async vatListing(db: AccEduClient, tenantId: string, direction: "out" | "in", from: string, to: string): Promise<VatListingRow[]> {
+    return unwrap(await db.rpc("rpt_vat_listing", { p_tenant: tenantId, p_direction: direction, p_from: from, p_to: to }));
+  },
+  /** Các dòng phiếu thu/chi (mọi trạng thái) đã chọn trừ vào hóa đơn */
+  async invoicePayments(db: AccEduClient, invoiceId: string): Promise<InvoicePaymentRow[]> {
+    const rows = unwrap(
+      await db.from("voucher_lines").select("voucher_id, line_no, amount, vouchers(number, posting_date, status, voucher_type)").eq("invoice_id", invoiceId),
+    ) as unknown as InvoicePaymentRow[];
+    return rows.toSorted((a, b) => (a.vouchers?.posting_date ?? "").localeCompare(b.vouchers?.posting_date ?? "") || a.line_no - b.line_no);
   },
   async accountLedger(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<LedgerRow[]> {
     return unwrap(await db.rpc("rpt_account_ledger", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));

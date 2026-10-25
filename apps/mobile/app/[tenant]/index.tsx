@@ -43,9 +43,14 @@ export default function Dashboard() {
           <Button gold title="− Phiếu chi" onPress={() => router.push({ pathname: "/[tenant]/quick", params: { tenant: slug, type: "PC" } })} />
         </View>
       </View>
-      <Pressable onPress={() => router.push({ pathname: "/[tenant]/trial-balance", params: { tenant: slug } })}>
-        <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Bảng cân đối phát sinh ›</Text>
-      </Pressable>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Pressable onPress={() => router.push({ pathname: "/[tenant]/trial-balance", params: { tenant: slug } })}>
+          <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Bảng cân đối phát sinh ›</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push({ pathname: "/[tenant]/receivables", params: { tenant: slug } })}>
+          <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Công nợ phải thu ›</Text>
+        </Pressable>
+      </View>
       <Text style={[s.title, { fontSize: 16 }]}>Chứng từ gần đây</Text>
       {(vouchers.data ?? []).slice(0, 15).map((v) => (
         <View key={v.id} style={[s.card, s.row]}>

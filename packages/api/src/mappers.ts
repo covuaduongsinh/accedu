@@ -54,6 +54,7 @@ export function toVoucherPayload(
       vat_code: l.vatCode ?? null,
       ...(l.vatAmount !== undefined ? { vat_amount: l.vatAmount } : {}),
       vat_account: l.vatAccount ?? null,
+      invoice_id: l.invoiceId ?? null,
     })),
   };
 }
@@ -110,6 +111,7 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
         vatCode: (l.vat_code as VatCodeValue | null) ?? null,
         vatAmount: Number(l.vat_amount ?? 0),
         vatAccount: l.vat_account,
+        invoiceId: l.invoice_id ?? null,
       })),
   };
 }
