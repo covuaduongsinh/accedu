@@ -17,6 +17,8 @@ export interface VoucherUiConfig {
   descriptionLabel: string;
   /** Mẫu chứng từ in */
   printForm?: { code: string; title: string; contactLabel: string; reasonLabel: string };
+  /** Hóa đơn: form có mặt hàng, số lượng, đơn giá, thuế GTGT theo dòng */
+  invoice?: boolean;
 }
 
 export const VOUCHER_UI: Record<string, VoucherUiConfig> = {
@@ -77,6 +79,62 @@ export const VOUCHER_UI: Record<string, VoucherUiConfig> = {
     partnerLabel: "Mã khách",
     contactLabel: "Người nhận tiền",
     descriptionLabel: "Diễn giải",
+  },
+  HDB: {
+    type: "HDB",
+    title: "Hóa đơn bán hàng",
+    subtitle: "Bán sách, bàn cờ, đồng phục… — thuế GTGT theo từng dòng",
+    style: "pair",
+    headerSide: "debit",
+    headerAccountLabel: "TK nợ (công nợ)",
+    defaultHeaderAccount: "131",
+    lineAccountLabel: "TK doanh thu",
+    partnerLabel: "Mã khách",
+    contactLabel: "Người mua",
+    descriptionLabel: "Diễn giải",
+    invoice: true,
+  },
+  HDV: {
+    type: "HDV",
+    title: "Hóa đơn dịch vụ",
+    subtitle: "Học phí, giải đấu, dịch vụ đào tạo — mặc định không chịu thuế (KCT)",
+    style: "pair",
+    headerSide: "debit",
+    headerAccountLabel: "TK nợ (công nợ)",
+    defaultHeaderAccount: "131",
+    lineAccountLabel: "TK doanh thu",
+    partnerLabel: "Mã khách",
+    contactLabel: "Người mua / phụ huynh",
+    descriptionLabel: "Diễn giải",
+    invoice: true,
+  },
+  HDM: {
+    type: "HDM",
+    title: "Hóa đơn mua hàng",
+    subtitle: "Mua sách, bàn cờ, đồ dùng — thuế GTGT đầu vào được khấu trừ (1331)",
+    style: "pair",
+    headerSide: "credit",
+    headerAccountLabel: "TK có (công nợ)",
+    defaultHeaderAccount: "331",
+    lineAccountLabel: "TK hàng / chi phí",
+    partnerLabel: "Mã NCC",
+    contactLabel: "Người giao hàng",
+    descriptionLabel: "Diễn giải",
+    invoice: true,
+  },
+  HMV: {
+    type: "HMV",
+    title: "Hóa đơn mua dịch vụ",
+    subtitle: "Thuê mặt bằng, điện nước, dịch vụ mua ngoài",
+    style: "pair",
+    headerSide: "credit",
+    headerAccountLabel: "TK có (công nợ)",
+    defaultHeaderAccount: "331",
+    lineAccountLabel: "TK chi phí",
+    partnerLabel: "Mã NCC",
+    contactLabel: "Người liên hệ",
+    descriptionLabel: "Diễn giải",
+    invoice: true,
   },
   PK: {
     type: "PK",

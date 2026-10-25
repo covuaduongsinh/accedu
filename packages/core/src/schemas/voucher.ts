@@ -18,6 +18,14 @@ export const voucherLineSchema = z
     jobId: z.uuid().nullish(),
     departmentId: z.uuid().nullish(),
     expenseItemId: z.uuid().nullish(),
+    itemId: z.uuid().nullish(),
+    quantity: z.number().finite().nullish(),
+    unitPrice: z.number().finite().nonnegative().nullish(),
+    uom: z.string().max(32).optional(),
+    discountAmount: money.optional(),
+    vatCode: z.enum(["0", "5", "8", "10", "KCT", "KKKNT"]).nullish(),
+    vatAmount: money.optional(),
+    vatAccount: accountCode.nullish(),
   })
   .refine((l) => !!(l.debitAccount || l.creditAccount), { message: "Dòng phải có tài khoản Nợ hoặc Có" });
 
@@ -37,6 +45,11 @@ export const voucherSchema = z.object({
   exchangeRate: z.number().positive().default(1),
   headerAccount: accountCode.nullish(),
   originalDocuments: z.string().max(256).optional(),
+  invoiceSeries: z.string().trim().max(16).optional(),
+  invoiceNumber: z.string().trim().max(20).optional(),
+  invoiceDate: isoDate.nullish(),
+  dueDate: isoDate.nullish(),
+  partnerTaxCode: z.string().trim().max(18).optional(),
   lines: z.array(voucherLineSchema).min(1, "Chứng từ chưa có dòng chi tiết"),
 });
 

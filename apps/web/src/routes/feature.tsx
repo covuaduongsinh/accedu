@@ -3,6 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 import type { ComponentType } from "react";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
+import { ItemsPage } from "../features/catalogs/ItemsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
 import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
 import { MigrationPage } from "../features/import/MigrationPage";
@@ -11,6 +12,7 @@ import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
+import { PartnerBalancesPage, PartnerLedgerPage } from "../features/reports/PartnerReports";
 import { TrialBalancePage } from "../features/reports/TrialBalancePage";
 import { VoucherModule } from "../features/vouchers/VoucherModule";
 import { Card, PageHeader } from "../components/ui";
@@ -31,6 +33,15 @@ const PAGES: Record<string, ComponentType> = {
   "sales/customers": () => <PartnersPage kind="customer" />,
   "purchase/suppliers": () => <PartnersPage kind="supplier" />,
   "general/journal-vouchers": () => <VoucherModule type="PK" />,
+  "inventory/items": ItemsPage,
+  "sales/invoices": () => <VoucherModule type="HDB" />,
+  "sales/service-invoices": () => <VoucherModule type="HDV" />,
+  "purchase/invoices": () => <VoucherModule type="HDM" />,
+  "purchase/service-invoices": () => <VoucherModule type="HMV" />,
+  "sales/receivable-ledger": () => <PartnerLedgerPage side="receivable" />,
+  "sales/receivable-summary": () => <PartnerBalancesPage side="receivable" />,
+  "purchase/payable-ledger": () => <PartnerLedgerPage side="payable" />,
+  "purchase/payable-summary": () => <PartnerBalancesPage side="payable" />,
   "cash/receipts": () => <VoucherModule type="PT" />,
   "cash/payments": () => <VoucherModule type="PC" />,
   "cash/bank-credits": () => <VoucherModule type="BC" />,

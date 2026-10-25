@@ -63,6 +63,11 @@ export function usePartners(tenantId: string | undefined) {
   });
 }
 
+export function useItems(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.items(tenantId ?? ""), queryFn: () => api.items(db, tenantId as string), enabled: !!tenantId, staleTime: 60_000 });
+}
+
 export function useVouchers(tenantId: string | undefined, types: readonly string[]) {
   const db = useDb();
   return useQuery({
@@ -139,6 +144,24 @@ export function useGeneralJournal(tenantId: string | undefined, from: string, to
   });
 }
 
+export function usePartnerLedger(tenantId: string | undefined, account: string, partnerId: string | undefined, from: string, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "partner-ledger", account, partnerId ?? "", from, to),
+    queryFn: () => api.partnerLedger(db, tenantId as string, account, partnerId as string, from, to),
+    enabled: !!tenantId && !!account && !!partnerId,
+  });
+}
+
+export function usePartnerBalances(tenantId: string | undefined, account: string, from: string, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "partner-balances", account, from, to),
+    queryFn: () => api.partnerBalances(db, tenantId as string, account, from, to),
+    enabled: !!tenantId && !!account,
+  });
+}
+
 export function useAccountLedger(tenantId: string | undefined, account: string, from: string, to: string) {
   const db = useDb();
   return useQuery({
@@ -157,7 +180,7 @@ function invalidateLedger(qc: QueryClient, tenantId: string, voucherId?: string)
 export type SyncState = "connecting" | "live" | "offline";
 
 /** Bảng được theo dõi (đều nằm trong publication supabase_realtime) */
-const SYNC_TABLES = ["vouchers", "accounts", "partners", "jobs", "opening_balances", "period_locks", "memberships"] as const;
+const SYNC_TABLES = ["vouchers", "accounts", "partners", "items", "jobs", "opening_balances", "period_locks", "memberships"] as const;
 
 /**
  * Đồng bộ thời gian thực giữa web / desktop / mobile qua Supabase Realtime: khi bất kỳ thiết bị nào
@@ -234,6 +257,8 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
       return inv(qk.partners(tenantId));
     case "jobs":
       return inv(qk.jobs(tenantId));
+    case "items":
+      return inv(qk.items(tenantId));
     case "opening_balances":
       inv(qk.opening(tenantId));
       return inv(["report", tenantId]);

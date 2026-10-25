@@ -1,6 +1,6 @@
 import type { FieldSpec } from "./table";
 
-export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners";
+export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items";
 
 export interface ImportSpec {
   kind: ImportKind;
@@ -101,6 +101,35 @@ export const IMPORT_SPECS: Record<ImportKind, ImportSpec> = {
       "Bỏ trống cột Loại: đối tượng mới là khách hàng (hoặc nhà cung cấp nếu nhập từ Danh mục nhà cung cấp).",
       "Đối tượng đã có (trùng mã) được cập nhật các cột có trong tệp; cột không có trong tệp giữ nguyên.",
       "Từ FAO: Bán hàng › Danh mục khách hàng › Kết xuất Excel.",
+    ],
+  },
+  items: {
+    kind: "items",
+    title: "Danh mục hàng hóa, dịch vụ",
+    fileName: "mau-danh-muc-hang-hoa",
+    fields: [
+      { key: "code", label: "Mã hàng", required: true, synonyms: ["Mã hàng", "Mã vật tư", "Mã hàng hóa", "Mã VT", "Mã dịch vụ", "Mã"], exclude: ["kho", "thuế", "nhóm", "tk", "vạch", "nt"] },
+      { key: "name", label: "Tên hàng", required: true, synonyms: ["Tên hàng", "Tên mặt hàng", "Tên vật tư", "Tên hàng hóa", "Tên dịch vụ", "Tên"], exclude: ["nhóm", "khác", "kho"] },
+      { key: "kind", label: "Loại (Hàng hóa/Sách/Dịch vụ…)", synonyms: ["Loại", "Loại hàng", "Loại vật tư"], exclude: ["thuế"] },
+      { key: "uom", label: "Đvt", synonyms: ["Đvt", "Đơn vị tính", "Đơn vị"] },
+      { key: "vatCode", label: "Mã thuế", synonyms: ["Mã thuế", "Thuế suất", "Thuế GTGT", "VAT"] },
+      { key: "salePrice", label: "Giá bán", synonyms: ["Giá bán", "Đơn giá bán", "Giá"], exclude: ["mua", "vốn"] },
+      { key: "purchasePrice", label: "Giá mua", synonyms: ["Giá mua", "Đơn giá mua", "Giá vốn"] },
+      { key: "revenueAccount", label: "TK doanh thu", synonyms: ["Tk doanh thu", "Tài khoản doanh thu"] },
+      { key: "inventoryAccount", label: "TK kho / chi phí", synonyms: ["Tk kho", "Tk vật tư", "Tk hàng hóa", "Tài khoản kho"] },
+      { key: "groupCode", label: "Nhóm", synonyms: ["Nhóm", "Nhóm hàng", "Nhóm vật tư", "Mã nhóm"] },
+      { key: "barcode", label: "Mã vạch", synonyms: ["Mã vạch", "Barcode"] },
+    ],
+    sample: [
+      ["SACH-NM", "Sách cờ vua nhập môn (mẫu)", "Sách", "Cuốn", "5", "120000", "80000", "5111", "", "SACH", ""],
+      ["BANCO-01", "Bàn cờ gỗ tiêu chuẩn (mẫu)", "Hàng hóa", "Bộ", "10", "350000", "220000", "5111", "", "DUNGCU", ""],
+      ["HP-TOT", "Học phí lớp Tốt (mẫu)", "Dịch vụ", "Tháng", "KCT", "800000", "", "5113", "", "HOCPHI", ""],
+    ],
+    notes: [
+      "Chỉ cột Mã hàng và Tên hàng là bắt buộc. Mã tối đa 32 ký tự, không trùng.",
+      "Loại: Hàng hóa, Sách, Vật tư, Thành phẩm, Công cụ, Dịch vụ. Mã thuế: 0, 5, 8, 10 hoặc KCT (không chịu thuế — học phí).",
+      "TK doanh thu bỏ trống thì hóa đơn dùng 5111 (hàng) / 5113 (dịch vụ). Hàng đã có (trùng mã) được cập nhật các cột có trong tệp.",
+      "Từ FAO: Tồn kho › Danh mục hàng hóa, vật tư › Kết xuất Excel.",
     ],
   },
   "opening-accounts": {

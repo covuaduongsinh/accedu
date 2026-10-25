@@ -12,6 +12,10 @@ export interface PostingLine {
   amountFc?: number;
   /** Nhóm định khoản (chỉ dùng cho kiểu một vế) */
   entryGroup?: number;
+  /** Tiền thuế GTGT của dòng (chỉ kiểu cặp) */
+  vatAmount?: number;
+  /** TK thuế; mặc định 33311 (TK phần đầu bên Nợ — bán) hoặc 1331 (bên Có — mua) */
+  vatAccount?: string | null;
 }
 
 export interface LedgerEntry {
@@ -36,9 +40,11 @@ export type PostingResult =
 
 /**
  * Sinh bút toán sổ cái (một vế/dòng) từ dòng chứng từ, đồng thời kiểm tra cân Nợ = Có.
- * Logic này trùng với hàm SQL `accounting.post_voucher` — dùng để xem trước và kiểm thử.
+ * Logic này trùng với hàm SQL `public.post_voucher` — dùng để xem trước và kiểm thử.
+ * `headerSide`: vế của TK phần đầu, quyết định bút toán thuế — bên Nợ (bán): Nợ TK đầu / Có TK thuế;
+ * bên Có (mua): Nợ TK thuế / Có TK đầu.
  */
-export function buildLedgerEntries(lines: readonly PostingLine[], decimals = 0): PostingResult {
+export function buildLedgerEntries(lines: readonly PostingLine[], decimals = 0, headerSide: "debit" | "credit" = "debit"): PostingResult {
   const errors: PostingError[] = [];
   if (lines.length === 0) return { ok: false, errors: [{ code: "empty", message: "Chứng từ chưa có dòng chi tiết" }] };
 
@@ -59,6 +65,15 @@ export function buildLedgerEntries(lines: readonly PostingLine[], decimals = 0):
         { lineNo: line.lineNo, account: d, contraAccount: c, debit: amount, credit: 0, debitFc: amountFc, creditFc: 0 },
         { lineNo: line.lineNo, account: c, contraAccount: d, debit: 0, credit: amount, debitFc: 0, creditFc: amountFc },
       );
+      const vat = roundAmount(line.vatAmount ?? 0, decimals);
+      if (vat > 0) {
+        const vatAccount = line.vatAccount || (headerSide === "debit" ? "33311" : "1331");
+        const [vd, vc] = headerSide === "debit" ? [d, vatAccount] : [vatAccount, c];
+        entries.push(
+          { lineNo: line.lineNo, account: vd, contraAccount: vc, debit: vat, credit: 0, debitFc: vat, creditFc: 0 },
+          { lineNo: line.lineNo, account: vc, contraAccount: vd, debit: 0, credit: vat, debitFc: 0, creditFc: vat },
+        );
+      }
     } else if (d || c) {
       const g = line.entryGroup ?? 1;
       const bucket = singles.get(g) ?? [];

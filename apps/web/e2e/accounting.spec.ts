@@ -282,6 +282,53 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     expect(sheet?.data[0]?.slice(0, 2)).toEqual(["Tài khoản", "Tên tài khoản"]);
   });
 
+  test("hóa đơn dịch vụ học phí (KCT), hóa đơn bán sách có thuế, sổ công nợ khách hàng", async ({ page }) => {
+    await signIn(page);
+    // Danh mục hàng hóa
+    await page.goto(`/${slug}/inventory/items`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    const form = page.getByRole("dialog");
+    await form.getByLabel("Mã hàng").fill("SACH-NM");
+    await form.getByLabel("Loại").selectOption("book");
+    await form.getByLabel("Tên hàng, dịch vụ").fill("Sách cờ vua nhập môn");
+    await form.getByLabel("Đơn vị tính").fill("Cuốn");
+    await form.getByLabel("Thuế suất GTGT").selectOption("5");
+    await form.getByLabel("Giá bán").fill("120000");
+    await form.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByRole("gridcell", { name: "Sách cờ vua nhập môn" })).toBeVisible();
+
+    // Hóa đơn dịch vụ học phí: mặc định không chịu thuế
+    await page.goto(`/${slug}/sales/service-invoices`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    const inv = page.getByRole("dialog");
+    await inv.getByLabel("Mã khách").first().fill("HV002");
+    await inv.getByLabel("Diễn giải dòng 1").fill("Học phí lớp Tốt tháng 10");
+    await inv.getByLabel("Thành tiền dòng 1").fill("3000000");
+    await expect(inv.getByLabel("Thuế suất dòng 1")).toHaveValue("KCT");
+    await expect(inv.getByTestId("invoice-total")).toHaveText("3.000.000");
+    await inv.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByText("Đã ghi sổ").first()).toBeVisible();
+
+    // Hóa đơn bán sách: chọn mã hàng tự điền giá, thuế 5%
+    await page.goto(`/${slug}/sales/invoices`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await inv.getByLabel("Mã khách").first().fill("HV002");
+    await inv.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
+    await expect(inv.getByLabel("Diễn giải dòng 1")).toHaveValue("Sách cờ vua nhập môn");
+    await inv.getByLabel("Số lượng dòng 1").fill("2");
+    await expect(inv.getByTestId("invoice-total")).toHaveText("252.000");
+    await shot(page, "14-hoa-don-ban-hang");
+    await inv.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "252.000" }).first()).toBeVisible();
+
+    // Sổ chi tiết công nợ: số dư đầu kỳ 3.000.000 (nhập từ Excel) + 3.000.000 + 252.000
+    await page.goto(`/${slug}/sales/receivable-ledger?partner=HV002&from=2026-01-01&to=2026-12-31`);
+    await expect(page.locator(".ag-row", { hasText: "Số dư cuối kỳ" })).toContainText("6.252.000");
+    await shot(page, "15-so-cong-no");
+    await page.goto(`/${slug}/sales/receivable-summary`);
+    await expect(page.locator(".ag-row", { hasText: "HV002" })).toContainText("6.252.000");
+  });
+
   test("khóa sổ, lớp học", async ({ page }) => {
     await signIn(page);
     await page.goto(`/${slug}/project/jobs`);
