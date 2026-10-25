@@ -185,7 +185,7 @@ function StockForm({
     if (c.qty <= 0) problems.push(`Dòng ${n}: chưa nhập số lượng`);
     if (receipt && c.amount <= 0) problems.push(`Dòng ${n}: chưa nhập đơn giá / thành tiền`);
     if (!receipt && status !== "posted" && c.item && c.qty > c.stock.quantity)
-      problems.push(`Dòng ${n}: ${c.item.code} tại kho chỉ còn ${formatAmount(c.stock.quantity, { decimals: 2 })} ${c.item.uom}`);
+      problems.push(`Dòng ${n}: ${c.item.code} tại kho chỉ còn ${formatAmount(c.stock.quantity, { decimals: Number.isInteger(c.stock.quantity) ? 0 : 2 })} ${c.item.uom}`);
     if (transfer && c.draft.warehouseId && c.draft.warehouseId === header.toWarehouseId) problems.push(`Dòng ${n}: kho xuất trùng kho nhập`);
   });
   if (!used.length) problems.push("Chưa có dòng hàng");

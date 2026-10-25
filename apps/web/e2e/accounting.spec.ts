@@ -436,6 +436,78 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await shot(page, "23-hoa-don-mua-nhap");
   });
 
+  test("kho hàng: tồn đầu kỳ, hóa đơn mua nhập kho, phiếu xuất tính giá vốn, chặn xuất âm, nhập–xuất–tồn, thẻ kho", async ({ page }) => {
+    await signIn(page);
+    const dialog = page.getByRole("dialog");
+    // Tồn kho đầu kỳ: dán từ Excel
+    await page.goto(`/${slug}/general/opening-balances`);
+    await page.getByRole("tab", { name: /Tồn kho/ }).click();
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog.getByLabel("Dữ liệu dán từ Excel").fill("Mã kho\tMã hàng\tSố lượng tồn\tGiá trị tồn\nKHO\tSACH-NM\t10\t800000");
+    await dialog.getByRole("button", { name: "Dùng dữ liệu đã dán" }).click();
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await dialog.getByRole("button", { name: "Nhập 1 dòng" }).click();
+    await expect(page.getByText(/Đã nhập tồn kho đầu kỳ: 1 dòng, giá trị 800.000/)).toBeVisible();
+    await expect(page.getByRole("gridcell", { name: "SACH-NM" })).toBeVisible();
+    await shot(page, "24-ton-kho-dau-ky");
+
+    // Hóa đơn mua 10 cuốn × 90.000 vào Kho chính → bình quân 85.000
+    await page.goto(`/${slug}/purchase/invoices`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã NCC").first().fill("NCC01");
+    await dialog.getByLabel("Số hóa đơn").fill("888");
+    await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
+    await dialog.getByLabel("Số lượng dòng 1").fill("10");
+    await dialog.getByLabel("Đơn giá dòng 1").fill("90000");
+    await expect(dialog.getByLabel("Kho dòng 1")).not.toHaveValue("");
+    await expect(dialog.getByTestId("invoice-total")).toHaveText("945.000");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "945.000" }).first()).toBeVisible();
+
+    // Phiếu xuất 5 cuốn: giá vốn 425.000
+    await page.goto(`/${slug}/inventory/issues`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Diễn giải").fill("Xuất sách cho CLB");
+    await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
+    await expect(dialog.getByTestId("ton-1")).toHaveText("20");
+    await dialog.getByLabel("Số lượng dòng 1").fill("5");
+    await expect(dialog.getByTestId("gia-von-1")).toHaveText("425.000");
+    await shot(page, "25-phieu-xuat-kho");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "425.000" }).first()).toBeVisible();
+
+    // Xuất quá số tồn: chặn ngay trên form
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
+    await dialog.getByLabel("Số lượng dòng 1").fill("100");
+    await expect(dialog.getByText(/SACH-NM tại kho chỉ còn 15 Cuốn/)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Lưu & ghi sổ" })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Đóng", exact: true }).last().click();
+
+    // Nhập – xuất – tồn và thẻ kho
+    await page.goto(`/${slug}/inventory/stock-summary`);
+    const row = page.locator(".ag-row", { hasText: "SACH-NM" }).first();
+    await expect(row).toContainText("1.275.000");
+    await expect(row).toContainText("15");
+    await shot(page, "26-nhap-xuat-ton");
+    await row.dblclick();
+    await expect(page.getByRole("heading", { name: "Thẻ kho / sổ chi tiết vật tư" })).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "Tồn cuối kỳ" })).toContainText("1.275.000");
+    await expect(page.locator(".ag-row", { hasText: /PX\d+/ })).toContainText("425.000");
+    await shot(page, "27-the-kho");
+
+    // Đổi sang bình quân cả tháng rồi đổi lại
+    await page.goto(`/${slug}/inventory/costing`);
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("radio", { name: /Bình quân cả tháng/ }).click();
+    await expect(page.getByText(/Đã đổi phương pháp tính giá/)).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Bình quân cả tháng/ })).toBeChecked();
+    await shot(page, "28-tinh-gia-von");
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("radio", { name: /Bình quân di động/ }).click();
+    await expect(page.getByRole("radio", { name: /Bình quân di động/ })).toBeChecked();
+  });
+
   test("khóa sổ, lớp học", async ({ page }) => {
     await signIn(page);
     await page.goto(`/${slug}/project/jobs`);
