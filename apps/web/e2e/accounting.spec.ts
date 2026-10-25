@@ -329,6 +329,51 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.locator(".ag-row", { hasText: "HV002" })).toContainText("6.252.000");
   });
 
+  test("thu tiền theo hóa đơn: phân bổ tự động, tình hình thanh toán, tuổi nợ, bảng kê bán ra", async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/${slug}/cash/receipts`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Mã khách").first().fill("HV002");
+    await dialog.getByRole("button", { name: "Thu theo hóa đơn" }).click();
+    const panel = dialog.getByRole("region", { name: "thu theo hóa đơn" });
+    // Hai hóa đơn còn nợ: học phí 3.000.000 và sách 252.000
+    await expect(panel.locator("tbody tr")).toHaveCount(2);
+    await panel.getByLabel("Số tiền thu theo hóa đơn").fill("3252000");
+    await panel.getByRole("button", { name: "Phân bổ tự động" }).click();
+    await expect(panel.getByTestId("settle-allocated")).toHaveText("3.252.000");
+    await shot(page, "16-thu-theo-hoa-don");
+    await panel.getByRole("button", { name: "Đưa vào phiếu" }).click();
+    await expect(dialog.getByLabel("Tài khoản dòng 2")).toHaveValue("131");
+    await expect(dialog.getByLabel("Hóa đơn dòng 1")).not.toHaveValue("");
+    await expect(dialog.getByLabel("Hóa đơn dòng 2")).not.toHaveValue("");
+    await expect(dialog.getByText("3.252.000").first()).toBeVisible();
+    await shot(page, "17-phieu-thu-theo-hoa-don");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "3.252.000" }).first()).toBeVisible();
+
+    // Hóa đơn sách: đã thu đủ
+    await page.goto(`/${slug}/sales/invoices`);
+    await page.getByRole("gridcell", { name: "252.000" }).first().dblclick();
+    await expect(dialog.getByTestId("invoice-paid")).toHaveText("252.000");
+    await expect(dialog.getByTestId("invoice-remaining")).toHaveText("0");
+    await shot(page, "18-tinh-hinh-thanh-toan");
+
+    // Tuổi nợ: chỉ còn số dư đầu kỳ 3.000.000 (nhập từ Excel, không theo hóa đơn)
+    await page.goto(`/${slug}/sales/aging`);
+    // HV002 chỉ còn số dư đầu kỳ ở cột "Không theo hóa đơn"; HV001 trả trước 1.500.000 (dư Có)
+    await expect(page.locator(".ag-row", { hasText: "HV002" }).first()).toHaveText(/Học viên Mẫu Hai\s*3\.000\.000\s*3\.000\.000/);
+    await expect(page.locator(".ag-row", { hasText: "HV001" }).first()).toContainText("-1.500.000");
+    await shot(page, "19-tuoi-no-phai-thu");
+
+    // Bảng kê bán ra: nhóm không chịu thuế (học phí) và nhóm 5% (sách)
+    await page.goto(`/${slug}/general/vat-out`);
+    await expect(page.getByText("Hàng hóa, dịch vụ không chịu thuế GTGT")).toBeVisible();
+    await expect(page.getByText("Hàng hóa, dịch vụ chịu thuế suất 5%")).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "Sách cờ vua nhập môn" }).first()).toContainText("12.000");
+    await shot(page, "20-bang-ke-ban-ra");
+  });
+
   test("khóa sổ, lớp học", async ({ page }) => {
     await signIn(page);
     await page.goto(`/${slug}/project/jobs`);

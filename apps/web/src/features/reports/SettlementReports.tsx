@@ -162,31 +162,29 @@ export function VatListingPage({ direction }: { direction: "out" | "in" }) {
 
   const cols = useMemo<ColDef<VatDisplayRow>[]>(
     () => [
-      { field: "stt", headerName: "STT", width: 70, sortable: false },
+      { field: "stt", headerName: "STT", width: 64 },
       {
         field: "invoice_series",
         headerName: "Ký hiệu HĐ",
         width: 120,
-        sortable: false,
         colSpan: (p) => (p.data?.row_kind === "entry" ? 1 : 7),
         valueGetter: (p) => (p.data?.row_kind === "entry" ? p.data.invoice_series : p.data?.label),
         cellClass: (p) => (p.data?.row_kind === "entry" ? "" : "font-semibold text-navy-700"),
       },
-      { field: "invoice_number", headerName: "Số HĐ", width: 110, sortable: false },
-      dateCol("invoice_date", "Ngày HĐ", { sortable: false }),
-      { field: "partner_name", headerName: sale ? "Tên người mua" : "Tên người bán", flex: 2, minWidth: 200, sortable: false },
-      { field: "partner_tax_code", headerName: sale ? "MST người mua" : "MST người bán", width: 130, sortable: false },
-      { field: "item_description", headerName: "Mặt hàng", flex: 1, minWidth: 180, sortable: false },
-      { field: "voucher_number", headerName: "Số CT", width: 100, sortable: false },
-      amountCol("net_amount", "Doanh số chưa thuế", { width: 150, sortable: false }),
+      { field: "invoice_number", headerName: "Số HĐ", width: 110 },
+      dateCol("invoice_date", "Ngày HĐ"),
+      { field: "partner_name", headerName: sale ? "Tên người mua" : "Tên người bán", flex: 2, minWidth: 200 },
+      { field: "partner_tax_code", headerName: sale ? "MST người mua" : "MST người bán", width: 130 },
+      { field: "item_description", headerName: "Mặt hàng", flex: 1, minWidth: 180 },
+      { field: "voucher_number", headerName: "Số CT", width: 100 },
+      amountCol("net_amount", "Doanh số chưa thuế", { width: 150 }),
       {
         field: "vat_code",
         headerName: "Thuế suất",
-        width: 120,
-        sortable: false,
+        width: 150,
         valueFormatter: (p) => (p.value ? (VAT_CODES[p.value as VatCode]?.label ?? String(p.value)) : ""),
       },
-      amountCol("vat_amount", "Thuế GTGT", { width: 130, sortable: false }),
+      amountCol("vat_amount", "Thuế GTGT", { width: 130 }),
     ],
     [sale],
   );
@@ -229,6 +227,8 @@ export function VatListingPage({ direction }: { direction: "out" | "in" }) {
       <DataGrid<VatDisplayRow>
         rowData={display}
         columnDefs={cols}
+        // Dòng nhóm/tổng xen giữa: không sắp xếp, không lọc
+        defaultColDef={{ sortable: false, filter: false, resizable: true }}
         loading={rows.isLoading}
         height="calc(100vh - 290px)"
         getRowClass={(p) => (p.data?.row_kind === "entry" ? "" : "bg-navy-50")}
