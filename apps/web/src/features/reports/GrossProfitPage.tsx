@@ -49,7 +49,7 @@ export function GrossProfitPage() {
         : []),
       amountCol("revenue", "Doanh thu", { width: 140 }),
       amountCol("deductions", "Giảm trừ", { width: 120 }),
-      amountCol("net_revenue", "Doanh thu thuần", { width: 140 }),
+      amountCol("net_revenue", "Doanh thu thuần", { width: 160 }),
       amountCol("cogs", "Giá vốn", { width: 140 }),
       amountCol("gross_profit", "Lãi gộp", { width: 140, cellClass: "num font-semibold" }),
       { field: "margin", headerName: "Tỷ suất", type: "rightAligned", width: 95, cellClass: "num", valueFormatter: (p: ValueFormatterParams) => pct(p.value) },

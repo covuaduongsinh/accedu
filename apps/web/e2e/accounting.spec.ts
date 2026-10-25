@@ -307,6 +307,19 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await form.getByRole("button", { name: "Lưu", exact: true }).click();
     await expect(page.getByRole("gridcell", { name: "Sách cờ vua nhập môn" })).toBeVisible();
 
+    // Tồn kho đầu kỳ của sách: dán từ Excel (hóa đơn bán hàng theo dõi tồn kho sẽ xuất kho)
+    const dialog = page.getByRole("dialog");
+    await page.goto(`/${slug}/general/opening-balances`);
+    await page.getByRole("tab", { name: /Tồn kho/ }).click();
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog.getByLabel("Dữ liệu dán từ Excel").fill("Mã kho\tMã hàng\tSố lượng tồn\tGiá trị tồn\nKHO\tSACH-NM\t10\t800000");
+    await dialog.getByRole("button", { name: "Dùng dữ liệu đã dán" }).click();
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await dialog.getByRole("button", { name: "Nhập 1 dòng" }).click();
+    await expect(page.getByText(/Đã nhập tồn kho đầu kỳ: 1 dòng, giá trị 800.000/)).toBeVisible();
+    await expect(page.getByRole("gridcell", { name: "SACH-NM" })).toBeVisible();
+    await shot(page, "24-ton-kho-dau-ky");
+
     // Hóa đơn dịch vụ học phí: mặc định không chịu thuế
     await page.goto(`/${slug}/sales/service-invoices`);
     await page.getByRole("button", { name: "Mới", exact: true }).click();
@@ -327,6 +340,11 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(inv.getByLabel("Diễn giải dòng 1")).toHaveValue("Sách cờ vua nhập môn");
     await inv.getByLabel("Số lượng dòng 1").fill("2");
     await expect(inv.getByTestId("invoice-total")).toHaveText("252.000");
+    // Sách theo dõi tồn kho: xuất từ Kho chính, giá vốn ước tính 2 × 80.000
+    await expect(inv.getByLabel("Kho dòng 1")).not.toHaveValue("");
+    await expect(inv.getByTestId("ton-1")).toHaveText("10");
+    await expect(inv.getByTestId("gia-von-1")).toHaveText("160.000");
+    await expect(inv.getByTestId("invoice-gross-profit")).toHaveText("80.000");
     await shot(page, "14-hoa-don-ban-hang");
     await inv.getByRole("button", { name: "Lưu & ghi sổ" }).click();
     await expect(page.getByRole("gridcell", { name: "252.000" }).first()).toBeVisible();
@@ -413,6 +431,9 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByLabel("Loại hóa đơn 45")).toHaveValue("HMV");
     await expect(page.getByLabel("TK Nợ hóa đơn 45")).toHaveValue("6422");
     await expect(page.getByText("1.939.999")).toBeVisible();
+    // Sách khớp mã hàng SACH-NM theo tên → dòng hóa đơn mua gắn mã hàng, ghi sổ sẽ nhập kho
+    await expect(page.getByTestId("items-123")).toHaveText("1/2");
+    await expect(page.getByTestId("items-45")).toHaveText("0/1");
     await page.getByRole("button", { name: "Chi tiết hóa đơn 123" }).click();
     await expect(page.getByText("Bàn cờ gỗ tiêu chuẩn")).toBeVisible();
     await shot(page, "21-hoa-don-dau-vao-xem-truoc");
@@ -436,20 +457,9 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await shot(page, "23-hoa-don-mua-nhap");
   });
 
-  test("kho hàng: tồn đầu kỳ, hóa đơn mua nhập kho, phiếu xuất tính giá vốn, chặn xuất âm, nhập–xuất–tồn, thẻ kho", async ({ page }) => {
+  test("kho hàng: hóa đơn mua nhập kho, phiếu xuất tính giá vốn, chặn xuất âm, nhập–xuất–tồn, thẻ kho, hóa đơn bán có giá vốn, lãi gộp", async ({ page }) => {
     await signIn(page);
     const dialog = page.getByRole("dialog");
-    // Tồn kho đầu kỳ: dán từ Excel
-    await page.goto(`/${slug}/general/opening-balances`);
-    await page.getByRole("tab", { name: /Tồn kho/ }).click();
-    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
-    await dialog.getByLabel("Dữ liệu dán từ Excel").fill("Mã kho\tMã hàng\tSố lượng tồn\tGiá trị tồn\nKHO\tSACH-NM\t10\t800000");
-    await dialog.getByRole("button", { name: "Dùng dữ liệu đã dán" }).click();
-    await dialog.getByRole("button", { name: "Xem trước" }).click();
-    await dialog.getByRole("button", { name: "Nhập 1 dòng" }).click();
-    await expect(page.getByText(/Đã nhập tồn kho đầu kỳ: 1 dòng, giá trị 800.000/)).toBeVisible();
-    await expect(page.getByRole("gridcell", { name: "SACH-NM" })).toBeVisible();
-    await shot(page, "24-ton-kho-dau-ky");
 
     // Hóa đơn mua 10 cuốn × 90.000 vào Kho chính → bình quân 85.000
     await page.goto(`/${slug}/purchase/invoices`);
@@ -467,9 +477,11 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     // Phiếu xuất 5 cuốn: giá vốn 425.000
     await page.goto(`/${slug}/inventory/issues`);
     await page.getByRole("button", { name: "Mới", exact: true }).click();
-    await dialog.getByLabel("Diễn giải").fill("Xuất sách cho CLB");
+    await dialog.getByLabel("Diễn giải").fill("Xuất sách tặng CLB");
+    await dialog.getByLabel("TK nợ (giá vốn / chi phí)").fill("6421");
     await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
-    await expect(dialog.getByTestId("ton-1")).toHaveText("20");
+    // 10 tồn đầu + 10 mua − 2 đã bán
+    await expect(dialog.getByTestId("ton-1")).toHaveText("18");
     await dialog.getByLabel("Số lượng dòng 1").fill("5");
     await expect(dialog.getByTestId("gia-von-1")).toHaveText("425.000");
     await shot(page, "25-phieu-xuat-kho");
@@ -480,21 +492,50 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await page.getByRole("button", { name: "Mới", exact: true }).click();
     await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
     await dialog.getByLabel("Số lượng dòng 1").fill("100");
-    await expect(dialog.getByText(/SACH-NM tại kho chỉ còn 15 Cuốn/)).toBeVisible();
+    await expect(dialog.getByText(/SACH-NM tại kho chỉ còn 13 Cuốn/)).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Lưu & ghi sổ" })).toBeDisabled();
     await dialog.getByRole("button", { name: "Đóng", exact: true }).last().click();
 
     // Nhập – xuất – tồn và thẻ kho
     await page.goto(`/${slug}/inventory/stock-summary`);
     const row = page.locator(".ag-row", { hasText: "SACH-NM" }).first();
-    await expect(row).toContainText("1.275.000");
-    await expect(row).toContainText("15");
+    // Cùng ngày: nhập trước, xuất sau → bình quân 85.000; còn 13 cuốn
+    await expect(row).toContainText("1.105.000");
+    await expect(row).toContainText("13");
     await shot(page, "26-nhap-xuat-ton");
     await row.dblclick();
     await expect(page.getByRole("heading", { name: "Thẻ kho / sổ chi tiết vật tư" })).toBeVisible();
-    await expect(page.locator(".ag-row", { hasText: "Tồn cuối kỳ" })).toContainText("1.275.000");
+    await expect(page.locator(".ag-row", { hasText: "Tồn cuối kỳ" })).toContainText("1.105.000");
     await expect(page.locator(".ag-row", { hasText: /PX\d+/ })).toContainText("425.000");
+    // Hóa đơn bán 2 cuốn tính lại theo bình quân sau khi mua: 2 × 85.000
+    await expect(page.locator(".ag-row", { hasText: /HD\d+/ }).first()).toContainText("170.000");
     await shot(page, "27-the-kho");
+
+    // Hóa đơn bán 3 cuốn: tự xuất kho, giá vốn 3 × 85.000, lãi gộp 360.000 − 255.000
+    await page.goto(`/${slug}/sales/invoices`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã khách").first().fill("HV002");
+    await dialog.getByLabel("Mã hàng dòng 1").fill("SACH-NM");
+    await dialog.getByLabel("Số lượng dòng 1").fill("3");
+    await expect(dialog.getByTestId("ton-1")).toHaveText("13");
+    await expect(dialog.getByTestId("gia-von-1")).toHaveText("255.000");
+    await expect(dialog.getByTestId("invoice-gross-profit")).toHaveText("105.000");
+    await shot(page, "29-hoa-don-ban-gia-von");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "378.000" }).first()).toBeVisible();
+    await page.goto(`/${slug}/inventory/stock-summary`);
+    await expect(page.locator(".ag-row", { hasText: "SACH-NM" }).first()).toContainText("850.000");
+
+    // Lãi gộp theo mặt hàng: sách bán 5 cuốn, doanh thu 600.000, giá vốn 170.000 + 255.000
+    await page.goto(`/${slug}/sales/gross-profit`);
+    const gp = page.locator(".ag-row", { hasText: "SACH-NM" }).first();
+    await expect(gp).toContainText("600.000");
+    await expect(gp).toContainText("425.000");
+    await expect(gp).toContainText("175.000");
+    await expect(gp).toContainText("29,2%");
+    await shot(page, "30-lai-gop");
+    await page.getByLabel("Xem lãi gộp theo").selectOption("customer");
+    await expect(page.locator(".ag-row", { hasText: "HV002" }).first()).toContainText("425.000");
 
     // Đổi sang bình quân cả tháng rồi đổi lại
     await page.goto(`/${slug}/inventory/costing`);

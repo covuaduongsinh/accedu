@@ -260,7 +260,8 @@ function InvoiceForm({
           itemId: item?.id ?? null,
           jobId: job?.id ?? null,
           ...(stockLine(item, l.account) && l.warehouseId ? { warehouseId: l.warehouseId } : {}),
-          quantity: qty !== null && price !== null ? qty : null,
+          // Dòng xuất kho (hóa đơn bán) luôn gửi số lượng, kể cả khi nhập thành tiền tay
+          quantity: qty !== null && (price !== null || (issue && stockLine(item, l.account))) ? qty : null,
           unitPrice: qty !== null && price !== null ? price : null,
           uom: l.uom,
           discountAmount: num(l.discount) ?? 0,
