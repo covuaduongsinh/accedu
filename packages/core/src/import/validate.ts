@@ -1,0 +1,486 @@
+import { inferAccount, type CoaKind, type NormalSide } from "../accounting/coa";
+import { partnerSchema } from "../schemas/catalog";
+import { IMPORT_SPECS, type ImportKind } from "./specs";
+import { cellText, normalizeHeader, parseFlag, parseLooseAmount, type Cell, type ColumnMap, type HeaderGuess, type Table } from "./table";
+
+/** Dữ liệu hiện có của đơn vị — để biết dòng nào mới/cập nhật và kiểm tra tham chiếu */
+export interface ImportContext {
+  accounts: ReadonlyArray<{ code: string; is_postable: boolean; track_partner: boolean }>;
+  partners: ReadonlyArray<{ code: string }>;
+  /** Nhập từ trang Khách hàng hay Nhà cung cấp: loại mặc định của đối tượng mới */
+  partnerDefault?: "customer" | "supplier";
+}
+
+/** Dòng gửi lên hàm SQL import_accounts — trường vắng mặt = giữ nguyên khi cập nhật */
+export interface AccountImportRow {
+  row: number;
+  code: string;
+  name?: string;
+  name_en?: string | null;
+  parent_code?: string | null;
+  kind?: CoaKind;
+  normal_side?: NormalSide;
+  currency?: string | null;
+  track_partner?: boolean;
+  track_item?: boolean;
+}
+
+export interface PartnerImportRow {
+  row: number;
+  code: string;
+  name?: string;
+  tax_code?: string | null;
+  id_number?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contact_name?: string | null;
+  group_code?: string | null;
+  bank_account_no?: string | null;
+  bank_name?: string | null;
+  note?: string | null;
+  is_customer?: boolean;
+  is_supplier?: boolean;
+  is_employee?: boolean;
+  is_student?: boolean;
+}
+
+export interface OpeningImportRow {
+  row: number;
+  account: string;
+  partner_code?: string;
+  debit: number;
+  credit: number;
+}
+
+export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow;
+export type RowStatus = "new" | "update" | "skip" | "error";
+
+export interface PreviewRow<P extends ImportPayload = ImportPayload> {
+  /** Số dòng trên sheet (từ 1, như Excel hiển thị) */
+  row: number;
+  status: RowStatus;
+  message?: string;
+  /** Giá trị hiển thị theo từng trường */
+  values: Record<string, string>;
+  payload?: P;
+}
+
+export interface Preview<P extends ImportPayload = ImportPayload> {
+  kind: ImportKind;
+  rows: PreviewRow<P>[];
+  counts: Record<RowStatus, number>;
+  /** Số dư: tổng Nợ/Có các dòng sẽ nhập và các dòng TK công nợ bị bỏ qua */
+  totals?: { debit: number; credit: number; skippedDebit: number; skippedCredit: number };
+}
+
+const TOTAL_WORDS = ["tong", "cong", "total", "luy ke"];
+
+function looksLikeTotal(values: string[]): boolean {
+  return values.some((v) => {
+    const n = normalizeHeader(v);
+    return TOTAL_WORDS.some((w) => n.startsWith(w));
+  });
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+function parseSide(text: string): NormalSide | null | undefined {
+  const t = normalizeHeader(text);
+  if (t === "") return undefined;
+  if (["no", "d", "debit", "du no", "ben no"].includes(t)) return "debit";
+  if (["co", "c", "credit", "du co", "ben co"].includes(t)) return "credit";
+  if (["luong tinh", "both", "l", "ca hai", "hai ben", "no co", "2"].includes(t)) return "both";
+  return null;
+}
+
+const TYPE_WORDS: Record<string, "is_customer" | "is_supplier" | "is_employee" | "is_student"> = {
+  kh: "is_customer",
+  "khach hang": "is_customer",
+  khach: "is_customer",
+  ncc: "is_supplier",
+  "nha cung cap": "is_supplier",
+  nv: "is_employee",
+  "nhan vien": "is_employee",
+  hlv: "is_employee",
+  hv: "is_student",
+  "hoc vien": "is_student",
+  "hoc sinh": "is_student",
+};
+
+function parseTypes(text: string): Partial<Record<"is_customer" | "is_supplier" | "is_employee" | "is_student", boolean>> | null {
+  const parts = text
+    .split(/[,;/+&]| va /i)
+    .map((p) => normalizeHeader(p))
+    .filter(Boolean);
+  const out: Partial<Record<"is_customer" | "is_supplier" | "is_employee" | "is_student", boolean>> = {
+    is_customer: false,
+    is_supplier: false,
+    is_employee: false,
+    is_student: false,
+  };
+  for (const p of parts) {
+    const k = TYPE_WORDS[p];
+    if (!k) return null;
+    out[k] = true;
+  }
+  return out;
+}
+
+/** Chuẩn hóa số hiệu tài khoản: bỏ khoảng trắng, dấu chấm (Excel đôi khi hiển thị 1121.0) */
+function accountCode(c: Cell): string {
+  if (typeof c === "number" && Number.isInteger(c)) return String(c);
+  return cellText(c).replace(/\.0+$/, "").replace(/[\s.]/g, "");
+}
+
+/** Mã đối tượng: số nguyên trong ô Excel → chuỗi không có phần thập phân */
+function codeText(c: Cell): string {
+  if (typeof c === "number" && Number.isInteger(c)) return String(c);
+  return cellText(c);
+}
+
+/**
+ * Chuyển bảng đọc từ Excel thành bản xem trước: từng dòng có trạng thái Mới / Cập nhật / Bỏ qua / Lỗi
+ * và dữ liệu đã chuẩn hóa để gửi lên máy chủ. Máy chủ kiểm tra lại toàn bộ trước khi ghi.
+ */
+export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess, map: ColumnMap, ctx: ImportContext): Preview {
+  const spec = IMPORT_SPECS[kind];
+  const first = header.row + header.height;
+  const rows: PreviewRow[] = [];
+  const has = (key: string) => map[key] !== null && map[key] !== undefined;
+  const raw = (cells: readonly Cell[], key: string): Cell => (has(key) ? cells[map[key]!] : undefined);
+
+  for (let i = first; i < table.length; i++) {
+    const cells = table[i] ?? [];
+    const values: Record<string, string> = {};
+    for (const f of spec.fields) if (has(f.key)) values[f.key] = cellText(raw(cells, f.key));
+    // Dòng trống hoàn toàn: không hiển thị
+    if (!cells.some((c) => cellText(c) !== "")) continue;
+    rows.push({ row: i + 1, status: "new", values });
+  }
+
+  const accountByCode = new Map(ctx.accounts.map((a) => [a.code, a]));
+  const partnerCodes = new Set(ctx.partners.map((p) => p.code.toUpperCase()));
+  const fail = (r: PreviewRow, message: string) => {
+    r.status = "error";
+    r.message = message;
+  };
+  const skip = (r: PreviewRow, message: string) => {
+    r.status = "skip";
+    r.message = message;
+  };
+  const tableRow = (r: PreviewRow) => table[r.row - 1] ?? [];
+
+  if (kind === "accounts") {
+    const seen = new Map<string, number>();
+    const fileCodes = new Set<string>();
+    for (const r of rows) {
+      const code = accountCode(raw(tableRow(r), "code"));
+      if (/^\d{3,16}$/.test(code)) fileCodes.add(code);
+    }
+    const known = new Set([...accountByCode.keys(), ...fileCodes]);
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const code = accountCode(raw(cells, "code"));
+      r.values.code = code;
+      if (!/^\d{3,16}$/.test(code)) {
+        if (looksLikeTotal(Object.values(r.values)) || (code === "" && !r.values.name)) skip(r, "Không phải dòng tài khoản");
+        else fail(r, code === "" ? "Thiếu số hiệu tài khoản" : "Số hiệu tài khoản chỉ gồm chữ số (3–16 ký tự)");
+        continue;
+      }
+      const dup = seen.get(code);
+      if (dup) {
+        fail(r, `Trùng số hiệu với dòng ${dup}`);
+        continue;
+      }
+      seen.set(code, r.row);
+      const exists = accountByCode.has(code);
+      const name = cellText(raw(cells, "name"));
+      if (!name) {
+        fail(r, "Thiếu tên tài khoản");
+        continue;
+      }
+      if (name.length > 128) {
+        fail(r, "Tên tài khoản tối đa 128 ký tự");
+        continue;
+      }
+      const p: AccountImportRow = { row: r.row, code, name };
+      if (has("nameEn")) p.name_en = cellText(raw(cells, "nameEn")) || null;
+
+      if (has("parentCode")) {
+        const parent = accountCode(raw(cells, "parentCode")) || null;
+        if (parent && (!/^\d{3,16}$/.test(parent) || !code.startsWith(parent) || parent === code)) {
+          fail(r, `Tài khoản mẹ ${parent} không hợp lệ (số hiệu con phải bắt đầu bằng số hiệu mẹ)`);
+          continue;
+        }
+        if (parent && !known.has(parent)) {
+          fail(r, `Chưa có tài khoản mẹ ${parent}`);
+          continue;
+        }
+        p.parent_code = parent;
+      } else if (!exists) {
+        let parent: string | null = null;
+        for (let len = code.length - 1; len >= 3 && !parent; len--) if (known.has(code.slice(0, len))) parent = code.slice(0, len);
+        p.parent_code = parent;
+      }
+
+      if (has("currency")) {
+        const cur = cellText(raw(cells, "currency")).toUpperCase();
+        if (cur && !/^[A-Z]{3}$/.test(cur)) {
+          fail(r, `Mã ngoại tệ ${cur} không hợp lệ`);
+          continue;
+        }
+        p.currency = cur || null;
+      }
+      if (has("normalSide")) {
+        const side = parseSide(cellText(raw(cells, "normalSide")));
+        if (side === null) {
+          fail(r, "Tính chất phải là Nợ, Có hoặc Lưỡng tính");
+          continue;
+        }
+        if (side) p.normal_side = side;
+      }
+      if (has("trackPartner")) {
+        const flag = parseFlag(raw(cells, "trackPartner"));
+        if (flag === null) {
+          fail(r, "Theo dõi công nợ: dùng 1/0 hoặc Có/Không");
+          continue;
+        }
+        p.track_partner = flag;
+      }
+      if (!exists) {
+        const inferred = inferAccount(code);
+        p.kind = inferred.kind;
+        p.normal_side ??= inferred.normalSide;
+        p.track_partner ??= inferred.trackPartner;
+        p.track_item = inferred.trackItem;
+      }
+      r.status = exists ? "update" : "new";
+      r.payload = p;
+    }
+  }
+
+  if (kind === "partners") {
+    const seen = new Map<string, number>();
+    const typeCols = ["isCustomer", "isSupplier", "isEmployee", "isStudent"] as const;
+    const flagKey = { isCustomer: "is_customer", isSupplier: "is_supplier", isEmployee: "is_employee", isStudent: "is_student" } as const;
+    const text = (cells: readonly Cell[], key: string) => (has(key) ? cellText(raw(cells, key)) : undefined);
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const code = codeText(raw(cells, "code"));
+      r.values.code = code;
+      if (!code) {
+        if (looksLikeTotal(Object.values(r.values)) || !r.values.name) skip(r, "Không phải dòng đối tượng");
+        else fail(r, "Thiếu mã đối tượng");
+        continue;
+      }
+      const upper = code.toUpperCase();
+      const dup = seen.get(upper);
+      if (dup) {
+        fail(r, `Trùng mã với dòng ${dup}`);
+        continue;
+      }
+      seen.set(upper, r.row);
+      const exists = partnerCodes.has(upper);
+      const name = text(cells, "name") ?? "";
+      const taxCode = text(cells, "taxCode")?.replace(/\s/g, "");
+      const parsed = partnerSchema.safeParse({
+        code,
+        name: exists && !has("name") ? "-" : name,
+        taxCode,
+        idNumber: text(cells, "idNumber"),
+        address: text(cells, "address"),
+        phone: text(cells, "phone"),
+        email: text(cells, "email"),
+        contactName: text(cells, "contactName"),
+        groupCode: text(cells, "groupCode"),
+        bankAccountNo: text(cells, "bankAccountNo"),
+        bankName: text(cells, "bankName"),
+        note: text(cells, "note"),
+      });
+      if (!parsed.success) {
+        fail(r, parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ");
+        continue;
+      }
+      const p: PartnerImportRow = { row: r.row, code };
+      if (has("name")) p.name = name;
+      const opt = (key: string, col: keyof PartnerImportRow, value = text(cells, key)) => {
+        if (value !== undefined) (p as unknown as Record<string, string | null>)[col] = value || null;
+      };
+      opt("taxCode", "tax_code", taxCode);
+      opt("idNumber", "id_number");
+      opt("address", "address");
+      opt("phone", "phone");
+      opt("email", "email");
+      opt("contactName", "contact_name");
+      opt("groupCode", "group_code");
+      opt("bankAccountNo", "bank_account_no");
+      opt("bankName", "bank_name");
+      opt("note", "note");
+
+      let flags: Partial<Record<(typeof flagKey)[keyof typeof flagKey], boolean>> = {};
+      if (has("type") && text(cells, "type")) {
+        const t = parseTypes(text(cells, "type")!);
+        if (!t) {
+          fail(r, "Loại không rõ — dùng KH, NCC, NV, HV (nhiều loại ngăn bằng dấu phẩy)");
+          continue;
+        }
+        flags = t;
+      } else if (typeCols.some(has)) {
+        let bad = false;
+        for (const k of typeCols) {
+          if (!has(k)) continue;
+          const v = parseFlag(raw(cells, k));
+          if (v === null) bad = true;
+          else flags[flagKey[k]] = v;
+        }
+        if (bad) {
+          fail(r, "Cột loại đối tượng: dùng 1/0 hoặc Có/Không");
+          continue;
+        }
+      }
+      const defaultFlag = ctx.partnerDefault === "supplier" ? "is_supplier" : "is_customer";
+      if (exists) {
+        if (Object.keys(flags).length === 0) flags[defaultFlag] = true;
+      } else {
+        const anyType = Object.values(flags).some(Boolean);
+        flags = {
+          is_customer: flags.is_customer ?? false,
+          is_supplier: flags.is_supplier ?? false,
+          is_employee: flags.is_employee ?? false,
+          is_student: flags.is_student ?? false,
+          ...(anyType ? {} : { [defaultFlag]: true }),
+        };
+        if (!name) {
+          fail(r, "Thiếu tên đối tượng");
+          continue;
+        }
+      }
+      Object.assign(p, flags);
+      r.status = exists ? "update" : "new";
+      r.payload = p;
+    }
+  }
+
+  let totals: Preview["totals"];
+  if (kind === "opening-accounts" || kind === "opening-partners") {
+    totals = { debit: 0, credit: 0, skippedDebit: 0, skippedCredit: 0 };
+    const seen = new Map<string, number>();
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const account = accountCode(raw(cells, "account"));
+      r.values.account = account;
+      if (!/^\d{3,16}$/.test(account)) {
+        if (looksLikeTotal(Object.values(r.values)) || account === "") skip(r, "Không phải dòng tài khoản");
+        else fail(r, "Số hiệu tài khoản chỉ gồm chữ số (3–16 ký tự)");
+        continue;
+      }
+      const d = parseLooseAmount(raw(cells, "debit") ?? null);
+      const c = parseLooseAmount(raw(cells, "credit") ?? null);
+      const badD = d === null && cellText(raw(cells, "debit")) !== "";
+      const badC = c === null && cellText(raw(cells, "credit")) !== "";
+      if (badD || badC) {
+        fail(r, `Số tiền không hợp lệ: ${badD ? r.values.debit : r.values.credit}`);
+        continue;
+      }
+      // Số âm ở cột Nợ là dư Có và ngược lại
+      let debit = 0;
+      let credit = 0;
+      for (const [v, side] of [
+        [d ?? 0, "debit"],
+        [c ?? 0, "credit"],
+      ] as const) {
+        if ((v >= 0) === (side === "debit")) debit += Math.abs(v);
+        else credit += Math.abs(v);
+      }
+      debit = round2(debit);
+      credit = round2(credit);
+      if (debit === 0 && credit === 0) {
+        skip(r, "Không có số dư");
+        continue;
+      }
+      const acc = accountByCode.get(account);
+      if (!acc) {
+        fail(r, `Chưa có tài khoản ${account} — nhập danh mục tài khoản trước`);
+        continue;
+      }
+      if (!acc.is_postable) {
+        skip(r, "Tài khoản tổng hợp — số dư lấy từ tài khoản chi tiết");
+        continue;
+      }
+      if (kind === "opening-accounts") {
+        if (acc.track_partner) {
+          skip(r, "Tài khoản theo dõi công nợ — nhập ở mẫu Số dư công nợ");
+          totals.skippedDebit = round2(totals.skippedDebit + debit);
+          totals.skippedCredit = round2(totals.skippedCredit + credit);
+          continue;
+        }
+        const dup = seen.get(account);
+        if (dup) {
+          fail(r, `Trùng tài khoản với dòng ${dup}`);
+          continue;
+        }
+        seen.set(account, r.row);
+        r.payload = { row: r.row, account, debit, credit };
+      } else {
+        if (!acc.track_partner) {
+          fail(r, `Tài khoản ${account} không theo dõi công nợ — nhập ở mẫu Số dư tài khoản`);
+          continue;
+        }
+        const partner = codeText(raw(cells, "partnerCode"));
+        r.values.partnerCode = partner;
+        if (!partner) {
+          fail(r, "Thiếu mã đối tượng");
+          continue;
+        }
+        if (!partnerCodes.has(partner.toUpperCase())) {
+          fail(r, `Chưa có đối tượng ${partner} — nhập danh mục đối tượng trước`);
+          continue;
+        }
+        const key = `${account}|${partner.toUpperCase()}`;
+        const dup = seen.get(key);
+        if (dup) {
+          fail(r, `Trùng tài khoản + đối tượng với dòng ${dup}`);
+          continue;
+        }
+        seen.set(key, r.row);
+        r.payload = { row: r.row, account, partner_code: partner, debit, credit };
+      }
+      r.status = "new";
+      totals.debit = round2(totals.debit + debit);
+      totals.credit = round2(totals.credit + credit);
+    }
+  }
+
+  const counts: Record<RowStatus, number> = { new: 0, update: 0, skip: 0, error: 0 };
+  for (const r of rows) counts[r.status]++;
+  return totals ? { kind, rows, counts, totals } : { kind, rows, counts };
+}
+
+/** Gắn lỗi máy chủ trả về (theo số dòng) vào bản xem trước */
+export function applyServerErrors(preview: Preview, errors: ReadonlyArray<{ row: number; message: string }>): Preview {
+  const byRow = new Map(errors.map((e) => [e.row, e.message]));
+  const rows = preview.rows.map((r) => (byRow.has(r.row) ? { ...r, status: "error" as const, message: byRow.get(r.row)! } : r));
+  const counts: Record<RowStatus, number> = { new: 0, update: 0, skip: 0, error: 0 };
+  for (const r of rows) counts[r.status]++;
+  return { ...preview, rows, counts };
+}
+
+/** Các dòng sẽ gửi lên máy chủ */
+export function payloadOf<P extends ImportPayload>(preview: Preview<P>): P[] {
+  return preview.rows.filter((r) => (r.status === "new" || r.status === "update") && r.payload).map((r) => r.payload!);
+}
+
+/** Dòng tiêu đề + dòng mẫu của tệp mẫu */
+export function templateRows(kind: ImportKind): string[][] {
+  const spec = IMPORT_SPECS[kind];
+  return [spec.fields.map((f) => f.label), ...spec.sample.map((r) => [...r])];
+}
+
+/** Trường bắt buộc chưa được ghép cột (để chặn bước tiếp theo) */
+export function missingRequired(kind: ImportKind, map: ColumnMap): string[] {
+  const spec = IMPORT_SPECS[kind];
+  const missing = spec.fields.filter((f) => f.required && (map[f.key] === null || map[f.key] === undefined)).map((f) => f.label);
+  if ((kind === "opening-accounts" || kind === "opening-partners") && map.debit == null && map.credit == null) missing.push("Dư Nợ hoặc Dư Có");
+  return missing;
+}
