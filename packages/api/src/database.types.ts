@@ -95,6 +95,13 @@ export type VoucherRow = {
   updated_at: Timestamp;
   posted_at: Timestamp | null;
   version: number;
+  invoice_series: string | null;
+  invoice_number: string | null;
+  invoice_date: DateStr | null;
+  due_date: DateStr | null;
+  partner_tax_code: string | null;
+  total_net: Numeric;
+  total_vat: Numeric;
 };
 
 export type VoucherLineRow = {
@@ -116,6 +123,59 @@ export type VoucherLineRow = {
   warehouse_id: string | null;
   quantity: Numeric | null;
   unit_price: Numeric | null;
+  uom: string | null;
+  discount_amount: Numeric;
+  vat_code: string | null;
+  vat_rate: Numeric;
+  vat_amount: Numeric;
+  vat_account: string | null;
+};
+
+export type ItemRow = {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  kind: "goods" | "material" | "finished" | "service" | "tool" | "book";
+  uom: string;
+  group_code: string | null;
+  inventory_account: string | null;
+  revenue_account: string | null;
+  cogs_account: string | null;
+  vat_code: string;
+  sale_price: Numeric | null;
+  purchase_price: Numeric | null;
+  track_inventory: boolean;
+  barcode: string | null;
+  is_active: boolean;
+};
+
+export type PartnerLedgerRow = {
+  row_kind: "opening" | "entry" | "total" | "closing";
+  posting_date: DateStr;
+  voucher_number: string | null;
+  voucher_type: string | null;
+  issue_date: DateStr | null;
+  voucher_id: string | null;
+  description: string | null;
+  account: string;
+  contra_account: string | null;
+  debit: Numeric | null;
+  credit: Numeric | null;
+  balance_debit: Numeric | null;
+  balance_credit: Numeric | null;
+};
+
+export type PartnerBalanceRow = {
+  partner_id: string;
+  partner_code: string;
+  partner_name: string;
+  opening_debit: Numeric;
+  opening_credit: Numeric;
+  debit: Numeric;
+  credit: Numeric;
+  closing_debit: Numeric;
+  closing_credit: Numeric;
 };
 
 export type JobRow = {
@@ -223,6 +283,7 @@ export type Database = {
       vouchers: Table<VoucherRow>;
       voucher_lines: Table<VoucherLineRow>;
       jobs: Table<JobRow, Partial<JobRow> & Pick<JobRow, "tenant_id" | "code" | "name">>;
+      items: Table<ItemRow, Partial<ItemRow> & Pick<ItemRow, "tenant_id" | "code" | "name">>;
       opening_balances: Table<OpeningBalanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
@@ -248,6 +309,12 @@ export type Database = {
       };
       import_accounts: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: ImportResult };
       import_partners: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: ImportResult };
+      import_items: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: ImportResult };
+      rpt_partner_ledger: {
+        Args: { p_tenant: string; p_account: string; p_partner: string; p_from: string; p_to: string };
+        Returns: PartnerLedgerRow[];
+      };
+      rpt_partner_balances: { Args: { p_tenant: string; p_account: string; p_from: string; p_to: string }; Returns: PartnerBalanceRow[] };
       import_opening_balances: { Args: { p_tenant: string; p_scope: "account" | "partner"; p_rows: unknown[] }; Returns: ImportResult };
       rpt_trial_balance: {
         Args: { p_tenant: string; p_from: string; p_to: string; p_max_level?: number };

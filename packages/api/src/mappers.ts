@@ -1,4 +1,6 @@
-import type { VoucherInput } from "@accedu/core";
+import type { VatCode, VoucherInput } from "@accedu/core";
+
+type VatCodeValue = VatCode;
 import type { VoucherLineRow, VoucherRow } from "./database.types";
 
 /** Chuyển dữ liệu form (camelCase, schema core) sang payload RPC save_voucher (snake_case). */
@@ -26,6 +28,11 @@ export function toVoucherPayload(
     exchange_rate: v.exchangeRate ?? 1,
     header_account: v.headerAccount ?? null,
     original_documents: v.originalDocuments ?? null,
+    invoice_series: v.invoiceSeries ?? null,
+    invoice_number: v.invoiceNumber ?? null,
+    invoice_date: v.invoiceDate ?? null,
+    due_date: v.dueDate ?? null,
+    partner_tax_code: v.partnerTaxCode ?? null,
     source,
     lines: v.lines.map((l) => ({
       line_no: l.lineNo,
@@ -39,6 +46,14 @@ export function toVoucherPayload(
       job_id: l.jobId ?? null,
       department_id: l.departmentId ?? null,
       expense_item_id: l.expenseItemId ?? null,
+      item_id: l.itemId ?? null,
+      quantity: l.quantity ?? null,
+      unit_price: l.unitPrice ?? null,
+      uom: l.uom ?? null,
+      discount_amount: l.discountAmount ?? 0,
+      vat_code: l.vatCode ?? null,
+      ...(l.vatAmount !== undefined ? { vat_amount: l.vatAmount } : {}),
+      vat_account: l.vatAccount ?? null,
     })),
   };
 }
@@ -68,6 +83,11 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
     exchangeRate: Number(v.exchange_rate),
     headerAccount: v.header_account,
     ...(v.original_documents ? { originalDocuments: v.original_documents } : {}),
+    ...(v.invoice_series ? { invoiceSeries: v.invoice_series } : {}),
+    ...(v.invoice_number ? { invoiceNumber: v.invoice_number } : {}),
+    invoiceDate: v.invoice_date,
+    dueDate: v.due_date,
+    ...(v.partner_tax_code ? { partnerTaxCode: v.partner_tax_code } : {}),
     lines: v.voucher_lines
       .toSorted((a, b) => a.line_no - b.line_no)
       .map((l) => ({
@@ -82,6 +102,14 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
         jobId: l.job_id,
         departmentId: l.department_id,
         expenseItemId: l.expense_item_id,
+        itemId: l.item_id,
+        quantity: l.quantity === null ? null : Number(l.quantity),
+        unitPrice: l.unit_price === null ? null : Number(l.unit_price),
+        ...(l.uom ? { uom: l.uom } : {}),
+        discountAmount: Number(l.discount_amount ?? 0),
+        vatCode: (l.vat_code as VatCodeValue | null) ?? null,
+        vatAmount: Number(l.vat_amount ?? 0),
+        vatAccount: l.vat_account,
       })),
   };
 }
@@ -92,6 +120,7 @@ export function friendlyError(e: unknown): string {
   if (/JWT expired|invalid JWT/i.test(msg)) return "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại";
   if (/row-level security|permission denied/i.test(msg)) return "Bạn không có quyền thực hiện thao tác này";
   if (/duplicate key.*vouchers_tenant_id_voucher_type_number/i.test(msg)) return "Số chứng từ đã tồn tại";
+  if (/duplicate key.*vouchers_purchase_invoice/i.test(msg)) return "Hóa đơn này (cùng nhà cung cấp, ký hiệu, số) đã được nhập";
   if (/duplicate key/i.test(msg)) return "Mã đã tồn tại";
   if (/Failed to fetch|NetworkError|network/i.test(msg)) return "Mất kết nối mạng — dữ liệu sẽ đồng bộ khi có mạng";
   return msg;

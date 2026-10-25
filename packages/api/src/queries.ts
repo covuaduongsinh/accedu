@@ -1,8 +1,9 @@
-import type { AccountImportRow, AccountInput, OpeningImportRow, PartnerImportRow, PartnerInput, VoucherInput } from "@accedu/core";
+import type { AccountImportRow, AccountInput, ItemImportRow, ItemInput, OpeningImportRow, PartnerImportRow, PartnerInput, VoucherInput } from "@accedu/core";
 import type { AccEduClient } from "./client";
 import type {
   AccountRow,
   ImportResult,
+  ItemRow,
   JobRow,
   MemberRow,
   OpeningBalanceRow,
@@ -10,6 +11,8 @@ import type {
   JournalRow,
   LedgerRow,
   MyTenantRow,
+  PartnerBalanceRow,
+  PartnerLedgerRow,
   PartnerRow,
   TenantRow,
   TrialBalanceRow,
@@ -101,6 +104,33 @@ export const api = {
     return id
       ? unwrap(await db.from("partners").update(row).eq("id", id).select().single())
       : unwrap(await db.from("partners").insert(row).select().single());
+  },
+
+  async items(db: AccEduClient, tenantId: string): Promise<ItemRow[]> {
+    return unwrap(await db.from("items").select("*").eq("tenant_id", tenantId).order("code"));
+  },
+  async saveItem(db: AccEduClient, tenantId: string, it: ItemInput, id?: string): Promise<ItemRow> {
+    const kind = it.kind ?? "goods";
+    const row = {
+      tenant_id: tenantId,
+      code: it.code,
+      name: it.name,
+      kind,
+      uom: it.uom ?? "Cái",
+      vat_code: it.vatCode ?? "10",
+      sale_price: it.salePrice ?? null,
+      purchase_price: it.purchasePrice ?? null,
+      revenue_account: it.revenueAccount || null,
+      inventory_account: it.inventoryAccount || null,
+      group_code: it.groupCode || null,
+      track_inventory: kind !== "service",
+    };
+    return id
+      ? unwrap(await db.from("items").update(row).eq("id", id).select().single())
+      : unwrap(await db.from("items").insert(row).select().single());
+  },
+  async importItems(db: AccEduClient, tenantId: string, rows: ItemImportRow[]): Promise<ImportResult> {
+    return unwrap(await db.rpc("import_items", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
   },
 
   async vouchers(
@@ -232,6 +262,14 @@ export const api = {
   async generalJournal(db: AccEduClient, tenantId: string, from: string, to: string): Promise<JournalRow[]> {
     return unwrap(await db.rpc("rpt_general_journal", { p_tenant: tenantId, p_from: from, p_to: to }));
   },
+  async partnerLedger(db: AccEduClient, tenantId: string, account: string, partnerId: string, from: string, to: string): Promise<PartnerLedgerRow[]> {
+    return unwrap(
+      await db.rpc("rpt_partner_ledger", { p_tenant: tenantId, p_account: account, p_partner: partnerId, p_from: from, p_to: to }),
+    );
+  },
+  async partnerBalances(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<PartnerBalanceRow[]> {
+    return unwrap(await db.rpc("rpt_partner_balances", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));
+  },
   async accountLedger(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<LedgerRow[]> {
     return unwrap(await db.rpc("rpt_account_ledger", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));
   },
@@ -249,5 +287,6 @@ export const qk = {
   opening: (tenantId: string) => ["opening", tenantId] as const,
   locks: (tenantId: string) => ["locks", tenantId] as const,
   jobs: (tenantId: string) => ["jobs", tenantId] as const,
+  items: (tenantId: string) => ["items", tenantId] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,
 };

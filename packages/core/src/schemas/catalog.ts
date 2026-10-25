@@ -37,5 +37,21 @@ export const partnerSchema = z.object({
   note: z.string().max(512, "Ghi chú tối đa 512 ký tự").optional(),
 });
 
+export const ITEM_KINDS = { goods: "Hàng hóa", book: "Sách", material: "Vật tư", finished: "Thành phẩm", tool: "Công cụ", service: "Dịch vụ" } as const;
+
+export const itemSchema = z.object({
+  code: z.string().trim().min(1, "Thiếu mã hàng").max(32, "Mã hàng tối đa 32 ký tự"),
+  name: z.string().trim().min(1, "Thiếu tên hàng").max(256, "Tên tối đa 256 ký tự"),
+  kind: z.enum(["goods", "book", "material", "finished", "tool", "service"]).default("goods"),
+  uom: z.string().trim().min(1, "Thiếu đơn vị tính").max(32).default("Cái"),
+  vatCode: z.enum(["0", "5", "8", "10", "KCT", "KKKNT"]).default("10"),
+  salePrice: z.number().finite().nonnegative("Giá bán không âm").nullish(),
+  purchasePrice: z.number().finite().nonnegative("Giá mua không âm").nullish(),
+  revenueAccount: z.string().trim().regex(/^\d{3,16}$/, "Tài khoản chỉ gồm chữ số").nullish().or(z.literal("")),
+  inventoryAccount: z.string().trim().regex(/^\d{3,16}$/, "Tài khoản chỉ gồm chữ số").nullish().or(z.literal("")),
+  groupCode: z.string().max(16).optional(),
+});
+
+export type ItemInput = z.input<typeof itemSchema>;
 export type AccountInput = z.input<typeof accountSchema>;
 export type PartnerInput = z.input<typeof partnerSchema>;

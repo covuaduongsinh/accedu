@@ -7,6 +7,7 @@ import { cellText, normalizeHeader, parseFlag, parseLooseAmount, type Cell, type
 export interface ImportContext {
   accounts: ReadonlyArray<{ code: string; is_postable: boolean; track_partner: boolean }>;
   partners: ReadonlyArray<{ code: string }>;
+  items?: ReadonlyArray<{ code: string }>;
   /** Nhập từ trang Khách hàng hay Nhà cung cấp: loại mặc định của đối tượng mới */
   partnerDefault?: "customer" | "supplier";
 }
@@ -53,7 +54,55 @@ export interface OpeningImportRow {
   credit: number;
 }
 
-export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow;
+export interface ItemImportRow {
+  row: number;
+  code: string;
+  name?: string;
+  kind?: "goods" | "book" | "material" | "finished" | "tool" | "service";
+  uom?: string;
+  vat_code?: string;
+  sale_price?: number | null;
+  purchase_price?: number | null;
+  revenue_account?: string | null;
+  inventory_account?: string | null;
+  group_code?: string | null;
+  barcode?: string | null;
+}
+
+export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow;
+
+const ITEM_KIND_WORDS: Record<string, NonNullable<ItemImportRow["kind"]>> = {
+  "hang hoa": "goods",
+  hh: "goods",
+  goods: "goods",
+  hang: "goods",
+  sach: "book",
+  book: "book",
+  "vat tu": "material",
+  "nguyen vat lieu": "material",
+  nvl: "material",
+  "thanh pham": "finished",
+  tp: "finished",
+  "cong cu": "tool",
+  ccdc: "tool",
+  "cong cu dung cu": "tool",
+  "dich vu": "service",
+  dv: "service",
+  service: "service",
+};
+
+/** "10%", "10", "KCT", "Không chịu thuế" → mã thuế AccEdu; null nếu không nhận ra */
+export function parseVatCode(text: string): "0" | "5" | "8" | "10" | "KCT" | "KKKNT" | null {
+  const t = normalizeHeader(text);
+  if (["kct", "khong chiu thue", "khong chiu"].includes(t)) return "KCT";
+  if (["kkknt", "khong ke khai"].includes(t)) return "KKKNT";
+  // "10", "10%", "10.0" hoặc ô Excel định dạng phần trăm (0.1)
+  const n = Number(text.trim().replace("%", "").replace(",", "."));
+  if (!Number.isFinite(n) || text.trim() === "") return null;
+  const pct = n > 0 && n < 1 ? Math.round(n * 100) : n;
+  const code = String(pct);
+  return code === "0" || code === "5" || code === "8" || code === "10" ? code : null;
+}
 export type RowStatus = "new" | "update" | "skip" | "error";
 
 export interface PreviewRow<P extends ImportPayload = ImportPayload> {
@@ -357,6 +406,96 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
         }
       }
       Object.assign(p, flags);
+      r.status = exists ? "update" : "new";
+      r.payload = p;
+    }
+  }
+
+  if (kind === "items") {
+    const seen = new Map<string, number>();
+    const itemCodes = new Set((ctx.items ?? []).map((i) => i.code.toUpperCase()));
+    const postable = new Set(ctx.accounts.filter((a) => a.is_postable).map((a) => a.code));
+    const text = (cells: readonly Cell[], key: string) => (has(key) ? cellText(raw(cells, key)) : undefined);
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const code = codeText(raw(cells, "code"));
+      r.values.code = code;
+      if (!code) {
+        if (looksLikeTotal(Object.values(r.values)) || !r.values.name) skip(r, "Không phải dòng hàng hóa");
+        else fail(r, "Thiếu mã hàng");
+        continue;
+      }
+      if (code.length > 32) {
+        fail(r, "Mã hàng tối đa 32 ký tự");
+        continue;
+      }
+      const upper = code.toUpperCase();
+      const dup = seen.get(upper);
+      if (dup) {
+        fail(r, `Trùng mã với dòng ${dup}`);
+        continue;
+      }
+      seen.set(upper, r.row);
+      const exists = itemCodes.has(upper);
+      const p: ItemImportRow = { row: r.row, code };
+      const name = text(cells, "name");
+      if (name !== undefined) p.name = name;
+      if (!exists && !name) {
+        fail(r, "Thiếu tên hàng");
+        continue;
+      }
+      const kindText = text(cells, "kind");
+      if (kindText) {
+        const k = ITEM_KIND_WORDS[normalizeHeader(kindText)];
+        if (!k) {
+          fail(r, "Loại không rõ — dùng Hàng hóa, Sách, Vật tư, Thành phẩm, Công cụ, Dịch vụ");
+          continue;
+        }
+        p.kind = k;
+      }
+      const uom = text(cells, "uom");
+      if (uom) p.uom = uom;
+      const vatText = text(cells, "vatCode");
+      if (vatText) {
+        const v = parseVatCode(vatText);
+        if (!v) {
+          fail(r, `Mã thuế ${vatText} không hợp lệ — dùng 0, 5, 8, 10 hoặc KCT`);
+          continue;
+        }
+        p.vat_code = v;
+      }
+      let bad = "";
+      for (const [key, col] of [
+        ["salePrice", "sale_price"],
+        ["purchasePrice", "purchase_price"],
+      ] as const) {
+        if (!has(key)) continue;
+        const c = raw(cells, key);
+        if (cellText(c) === "") {
+          p[col] = null;
+          continue;
+        }
+        const n = parseLooseAmount(c ?? null);
+        if (n === null || n < 0) bad = `Giá không hợp lệ: ${cellText(c)}`;
+        else p[col] = n;
+      }
+      for (const [key, col] of [
+        ["revenueAccount", "revenue_account"],
+        ["inventoryAccount", "inventory_account"],
+      ] as const) {
+        if (!has(key)) continue;
+        const acc = accountCode(raw(cells, key));
+        if (acc && !postable.has(acc)) bad ||= `Tài khoản ${acc} không tồn tại hoặc không phải tài khoản chi tiết`;
+        p[col] = acc || null;
+      }
+      if (bad) {
+        fail(r, bad);
+        continue;
+      }
+      const group = text(cells, "groupCode");
+      if (group !== undefined) p.group_code = group || null;
+      const barcode = text(cells, "barcode");
+      if (barcode !== undefined) p.barcode = barcode || null;
       r.status = exists ? "update" : "new";
       r.payload = p;
     }
