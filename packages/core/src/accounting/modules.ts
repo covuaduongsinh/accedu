@@ -79,6 +79,7 @@ export const MODULES: ModuleDef[] = [
       { path: "sales/receivable-ledger", title: "Sổ chi tiết công nợ khách hàng", kind: "report", phase: "P4", ready: true, mobile: true },
       { path: "sales/receivable-summary", title: "Tổng hợp công nợ phải thu", kind: "report", phase: "P4", ready: true },
       { path: "sales/aging", title: "Tuổi nợ phải thu", kind: "report", phase: "P4", ready: true, mobile: true },
+      { path: "sales/gross-profit", title: "Lãi gộp theo mặt hàng, khách hàng", kind: "report", phase: "P5", ready: true },
       { path: "sales/einvoices", title: "Hóa đơn điện tử", kind: "process", phase: "P8" },
     ],
   },

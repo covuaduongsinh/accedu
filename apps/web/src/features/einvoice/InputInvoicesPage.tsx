@@ -80,6 +80,7 @@ function toPayload(it: Item): PurchaseInvoiceImport {
     invoice_series_short: inv.seriesShort,
     invoice_number: inv.number,
     lines: inv.lines.map((l) => ({
+      item_code: l.itemCode,
       description: l.description,
       uom: l.uom,
       quantity: l.quantity,
@@ -265,6 +266,9 @@ export function InputInvoicesPage() {
                   <th className="px-2 text-right">Tiền hàng</th>
                   <th className="px-2 text-right">Thuế GTGT</th>
                   <th className="px-2 text-right">Tổng</th>
+                  <th className="px-2 text-center" title="Số dòng đã gắn được mã hàng (theo mã hàng của người bán, rồi theo tên)">
+                    Mã hàng
+                  </th>
                   <th className="w-40 px-2 text-left">Loại</th>
                   <th className="w-28 px-2 text-left">TK Nợ</th>
                   <th className="w-40 px-2 text-left">Ngày hạch toán</th>
@@ -306,6 +310,15 @@ export function InputInvoicesPage() {
                         <td className="num px-2 py-1.5 text-right">{inv ? formatAmount(inv.totals.net) : ""}</td>
                         <td className="num px-2 py-1.5 text-right">{inv ? formatAmount(inv.totals.vat) : ""}</td>
                         <td className="num px-2 py-1.5 text-right font-medium">{inv ? formatAmount(inv.totals.total) : ""}</td>
+                        <td className="num px-2 py-1.5 text-center text-xs" data-testid={`items-${inv?.number ?? it.id}`}>
+                          {r?.items ? (
+                            <span className={r.items.matched === r.items.lines ? "text-success" : "text-muted"} title="Dòng khớp mã hàng / tổng số dòng — dòng khớp tự nhập kho khi ghi sổ">
+                              {r.items.matched}/{r.items.lines}
+                            </span>
+                          ) : (
+                            ""
+                          )}
+                        </td>
                         <td className="px-1 py-1">
                           {inv ? (
                             <Select
@@ -337,12 +350,13 @@ export function InputInvoicesPage() {
                       {open.has(it.id) ? (
                         <tr className="bg-navy-50/40">
                           <td />
-                          <td colSpan={10} className="px-2 py-2">
+                          <td colSpan={11} className="px-2 py-2">
                             <div className="mb-1 text-xs text-muted">Tệp: {it.file}</div>
                             {inv ? (
                               <table className="w-full text-xs">
                                 <thead className="text-muted">
                                   <tr>
+                                    <th className="px-2 text-left">Mã người bán</th>
                                     <th className="px-2 text-left">Hàng hóa, dịch vụ</th>
                                     <th className="px-2 text-left">Đvt</th>
                                     <th className="px-2 text-right">SL</th>
@@ -356,6 +370,7 @@ export function InputInvoicesPage() {
                                 <tbody>
                                   {inv.lines.map((l) => (
                                     <tr key={l.lineNo} className="border-t border-line">
+                                      <td className="px-2 text-muted">{l.itemCode ?? ""}</td>
                                       <td className="px-2">{l.description}</td>
                                       <td className="px-2">{l.uom}</td>
                                       <td className="num px-2 text-right">{l.quantity ?? ""}</td>

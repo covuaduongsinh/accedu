@@ -13,6 +13,7 @@ import { CompanyPage, PeriodLockCard } from "../features/system/CompanyPage";
 import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
+import { GrossProfitPage } from "../features/reports/GrossProfitPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
 import { PartnerBalancesPage, PartnerLedgerPage } from "../features/reports/PartnerReports";
 import { AgingPage, VatListingPage } from "../features/reports/SettlementReports";
@@ -55,6 +56,7 @@ const PAGES: Record<string, ComponentType> = {
   "purchase/payable-ledger": () => <PartnerLedgerPage side="payable" />,
   "purchase/payable-summary": () => <PartnerBalancesPage side="payable" />,
   "sales/aging": () => <AgingPage side="receivable" />,
+  "sales/gross-profit": GrossProfitPage,
   "purchase/aging": () => <AgingPage side="payable" />,
   "general/vat-out": () => <VatListingPage direction="out" />,
   "general/vat-in": () => <VatListingPage direction="in" />,

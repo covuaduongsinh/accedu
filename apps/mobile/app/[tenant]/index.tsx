@@ -51,6 +51,9 @@ export default function Dashboard() {
           <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Công nợ phải thu ›</Text>
         </Pressable>
       </View>
+      <Pressable onPress={() => router.push({ pathname: "/[tenant]/stock", params: { tenant: slug } })}>
+        <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Tồn kho ›</Text>
+      </Pressable>
       <Text style={[s.title, { fontSize: 16 }]}>Chứng từ gần đây</Text>
       {(vouchers.data ?? []).slice(0, 15).map((v) => (
         <View key={v.id} style={[s.card, s.row]}>

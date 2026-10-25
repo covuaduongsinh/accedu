@@ -9,6 +9,7 @@ import { platform } from "../../lib/supabase";
 import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, type VoucherUiConfig } from "./config";
 import { AccountName, AmountInput, PartnerName } from "./VoucherEditor";
+import { formatQty, shortageMessage, stockOf } from "./stock-check";
 
 interface LineDraft {
   key: string;
@@ -152,21 +153,10 @@ function StockForm({
   const activeWarehouses = (warehouses.data ?? []).filter((w) => w.is_active);
   const partner = partnerByCode.get(header.partnerCode.trim().toUpperCase());
 
-  /** Tồn của mặt hàng tại kho, và tổng mọi kho (giá bình quân) — đến ngày hạch toán, chưa tính phiếu này */
-  const stockOf = (itemId: string | undefined, warehouseId: string) => {
-    const rows = (balances.data ?? []).filter((b) => b.item_id === itemId);
-    const here = rows.find((b) => b.warehouse_id === warehouseId);
-    const first = rows[0];
-    return {
-      quantity: Number(here?.quantity ?? 0),
-      item: { quantity: Number(first?.item_quantity ?? 0), amount: Number(first?.item_amount ?? 0) },
-    };
-  };
-
   const computed = lines.map((l) => {
     const it = itemByCode.get(l.itemCode.trim().toUpperCase());
     const qty = num(l.quantity) ?? 0;
-    const stock = stockOf(it?.id, l.warehouseId);
+    const stock = stockOf(balances.data, it?.id, l.warehouseId);
     let amount: number;
     if (status === "posted" && l.saved !== undefined) amount = l.saved;
     else if (receipt) amount = num(l.unitPrice) !== null && qty ? roundAmount(qty * (num(l.unitPrice) ?? 0)) : (num(l.amount) ?? 0);
@@ -185,7 +175,7 @@ function StockForm({
     if (c.qty <= 0) problems.push(`Dòng ${n}: chưa nhập số lượng`);
     if (receipt && c.amount <= 0) problems.push(`Dòng ${n}: chưa nhập đơn giá / thành tiền`);
     if (!receipt && status !== "posted" && c.item && c.qty > c.stock.quantity)
-      problems.push(`Dòng ${n}: ${c.item.code} tại kho chỉ còn ${formatAmount(c.stock.quantity, { decimals: Number.isInteger(c.stock.quantity) ? 0 : 2 })} ${c.item.uom}`);
+      problems.push(shortageMessage(n, c.item, c.stock.quantity));
     if (transfer && c.draft.warehouseId && c.draft.warehouseId === header.toWarehouseId) problems.push(`Dòng ${n}: kho xuất trùng kho nhập`);
   });
   if (!used.length) problems.push("Chưa có dòng hàng");
@@ -381,7 +371,7 @@ function StockForm({
                     </Select>
                   </td>
                   <td className="num px-2 text-right text-xs text-muted" data-testid={`ton-${n}`}>
-                    {c.item ? formatAmount(c.stock.quantity, { decimals: Number.isInteger(c.stock.quantity) ? 0 : 2 }) : ""}
+                    {c.item ? formatQty(c.stock.quantity) : ""}
                   </td>
                   <td className="px-1">
                     <AmountInput value={l.quantity} disabled={readOnly} label={`Số lượng dòng ${n}`} onChange={(v) => setLine(l.key, { quantity: v })} />
