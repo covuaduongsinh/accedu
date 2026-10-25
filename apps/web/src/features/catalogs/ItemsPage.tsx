@@ -1,5 +1,5 @@
 import { api, friendlyError, qk, type ItemRow } from "@accedu/api";
-import { useDb, useItems } from "@accedu/api/react";
+import { useDb, useItems, useWarehouses } from "@accedu/api/react";
 import { ITEM_KINDS, VAT_CODES, itemSchema, parseAmount, formatAmount, type ItemInput, type VatCode } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
@@ -35,6 +35,7 @@ export function ItemsPage() {
       { field: "revenue_account", headerName: "TK doanh thu", width: 120 },
       { field: "inventory_account", headerName: "TK kho / chi phí", width: 130 },
       { field: "group_code", headerName: "Nhóm", width: 110 },
+      { field: "track_inventory", headerName: "Theo dõi tồn", width: 120, valueFormatter: (p) => (p.value ? "✓" : "") },
     ],
     [],
   );
@@ -108,6 +109,7 @@ function ItemForm({ item, onDone }: { item: ItemRow | null; onDone: () => void }
   const { tenant } = useTenantCtx();
   const db = useDb();
   const qc = useQueryClient();
+  const warehouses = useWarehouses(tenant.id);
   const [form, setForm] = useState({
     code: item?.code ?? "",
     name: item?.name ?? "",
@@ -119,6 +121,9 @@ function ItemForm({ item, onDone }: { item: ItemRow | null; onDone: () => void }
     revenueAccount: item?.revenue_account ?? "",
     inventoryAccount: item?.inventory_account ?? "",
     groupCode: item?.group_code ?? "",
+    trackInventory: item?.track_inventory ?? true,
+    cogsAccount: item?.cogs_account ?? "",
+    defaultWarehouseId: item?.default_warehouse_id ?? "",
   });
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<typeof form>) => setForm({ ...form, ...patch });
@@ -157,7 +162,11 @@ function ItemForm({ item, onDone }: { item: ItemRow | null; onDone: () => void }
           value={form.kind}
           onChange={(e) => {
             const kind = e.target.value as ItemRow["kind"];
-            set({ kind, ...(kind === "service" && form.vatCode === "10" ? { vatCode: "KCT" as VatCode } : {}) });
+            set({
+              kind,
+              trackInventory: kind !== "service",
+              ...(kind === "service" && form.vatCode === "10" ? { vatCode: "KCT" as VatCode } : {}),
+            });
           }}
         >
           {Object.entries(ITEM_KINDS).map(([k, v]) => (
@@ -196,6 +205,25 @@ function ItemForm({ item, onDone }: { item: ItemRow | null; onDone: () => void }
       </Field>
       <Field label="Nhóm">
         <Input value={form.groupCode} onChange={(e) => set({ groupCode: e.target.value.toUpperCase() })} />
+      </Field>
+      <Field label="TK giá vốn" hint="Trống: 632">
+        <Input value={form.cogsAccount} onChange={(e) => set({ cogsAccount: e.target.value.trim() })} />
+      </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={form.trackInventory} disabled={form.kind === "service"} onChange={(e) => set({ trackInventory: e.target.checked })} /> Theo dõi
+        tồn kho (số lượng, giá vốn)
+      </label>
+      <Field label="Kho mặc định" hint="Tự chọn khi lập phiếu, hóa đơn">
+        <Select value={form.defaultWarehouseId} disabled={!form.trackInventory} onChange={(e) => set({ defaultWarehouseId: e.target.value })}>
+          <option value="">— Kho chính —</option>
+          {(warehouses.data ?? [])
+            .filter((w) => w.is_active)
+            .map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.code} — {w.name}
+              </option>
+            ))}
+        </Select>
       </Field>
       <div className="col-span-2 flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone}>

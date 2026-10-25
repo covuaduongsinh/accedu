@@ -19,6 +19,8 @@ export interface VoucherUiConfig {
   printForm?: { code: string; title: string; contactLabel: string; reasonLabel: string };
   /** Hóa đơn: form có mặt hàng, số lượng, đơn giá, thuế GTGT theo dòng */
   invoice?: boolean;
+  /** Chứng từ kho (PNK, PXK, PDC): form mặt hàng, kho, số lượng; giá vốn do AccEdu tính */
+  stock?: "receipt" | "issue" | "transfer";
 }
 
 export const VOUCHER_UI: Record<string, VoucherUiConfig> = {
@@ -135,6 +137,45 @@ export const VOUCHER_UI: Record<string, VoucherUiConfig> = {
     contactLabel: "Người liên hệ",
     descriptionLabel: "Diễn giải",
     invoice: true,
+  },
+  PNK: {
+    type: "PNK",
+    title: "Phiếu nhập kho",
+    subtitle: "Nhập hàng chưa có hóa đơn, nhập thành phẩm, nhập thừa… — hàng mua có hóa đơn thì lập Hóa đơn mua hàng (tự nhập kho)",
+    style: "pair",
+    headerSide: "credit",
+    headerAccountLabel: "TK có (đối ứng)",
+    defaultHeaderAccount: "331",
+    lineAccountLabel: "TK kho",
+    partnerLabel: "Mã đối tượng",
+    contactLabel: "Người giao hàng",
+    descriptionLabel: "Diễn giải",
+    stock: "receipt",
+  },
+  PXK: {
+    type: "PXK",
+    title: "Phiếu xuất kho",
+    subtitle: "Xuất bán lẻ, xuất dùng, xuất tặng… — giá vốn tính theo giá bình quân khi ghi sổ",
+    style: "pair",
+    headerSide: "debit",
+    headerAccountLabel: "TK nợ (giá vốn / chi phí)",
+    defaultHeaderAccount: "632",
+    lineAccountLabel: "TK kho",
+    partnerLabel: "Mã đối tượng",
+    contactLabel: "Người nhận hàng",
+    descriptionLabel: "Diễn giải",
+    stock: "issue",
+  },
+  PDC: {
+    type: "PDC",
+    title: "Phiếu xuất điều chuyển",
+    subtitle: "Chuyển hàng giữa các kho — không đổi giá vốn",
+    style: "pair",
+    lineAccountLabel: "TK kho",
+    partnerLabel: "Mã đối tượng",
+    contactLabel: "Người vận chuyển",
+    descriptionLabel: "Diễn giải",
+    stock: "transfer",
   },
   PK: {
     type: "PK",

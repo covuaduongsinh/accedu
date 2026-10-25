@@ -5,6 +5,7 @@ import type { ComponentType } from "react";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { ItemsPage } from "../features/catalogs/ItemsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
+import { WarehousesPage } from "../features/catalogs/WarehousesPage";
 import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
 import { InputInvoicesPage } from "../features/einvoice/InputInvoicesPage";
 import { MigrationPage } from "../features/import/MigrationPage";
@@ -15,6 +16,7 @@ import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
 import { PartnerBalancesPage, PartnerLedgerPage } from "../features/reports/PartnerReports";
 import { AgingPage, VatListingPage } from "../features/reports/SettlementReports";
+import { CostingPage, StockCardPage, StockSummaryPage } from "../features/reports/StockReports";
 import { TrialBalancePage } from "../features/reports/TrialBalancePage";
 import { VoucherModule } from "../features/vouchers/VoucherModule";
 import { Card, PageHeader } from "../components/ui";
@@ -36,6 +38,13 @@ const PAGES: Record<string, ComponentType> = {
   "purchase/suppliers": () => <PartnersPage kind="supplier" />,
   "general/journal-vouchers": () => <VoucherModule type="PK" />,
   "inventory/items": ItemsPage,
+  "inventory/warehouses": WarehousesPage,
+  "inventory/receipts": () => <VoucherModule type="PNK" />,
+  "inventory/issues": () => <VoucherModule type="PXK" />,
+  "inventory/transfers": () => <VoucherModule type="PDC" />,
+  "inventory/stock-summary": StockSummaryPage,
+  "inventory/stock-card": StockCardPage,
+  "inventory/costing": CostingPage,
   "sales/invoices": () => <VoucherModule type="HDB" />,
   "sales/service-invoices": () => <VoucherModule type="HDV" />,
   "purchase/invoices": () => <VoucherModule type="HDM" />,

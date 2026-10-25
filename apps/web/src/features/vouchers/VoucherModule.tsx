@@ -13,6 +13,7 @@ import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, VOUCHER_UI } from "./config";
 import { InvoiceEditor } from "./InvoiceEditor";
 import { PrintVoucher } from "./PrintVoucher";
+import { StockEditor } from "./StockEditor";
 import { VoucherEditor } from "./VoucherEditor";
 
 export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
@@ -153,10 +154,12 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
         <Lock size={12} /> Chứng từ đã ghi sổ chỉ xem được; bỏ ghi sổ để sửa. Tổng {vouchers.data?.length ?? 0} chứng từ · {formatAmount(total)} VND
       </p>
 
-      <Modal open={editing !== null} wide extraWide={!!cfg.invoice} title={`${cfg.title}${editing && editing !== "new" ? "" : " — mới"}`} onClose={() => setEditing(null)}>
+      <Modal open={editing !== null} wide extraWide={!!cfg.invoice || !!cfg.stock} title={`${cfg.title}${editing && editing !== "new" ? "" : " — mới"}`} onClose={() => setEditing(null)}>
         {editing !== null ? (
           cfg.invoice ? (
             <InvoiceEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
+          ) : cfg.stock ? (
+            <StockEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
           ) : (
             <VoucherEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
           )
