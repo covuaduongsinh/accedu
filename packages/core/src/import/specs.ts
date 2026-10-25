@@ -1,6 +1,6 @@
 import type { FieldSpec } from "./table";
 
-export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items";
+export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items" | "opening-stock";
 
 export interface ImportSpec {
   kind: ImportKind;
@@ -147,6 +147,29 @@ export const IMPORT_SPECS: Record<ImportKind, ImportSpec> = {
       "Chỉ nhập tài khoản chi tiết; dòng tài khoản tổng hợp và dòng Tổng cộng được bỏ qua.",
       "Tài khoản theo dõi công nợ (131, 331, 141…) nhập ở mẫu Số dư công nợ theo từng đối tượng.",
       "Có thể chọn thẳng tệp Bảng cân đối phát sinh của FAO và chọn lấy cột đầu kỳ hay cuối kỳ.",
+    ],
+  },
+  "opening-stock": {
+    kind: "opening-stock",
+    title: "Tồn kho đầu kỳ theo mặt hàng",
+    fileName: "mau-ton-kho-dau-ky",
+    fields: [
+      { key: "warehouseCode", label: "Mã kho", required: true, synonyms: ["Mã kho", "Kho", "Mã kho hàng"], exclude: ["tên"] },
+      { key: "itemCode", label: "Mã hàng", required: true, synonyms: ["Mã hàng", "Mã vật tư", "Mã hàng hóa", "Mã VT", "Mã"], exclude: ["kho", "tên", "nhóm", "tk", "vạch"] },
+      { key: "itemName", label: "Tên hàng (để đối chiếu)", synonyms: ["Tên hàng", "Tên vật tư", "Tên mặt hàng", "Tên"], exclude: ["kho", "nhóm"] },
+      { key: "quantity", label: "Số lượng tồn", required: true, synonyms: ["Số lượng tồn", "Số lượng", "SL tồn", "Tồn đầu", "SL", "Lượng tồn"], exclude: ["giá", "tiền", "nhập", "xuất"] },
+      { key: "amount", label: "Giá trị tồn", required: true, synonyms: ["Giá trị tồn", "Giá trị", "Tiền tồn", "Thành tiền", "Dư đầu", "Tiền"], exclude: ["nt", "nhập", "xuất", "đơn giá"] },
+      { key: "account", label: "TK kho", synonyms: ["Tk kho", "Tk vật tư", "Tài khoản kho", "Tk"], exclude: ["tên"] },
+    ],
+    sample: [
+      ["KHO", "SACH-NM", "Sách cờ vua nhập môn (mẫu)", "10", "800000", ""],
+      ["KHO", "BANCO-01", "Bàn cờ gỗ tiêu chuẩn (mẫu)", "5", "1100000", ""],
+    ],
+    notes: [
+      "Số lượng và giá trị hàng tồn tại ngày bắt đầu nhập liệu, theo từng kho. Nhập lại sẽ thay toàn bộ tồn kho đầu kỳ.",
+      "Nhập sau khi đã có danh mục hàng hóa và danh mục kho. Mỗi đơn vị có sẵn kho mã KHO (Kho chính).",
+      "TK kho bỏ trống thì lấy TK kho của mặt hàng, hoặc 1561 (TT99) / 156 (TT133). Tổng giá trị nên khớp số dư đầu kỳ TK 156.",
+      "Từ FAO: Tồn kho › Báo cáo tồn kho (hoặc Tổng hợp nhập xuất tồn) tại ngày đầu kỳ › Kết xuất Excel.",
     ],
   },
   "opening-partners": {

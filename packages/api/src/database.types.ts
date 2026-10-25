@@ -24,6 +24,7 @@ export type TenantRow = {
   email: string | null;
   regime: "TT99" | "TT133";
   base_currency: string;
+  /** weighted_moving: bình quân di động; weighted_period: bình quân cả tháng */
   costing_method: string;
   vat_method: string;
   fiscal_year_start_month: number;
@@ -102,6 +103,8 @@ export type VoucherRow = {
   partner_tax_code: string | null;
   total_net: Numeric;
   total_vat: Numeric;
+  /** Phiếu điều chuyển: kho nhập */
+  to_warehouse_id: string | null;
 };
 
 export type VoucherLineRow = {
@@ -149,6 +152,7 @@ export type ItemRow = {
   purchase_price: Numeric | null;
   track_inventory: boolean;
   barcode: string | null;
+  default_warehouse_id: string | null;
   is_active: boolean;
 };
 
@@ -280,6 +284,76 @@ export type PurchaseInvoiceImport = {
   }>;
 };
 
+export type WarehouseRow = {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  branch_id: string | null;
+  account_code: string | null;
+  address: string | null;
+  is_active: boolean;
+};
+
+export type StockOpeningRow = {
+  id: string;
+  tenant_id: string;
+  item_id: string;
+  warehouse_id: string;
+  account: string;
+  quantity: Numeric;
+  amount: Numeric;
+};
+
+export type StockBalanceRow = {
+  item_id: string;
+  warehouse_id: string;
+  quantity: Numeric;
+  amount: Numeric;
+  /** Tổng mọi kho của mặt hàng — giá bình quân = item_amount / item_quantity */
+  item_quantity: Numeric;
+  item_amount: Numeric;
+};
+
+export type StockSummaryRow = {
+  item_id: string;
+  item_code: string;
+  item_name: string;
+  uom: string;
+  account: string;
+  opening_qty: Numeric;
+  opening_amount: Numeric;
+  in_qty: Numeric;
+  in_amount: Numeric;
+  out_qty: Numeric;
+  out_amount: Numeric;
+  closing_qty: Numeric;
+  closing_amount: Numeric;
+};
+
+export type StockCardRow = {
+  row_kind: "opening" | "entry" | "closing";
+  line: number;
+  posting_date: DateStr;
+  voucher_id: string | null;
+  voucher_type: string | null;
+  voucher_number: string | null;
+  description: string | null;
+  warehouse_code: string | null;
+  qty_in: Numeric | null;
+  amount_in: Numeric | null;
+  qty_out: Numeric | null;
+  amount_out: Numeric | null;
+  balance_qty: Numeric;
+  balance_amount: Numeric;
+};
+
+export type StockVsLedgerRow = { account: string; stock_amount: Numeric; ledger_amount: Numeric; difference: Numeric };
+
+export type StockOpeningImportResult =
+  | { ok: true; inserted: number; skipped: number; quantity: Numeric; amount: Numeric }
+  | { ok: false; errors: Array<{ row: number; message: string }> };
+
 /** Một dòng phiếu thu/chi đã trừ vào hóa đơn */
 export type InvoicePaymentRow = {
   voucher_id: string;
@@ -395,6 +469,8 @@ export type Database = {
       jobs: Table<JobRow, Partial<JobRow> & Pick<JobRow, "tenant_id" | "code" | "name">>;
       items: Table<ItemRow, Partial<ItemRow> & Pick<ItemRow, "tenant_id" | "code" | "name">>;
       opening_balances: Table<OpeningBalanceRow>;
+      warehouses: Table<WarehouseRow, Partial<WarehouseRow> & Pick<WarehouseRow, "tenant_id" | "code" | "name">>;
+      stock_openings: Table<StockOpeningRow>;
       period_locks: Table<PeriodLockRow>;
     };
     Views: {
@@ -430,6 +506,16 @@ export type Database = {
         Returns: OpenInvoiceRow[];
       };
       rpt_aging: { Args: { p_tenant: string; p_side: "receivable" | "payable"; p_as_of: string; p_account?: string | null }; Returns: AgingRow[] };
+      import_stock_openings: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: StockOpeningImportResult };
+      stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
+      rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
+      rpt_stock_card: {
+        Args: { p_tenant: string; p_item: string; p_from: string; p_to: string; p_warehouse?: string | null };
+        Returns: StockCardRow[];
+      };
+      rpt_stock_vs_ledger: { Args: { p_tenant: string; p_to: string }; Returns: StockVsLedgerRow[] };
+      recost_inventory: { Args: { p_tenant: string; p_from?: string | null }; Returns: number };
+      set_stock_cost_method: { Args: { p_tenant: string; p_method: "moving" | "monthly" }; Returns: number };
       import_purchase_invoices: {
         Args: { p_tenant: string; p_invoices: PurchaseInvoiceImport[]; p_dry_run?: boolean };
         Returns: EInvoiceImportResult;

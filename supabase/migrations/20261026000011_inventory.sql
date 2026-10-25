@@ -13,9 +13,11 @@
 -- ---------------------------------------------------------------------------
 -- Cột & bảng
 -- ---------------------------------------------------------------------------
-alter table public.tenants
-  add column stock_cost_method text not null default 'moving' check (stock_cost_method in ('moving', 'monthly'));
-comment on column public.tenants.stock_cost_method is 'Giá vốn hàng xuất kho: moving = bình quân di động (tức thời), monthly = bình quân cả tháng';
+-- Phương pháp giá vốn dùng cột có sẵn tenants.costing_method (P1): weighted_moving = bình quân di động (tức thời),
+-- weighted_period = bình quân cả tháng (FIFO, đích danh: backlog). Chưa đơn vị nào có số liệu kho,
+-- nên đặt mặc định là bình quân di động.
+alter table public.tenants alter column costing_method set default 'weighted_moving';
+update public.tenants set costing_method = 'weighted_moving' where costing_method = 'weighted_period';
 
 alter table public.warehouses
   add column created_at timestamptz not null default now(),
@@ -267,7 +269,8 @@ declare
   v_changed uuid[] := '{}';
   v_vid uuid;
 begin
-  select stock_cost_method into v_method from public.tenants where id = p_tenant;
+  select case costing_method when 'weighted_period' then 'monthly' else 'moving' end into v_method
+  from public.tenants where id = p_tenant;
   foreach v_item in array coalesce(p_items, '{}'::uuid[]) loop
     v_start := case when v_method = 'monthly' then date_trunc('month', p_from)::date else p_from end;
     select coalesce(sum(quantity), 0), coalesce(sum(amount), 0) into q, val
@@ -769,7 +772,8 @@ begin
   if p_method not in ('moving', 'monthly') then
     raise exception 'Phương pháp tính giá không hợp lệ: %', p_method using errcode = '22023';
   end if;
-  update public.tenants set stock_cost_method = p_method where id = p_tenant;
+  update public.tenants set costing_method = case p_method when 'monthly' then 'weighted_period' else 'weighted_moving' end
+  where id = p_tenant;
   return public.recost_inventory(p_tenant, null);
 end $$;
 

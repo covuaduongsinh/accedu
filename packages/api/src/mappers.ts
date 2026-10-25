@@ -33,6 +33,7 @@ export function toVoucherPayload(
     invoice_date: v.invoiceDate ?? null,
     due_date: v.dueDate ?? null,
     partner_tax_code: v.partnerTaxCode ?? null,
+    to_warehouse_id: v.toWarehouseId ?? null,
     source,
     lines: v.lines.map((l) => ({
       line_no: l.lineNo,
@@ -47,6 +48,7 @@ export function toVoucherPayload(
       department_id: l.departmentId ?? null,
       expense_item_id: l.expenseItemId ?? null,
       item_id: l.itemId ?? null,
+      warehouse_id: l.warehouseId ?? null,
       quantity: l.quantity ?? null,
       unit_price: l.unitPrice ?? null,
       uom: l.uom ?? null,
@@ -89,6 +91,7 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
     invoiceDate: v.invoice_date,
     dueDate: v.due_date,
     ...(v.partner_tax_code ? { partnerTaxCode: v.partner_tax_code } : {}),
+    toWarehouseId: v.to_warehouse_id ?? null,
     lines: v.voucher_lines
       .toSorted((a, b) => a.line_no - b.line_no)
       .map((l) => ({
@@ -104,6 +107,7 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
         departmentId: l.department_id,
         expenseItemId: l.expense_item_id,
         itemId: l.item_id,
+        warehouseId: l.warehouse_id,
         quantity: l.quantity === null ? null : Number(l.quantity),
         unitPrice: l.unit_price === null ? null : Number(l.unit_price),
         ...(l.uom ? { uom: l.uom } : {}),

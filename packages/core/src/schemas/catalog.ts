@@ -50,8 +50,19 @@ export const itemSchema = z.object({
   revenueAccount: z.string().trim().regex(/^\d{3,16}$/, "Tài khoản chỉ gồm chữ số").nullish().or(z.literal("")),
   inventoryAccount: z.string().trim().regex(/^\d{3,16}$/, "Tài khoản chỉ gồm chữ số").nullish().or(z.literal("")),
   groupCode: z.string().max(16).optional(),
+  trackInventory: z.boolean().optional(),
+  cogsAccount: z.string().trim().regex(/^\d{3,16}$/, "Tài khoản chỉ gồm chữ số").nullish().or(z.literal("")),
+  defaultWarehouseId: z.uuid().nullish().or(z.literal("")),
 });
 
+export const warehouseSchema = z.object({
+  code: z.string().trim().min(1, "Thiếu mã kho").max(16, "Mã kho tối đa 16 ký tự").regex(/^[A-Za-z0-9_.-]+$/, "Mã kho chỉ gồm chữ, số, - _ ."),
+  name: z.string().trim().min(1, "Thiếu tên kho").max(128),
+  address: z.string().max(256).optional(),
+  isActive: z.boolean().default(true),
+});
+
+export type WarehouseInput = z.input<typeof warehouseSchema>;
 export type ItemInput = z.input<typeof itemSchema>;
 export type AccountInput = z.input<typeof accountSchema>;
 export type PartnerInput = z.input<typeof partnerSchema>;

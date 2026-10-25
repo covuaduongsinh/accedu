@@ -1,4 +1,15 @@
-import type { AccountImportRow, AccountInput, ItemImportRow, ItemInput, OpeningImportRow, PartnerImportRow, PartnerInput, VoucherInput } from "@accedu/core";
+import type {
+  AccountImportRow,
+  AccountInput,
+  ItemImportRow,
+  ItemInput,
+  OpeningImportRow,
+  PartnerImportRow,
+  PartnerInput,
+  StockOpeningImportRow,
+  VoucherInput,
+  WarehouseInput,
+} from "@accedu/core";
 import type { AccEduClient } from "./client";
 import type {
   AccountRow,
@@ -19,10 +30,17 @@ import type {
   PartnerLedgerRow,
   PartnerRow,
   PurchaseInvoiceImport,
+  StockBalanceRow,
+  StockCardRow,
+  StockOpeningImportResult,
+  StockOpeningRow,
+  StockSummaryRow,
+  StockVsLedgerRow,
   TenantRow,
   TrialBalanceRow,
   VatListingRow,
   VoucherRow,
+  WarehouseRow,
 } from "./database.types";
 import { toVoucherPayload, type VoucherWithLines } from "./mappers";
 
@@ -129,11 +147,48 @@ export const api = {
       revenue_account: it.revenueAccount || null,
       inventory_account: it.inventoryAccount || null,
       group_code: it.groupCode || null,
-      track_inventory: kind !== "service",
+      track_inventory: it.trackInventory ?? kind !== "service",
+      cogs_account: it.cogsAccount || null,
+      default_warehouse_id: it.defaultWarehouseId || null,
     };
     return id
       ? unwrap(await db.from("items").update(row).eq("id", id).select().single())
       : unwrap(await db.from("items").insert(row).select().single());
+  },
+  async warehouses(db: AccEduClient, tenantId: string): Promise<WarehouseRow[]> {
+    return unwrap(await db.from("warehouses").select("*").eq("tenant_id", tenantId).order("code"));
+  },
+  async saveWarehouse(db: AccEduClient, tenantId: string, w: WarehouseInput, id?: string): Promise<WarehouseRow> {
+    const row = { tenant_id: tenantId, code: w.code.trim().toUpperCase(), name: w.name.trim(), address: w.address || null, is_active: w.isActive ?? true };
+    return id
+      ? unwrap(await db.from("warehouses").update(row).eq("id", id).select().single())
+      : unwrap(await db.from("warehouses").insert(row).select().single());
+  },
+  async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
+    return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));
+  },
+  /** Thay toàn bộ tồn kho đầu kỳ (từ Excel hoặc lưới) — nguyên khối, lỗi theo dòng */
+  async importStockOpenings(db: AccEduClient, tenantId: string, rows: StockOpeningImportRow[]): Promise<StockOpeningImportResult> {
+    return unwrap(await db.rpc("import_stock_openings", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
+  },
+  async stockBalances(db: AccEduClient, tenantId: string, asOf?: string | null, warehouseId?: string | null): Promise<StockBalanceRow[]> {
+    return unwrap(await db.rpc("stock_balances", { p_tenant: tenantId, p_as_of: asOf ?? null, p_warehouse: warehouseId ?? null }));
+  },
+  async stockSummary(db: AccEduClient, tenantId: string, from: string, to: string, warehouseId?: string | null): Promise<StockSummaryRow[]> {
+    return unwrap(await db.rpc("rpt_stock_summary", { p_tenant: tenantId, p_from: from, p_to: to, p_warehouse: warehouseId ?? null }));
+  },
+  async stockCard(db: AccEduClient, tenantId: string, itemId: string, from: string, to: string, warehouseId?: string | null): Promise<StockCardRow[]> {
+    return unwrap(await db.rpc("rpt_stock_card", { p_tenant: tenantId, p_item: itemId, p_from: from, p_to: to, p_warehouse: warehouseId ?? null }));
+  },
+  async stockVsLedger(db: AccEduClient, tenantId: string, to: string): Promise<StockVsLedgerRow[]> {
+    return unwrap(await db.rpc("rpt_stock_vs_ledger", { p_tenant: tenantId, p_to: to }));
+  },
+  /** Tính lại giá vốn hàng xuất từ ngày (bỏ trống: từ ngày bắt đầu) — trả số chứng từ thay đổi */
+  async recostInventory(db: AccEduClient, tenantId: string, from?: string | null): Promise<number> {
+    return unwrap(await db.rpc("recost_inventory", { p_tenant: tenantId, p_from: from ?? null }));
+  },
+  async setStockCostMethod(db: AccEduClient, tenantId: string, method: "moving" | "monthly"): Promise<number> {
+    return unwrap(await db.rpc("set_stock_cost_method", { p_tenant: tenantId, p_method: method }));
   },
   async importItems(db: AccEduClient, tenantId: string, rows: ItemImportRow[]): Promise<ImportResult> {
     return unwrap(await db.rpc("import_items", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
@@ -332,5 +387,7 @@ export const qk = {
   locks: (tenantId: string) => ["locks", tenantId] as const,
   jobs: (tenantId: string) => ["jobs", tenantId] as const,
   items: (tenantId: string) => ["items", tenantId] as const,
+  warehouses: (tenantId: string) => ["warehouses", tenantId] as const,
+  stockOpenings: (tenantId: string) => ["stock-openings", tenantId] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,
 };

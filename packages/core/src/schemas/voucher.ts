@@ -28,6 +28,8 @@ export const voucherLineSchema = z
     vatAccount: accountCode.nullish(),
     /** Hóa đơn (HDB/HDV/HDM/HMV) mà dòng thu/chi này trừ vào */
     invoiceId: z.uuid().nullish(),
+    /** Kho (dòng hàng theo dõi tồn kho); phiếu điều chuyển: kho xuất */
+    warehouseId: z.uuid().nullish(),
   })
   .refine((l) => !!(l.debitAccount || l.creditAccount), { message: "Dòng phải có tài khoản Nợ hoặc Có" });
 
@@ -52,6 +54,8 @@ export const voucherSchema = z.object({
   invoiceDate: isoDate.nullish(),
   dueDate: isoDate.nullish(),
   partnerTaxCode: z.string().trim().max(18).optional(),
+  /** Phiếu điều chuyển (PDC): kho nhập */
+  toWarehouseId: z.uuid().nullish(),
   lines: z.array(voucherLineSchema).min(1, "Chứng từ chưa có dòng chi tiết"),
 });
 
