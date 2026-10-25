@@ -368,7 +368,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
   );
 }
 
-function AmountInput({ value, onChange, disabled, label }: { value: string; onChange: (v: string) => void; disabled?: boolean; label: string }) {
+export function AmountInput({ value, onChange, disabled, label }: { value: string; onChange: (v: string) => void; disabled?: boolean; label: string }) {
   const [focused, setFocused] = useState(false);
   const n = parseAmount(value);
   return (
@@ -385,10 +385,10 @@ function AmountInput({ value, onChange, disabled, label }: { value: string; onCh
   );
 }
 
-function AccountName({ a }: { a: AccountRow | undefined }) {
+export function AccountName({ a }: { a: AccountRow | undefined }) {
   return <span className="truncate text-xs text-muted">{a?.name ?? " "}</span>;
 }
 
-function PartnerName({ p }: { p: PartnerRow | undefined }) {
+export function PartnerName({ p }: { p: PartnerRow | undefined }) {
   return <span className="truncate text-xs text-muted">{p?.name ?? " "}</span>;
 }

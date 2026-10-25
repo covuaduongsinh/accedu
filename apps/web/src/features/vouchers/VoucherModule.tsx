@@ -11,6 +11,7 @@ import { Badge, Button, Modal, PageHeader } from "../../components/ui";
 import { downloadXlsx } from "../../lib/export";
 import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, VOUCHER_UI } from "./config";
+import { InvoiceEditor } from "./InvoiceEditor";
 import { PrintVoucher } from "./PrintVoucher";
 import { VoucherEditor } from "./VoucherEditor";
 
@@ -38,9 +39,16 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
     () => [
       dateCol("posting_date", "Ngày"),
       { field: "number", headerName: "Số", width: 110, cellClass: "font-medium text-navy-600" },
+      ...(cfg.invoice
+        ? ([
+            { headerName: "Số hóa đơn", width: 140, valueGetter: (p) => [p.data?.invoice_series, p.data?.invoice_number].filter(Boolean).join(" · ") },
+            dateCol("due_date", "Hạn TT"),
+          ] satisfies ColDef<VoucherRow>[])
+        : []),
       { field: "partner_name", headerName: "Đối tượng", flex: 1, minWidth: 160 },
       { field: "description", headerName: "Diễn giải", flex: 2, minWidth: 200 },
-      amountCol("total_amount", "Tiền"),
+      ...(cfg.invoice ? [amountCol("total_net", "Tiền hàng"), amountCol("total_vat", "Thuế GTGT", { width: 120 })] : []),
+      amountCol("total_amount", cfg.invoice ? "Tổng thanh toán" : "Tiền"),
       { field: "currency", headerName: "Mã nt", width: 80 },
       {
         field: "status",
@@ -51,7 +59,7 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
       },
       { field: "source", headerName: "Nguồn", width: 90 },
     ],
-    [],
+    [cfg.invoice],
   );
 
   async function run(kind: "post" | "unpost" | "delete") {
@@ -112,8 +120,14 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
               onClick={() =>
                 downloadXlsx(
                   `${cfg.type}-${tenant.slug}.xlsx`,
-                  ["Ngày", "Số", "Đối tượng", "Diễn giải", "Tiền", "Trạng thái"],
-                  (vouchers.data ?? []).map((v) => [v.posting_date, v.number, v.partner_name ?? "", v.description ?? "", Number(v.total_amount), STATUS_BADGE[v.status].label]),
+                  cfg.invoice
+                    ? ["Ngày", "Số", "Ký hiệu", "Số hóa đơn", "Ngày hóa đơn", "Hạn TT", "Đối tượng", "MST", "Diễn giải", "Tiền hàng", "Thuế GTGT", "Tổng thanh toán", "Trạng thái"]
+                    : ["Ngày", "Số", "Đối tượng", "Diễn giải", "Tiền", "Trạng thái"],
+                  (vouchers.data ?? []).map((v) =>
+                    cfg.invoice
+                      ? [v.posting_date, v.number, v.invoice_series ?? "", v.invoice_number ?? "", v.invoice_date ?? "", v.due_date ?? "", v.partner_name ?? "", v.partner_tax_code ?? "", v.description ?? "", Number(v.total_net), Number(v.total_vat), Number(v.total_amount), STATUS_BADGE[v.status].label]
+                      : [v.posting_date, v.number, v.partner_name ?? "", v.description ?? "", Number(v.total_amount), STATUS_BADGE[v.status].label],
+                  ),
                 )
               }
             >
@@ -139,8 +153,14 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
         <Lock size={12} /> Chứng từ đã ghi sổ chỉ xem được; bỏ ghi sổ để sửa. Tổng {vouchers.data?.length ?? 0} chứng từ · {formatAmount(total)} VND
       </p>
 
-      <Modal open={editing !== null} wide title={`${cfg.title}${editing && editing !== "new" ? "" : " — mới"}`} onClose={() => setEditing(null)}>
-        {editing !== null ? <VoucherEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} /> : null}
+      <Modal open={editing !== null} wide extraWide={!!cfg.invoice} title={`${cfg.title}${editing && editing !== "new" ? "" : " — mới"}`} onClose={() => setEditing(null)}>
+        {editing !== null ? (
+          cfg.invoice ? (
+            <InvoiceEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
+          ) : (
+            <VoucherEditor key={editing} cfg={cfg} id={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
+          )
+        ) : null}
       </Modal>
       {printing && cfg.printForm ? <PrintVoucher id={printing} cfg={cfg} onClose={() => setPrinting(null)} /> : null}
     </div>

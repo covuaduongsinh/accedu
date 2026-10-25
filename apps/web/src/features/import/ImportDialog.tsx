@@ -17,6 +17,7 @@ import {
   type ColumnMap,
   type HeaderGuess,
   type ImportKind,
+  type ItemImportRow,
   type OpeningImportRow,
   type PartnerImportRow,
   type Preview,
@@ -151,11 +152,12 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
     setBusy(true);
     try {
       // Luôn đối chiếu với danh mục mới nhất trên máy chủ (bộ nhớ đệm có thể cũ vài giây sau lần nhập trước)
-      const [accs, parts] = await Promise.all([
+      const [accs, parts, items] = await Promise.all([
         qc.fetchQuery({ queryKey: qk.accounts(tenant.id), queryFn: () => api.accounts(db, tenant.id), staleTime: 0 }),
         qc.fetchQuery({ queryKey: qk.partners(tenant.id), queryFn: () => api.partners(db, tenant.id), staleTime: 0 }),
+        kind === "items" ? qc.fetchQuery({ queryKey: qk.items(tenant.id), queryFn: () => api.items(db, tenant.id), staleTime: 0 }) : Promise.resolve([]),
       ]);
-      setPreview(buildPreview(kind, table, header, map, { accounts: accs, partners: parts, ...(partnerDefault ? { partnerDefault } : {}) }));
+      setPreview(buildPreview(kind, table, header, map, { accounts: accs, partners: parts, items, ...(partnerDefault ? { partnerDefault } : {}) }));
       setStep("preview");
     } catch (e) {
       toast.error(friendlyError(e));
@@ -172,6 +174,7 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
       let result: ImportResult;
       if (kind === "accounts") result = await api.importAccounts(db, tenant.id, rows as AccountImportRow[]);
       else if (kind === "partners") result = await api.importPartners(db, tenant.id, rows as PartnerImportRow[]);
+      else if (kind === "items") result = await api.importItems(db, tenant.id, rows as ItemImportRow[]);
       else result = await api.importOpeningBalances(db, tenant.id, kind === "opening-accounts" ? "account" : "partner", rows as OpeningImportRow[]);
       if (!result.ok) {
         setPreview(applyServerErrors(preview, result.errors));
@@ -182,6 +185,7 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.accounts(tenant.id) }),
         qc.invalidateQueries({ queryKey: qk.partners(tenant.id) }),
+        qc.invalidateQueries({ queryKey: qk.items(tenant.id) }),
         qc.invalidateQueries({ queryKey: qk.opening(tenant.id) }),
         qc.invalidateQueries({ queryKey: ["report", tenant.id] }),
       ]);
@@ -363,7 +367,7 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge tone="green">Mới {preview.counts.new}</Badge>
-            {kind === "accounts" || kind === "partners" ? <Badge tone="navy">Cập nhật {preview.counts.update}</Badge> : null}
+            {kind === "accounts" || kind === "partners" || kind === "items" ? <Badge tone="navy">Cập nhật {preview.counts.update}</Badge> : null}
             <Badge tone="gray">Bỏ qua {preview.counts.skip}</Badge>
             <Badge tone={preview.counts.error ? "red" : "gray"}>Lỗi {preview.counts.error}</Badge>
             {preview.totals ? (

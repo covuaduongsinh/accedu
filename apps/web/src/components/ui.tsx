@@ -97,7 +97,22 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
-export function Modal({ open, title, onClose, children, wide }: { open: boolean; title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  wide,
+  extraWide,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+  /** Lưới nhiều cột (hóa đơn) */
+  extraWide?: boolean;
+}) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -110,7 +125,7 @@ export function Modal({ open, title, onClose, children, wide }: { open: boolean;
       <div
         role="dialog"
         aria-label={title}
-        className={`w-full ${wide ? "max-w-6xl" : "max-w-xl"} rounded-lg bg-white shadow-xl`}
+        className={`w-full ${extraWide ? "max-w-[1400px]" : wide ? "max-w-6xl" : "max-w-xl"} rounded-lg bg-white shadow-xl`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between rounded-t-lg bg-navy-500 px-4 py-2.5 text-white">
