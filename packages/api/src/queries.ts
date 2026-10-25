@@ -1,7 +1,8 @@
-import type { AccountInput, PartnerInput, VoucherInput } from "@accedu/core";
+import type { AccountImportRow, AccountInput, OpeningImportRow, PartnerImportRow, PartnerInput, VoucherInput } from "@accedu/core";
 import type { AccEduClient } from "./client";
 import type {
   AccountRow,
+  ImportResult,
   JobRow,
   MemberRow,
   OpeningBalanceRow,
@@ -26,6 +27,16 @@ function unwrap<D>(res: { data: D; error: { message: string } | null }): NonNull
 function unwrapMaybe<D>(res: { data: D; error: { message: string } | null }): D {
   if (res.error) throw new Error(res.error.message);
   return res.data;
+}
+
+/** Giới hạn một lần nhập (máy chủ cũng chặn) */
+export const IMPORT_MAX_ROWS = 5000;
+
+function checkBatch<T>(rows: T[]): T[] {
+  if (rows.length > IMPORT_MAX_ROWS) {
+    throw new Error(`Tối đa ${IMPORT_MAX_ROWS.toLocaleString("vi-VN")} dòng mỗi lần nhập — chia tệp thành nhiều phần`);
+  }
+  return rows;
 }
 
 export const api = {
@@ -184,6 +195,18 @@ export const api = {
     rows: Array<{ account: string; partner_id?: string | null; debit: number; credit: number }>,
   ): Promise<number> {
     return unwrap(await db.rpc("set_opening_balances", { p_tenant: tenantId, p_rows: rows }));
+  },
+
+  /** Nhập danh mục tài khoản từ Excel — nguyên khối: có lỗi thì không ghi gì, trả lỗi theo số dòng */
+  async importAccounts(db: AccEduClient, tenantId: string, rows: AccountImportRow[]): Promise<ImportResult> {
+    return unwrap(await db.rpc("import_accounts", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
+  },
+  async importPartners(db: AccEduClient, tenantId: string, rows: PartnerImportRow[]): Promise<ImportResult> {
+    return unwrap(await db.rpc("import_partners", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
+  },
+  /** Thay toàn bộ số dư cấp tài khoản ('account') hoặc số dư công nợ theo đối tượng ('partner') */
+  async importOpeningBalances(db: AccEduClient, tenantId: string, scope: "account" | "partner", rows: OpeningImportRow[]): Promise<ImportResult> {
+    return unwrap(await db.rpc("import_opening_balances", { p_tenant: tenantId, p_scope: scope, p_rows: checkBatch(rows) }));
   },
 
   async periodLocks(db: AccEduClient, tenantId: string): Promise<PeriodLockRow[]> {
