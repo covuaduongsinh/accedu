@@ -26,6 +26,8 @@ export const voucherLineSchema = z
     vatCode: z.enum(["0", "5", "8", "10", "KCT", "KKKNT"]).nullish(),
     vatAmount: money.optional(),
     vatAccount: accountCode.nullish(),
+    /** Hóa đơn (HDB/HDV/HDM/HMV) mà dòng thu/chi này trừ vào */
+    invoiceId: z.uuid().nullish(),
   })
   .refine((l) => !!(l.debitAccount || l.creditAccount), { message: "Dòng phải có tài khoản Nợ hoặc Có" });
 

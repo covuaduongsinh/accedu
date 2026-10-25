@@ -129,6 +129,8 @@ export type VoucherLineRow = {
   vat_rate: Numeric;
   vat_amount: Numeric;
   vat_account: string | null;
+  /** Hóa đơn mà dòng thu/chi này trừ vào */
+  invoice_id: string | null;
 };
 
 export type ItemRow = {
@@ -176,6 +178,69 @@ export type PartnerBalanceRow = {
   credit: Numeric;
   closing_debit: Numeric;
   closing_credit: Numeric;
+};
+
+/** Hóa đơn đã ghi sổ còn nợ (open_invoices) */
+export type OpenInvoiceRow = {
+  id: string;
+  voucher_type: string;
+  number: string;
+  posting_date: DateStr;
+  invoice_series: string | null;
+  invoice_number: string | null;
+  invoice_date: DateStr | null;
+  due_date: DateStr | null;
+  partner_id: string;
+  partner_code: string | null;
+  partner_name: string | null;
+  account: string;
+  description: string | null;
+  total_amount: Numeric;
+  paid: Numeric;
+  remaining: Numeric;
+  /** Số ngày quá hạn; âm = chưa đến hạn */
+  days_overdue: number;
+};
+
+export type AgingRow = {
+  partner_id: string;
+  partner_code: string;
+  partner_name: string;
+  not_due: Numeric;
+  d1_30: Numeric;
+  d31_60: Numeric;
+  d61_90: Numeric;
+  over_90: Numeric;
+  /** Số dư không gắn hóa đơn (đầu kỳ, trả trước, bút toán khác) */
+  unallocated: Numeric;
+  total: Numeric;
+};
+
+export type VatListingRow = {
+  group_order: number;
+  vat_code: string;
+  vat_rate: Numeric;
+  voucher_id: string;
+  voucher_type: string;
+  voucher_number: string;
+  posting_date: DateStr;
+  invoice_series: string | null;
+  invoice_number: string | null;
+  invoice_date: DateStr;
+  partner_code: string | null;
+  partner_name: string | null;
+  partner_tax_code: string | null;
+  item_description: string | null;
+  net_amount: Numeric;
+  vat_amount: Numeric;
+};
+
+/** Một dòng phiếu thu/chi đã trừ vào hóa đơn */
+export type InvoicePaymentRow = {
+  voucher_id: string;
+  line_no: number;
+  amount: Numeric;
+  vouchers: Pick<VoucherRow, "number" | "posting_date" | "status" | "voucher_type"> | null;
 };
 
 export type JobRow = {
@@ -315,6 +380,12 @@ export type Database = {
         Returns: PartnerLedgerRow[];
       };
       rpt_partner_balances: { Args: { p_tenant: string; p_account: string; p_from: string; p_to: string }; Returns: PartnerBalanceRow[] };
+      open_invoices: {
+        Args: { p_tenant: string; p_side: "receivable" | "payable"; p_partner?: string | null; p_as_of?: string | null; p_include_paid?: boolean };
+        Returns: OpenInvoiceRow[];
+      };
+      rpt_aging: { Args: { p_tenant: string; p_side: "receivable" | "payable"; p_as_of: string; p_account?: string | null }; Returns: AgingRow[] };
+      rpt_vat_listing: { Args: { p_tenant: string; p_direction: "out" | "in"; p_from: string; p_to: string }; Returns: VatListingRow[] };
       import_opening_balances: { Args: { p_tenant: string; p_scope: "account" | "partner"; p_rows: unknown[] }; Returns: ImportResult };
       rpt_trial_balance: {
         Args: { p_tenant: string; p_from: string; p_to: string; p_max_level?: number };

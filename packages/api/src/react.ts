@@ -162,6 +162,48 @@ export function usePartnerBalances(tenantId: string | undefined, account: string
   });
 }
 
+/** Hóa đơn còn nợ (danh sách chọn khi thu/chi theo hóa đơn); partnerId undefined = chưa chọn đối tượng thì không tải */
+export function useOpenInvoices(
+  tenantId: string | undefined,
+  side: "receivable" | "payable" | null,
+  opts: { partnerId?: string | null; asOf?: string | null; includePaid?: boolean; enabled?: boolean } = {},
+) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "open-invoices", side ?? "", opts.partnerId ?? "*", opts.asOf ?? "", opts.includePaid ? "all" : "open"),
+    queryFn: () => api.openInvoices(db, tenantId as string, side as "receivable" | "payable", opts),
+    enabled: !!tenantId && !!side && (opts.enabled ?? true),
+  });
+}
+
+export function useAging(tenantId: string | undefined, side: "receivable" | "payable", asOf: string, account?: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "aging", side, asOf, account ?? ""),
+    queryFn: () => api.aging(db, tenantId as string, side, asOf, account),
+    enabled: !!tenantId && !!asOf,
+  });
+}
+
+export function useVatListing(tenantId: string | undefined, direction: "out" | "in", from: string, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "vat-listing", direction, from, to),
+    queryFn: () => api.vatListing(db, tenantId as string, direction, from, to),
+    enabled: !!tenantId,
+  });
+}
+
+/** Các phiếu thu/chi đã chọn trừ vào một hóa đơn */
+export function useInvoicePayments(tenantId: string | undefined, invoiceId: string | undefined) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "invoice-payments", invoiceId ?? ""),
+    queryFn: () => api.invoicePayments(db, invoiceId as string),
+    enabled: !!tenantId && !!invoiceId,
+  });
+}
+
 export function useAccountLedger(tenantId: string | undefined, account: string, from: string, to: string) {
   const db = useDb();
   return useQuery({

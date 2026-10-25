@@ -6,6 +6,7 @@ export * from "./accounting/types";
 export * from "./accounting/voucher-types";
 export * from "./accounting/vat";
 export * from "./accounting/invoice";
+export * from "./accounting/settlement";
 export * from "./accounting/ledger";
 export * from "./accounting/modules";
 export * from "./schemas/voucher";
