@@ -458,3 +458,16 @@ Thầy chọn **P4c** (đợt 3/3, khép lại P4). Kết quả mong muốn:
   - cảnh báo doanh nghiệp rủi ro;
   - tự khớp mã hàng của NCC với danh mục hàng hóa;
   - hóa đơn ngoại tệ, điều chỉnh giảm.
+
+## Kết quả đợt P4c (25/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Core `@accedu/core/einvoice`: đọc XML TT78 (cả vỏ `TDiep`), dòng hàng, thuế suất, chiết khấu thương mại, dồn chênh làm tròn cho khớp tiền thuế của người bán, cảnh báo/lỗi; `einvoiceKey`, `guessPurchaseType` | Xong | 8 test với XML giả |
+| Migration 0010 `import_purchase_invoices`: tìm/tạo NCC theo MST, bỏ qua hóa đơn đã có (ký hiệu bỏ mẫu số, số bỏ số 0 đầu), tạo HDM/HMV nháp qua `save_voucher`, kiểm tra TK; nguyên khối, chạy thử không ghi gì (kể cả bộ đếm số chứng từ) | Xong | Test CSDL `einvoice.test.ts` (5 test): chạy thử, tạo thật + ghi sổ Nợ 1561 + 1331 / Có 331, nhập lại → đã có, một hóa đơn lỗi thì cả lô không ghi, vai trò chỉ xem bị chặn |
+| Web: trang *Mua hàng › Hóa đơn đầu vào (XML)* | Xong | E2E 11/11: 1 tệp XML + 1 tệp ZIP → 2 hóa đơn nháp MH/MV, 2 NCC mới; thả lại → "Đã có"; danh sách hóa đơn mua có hóa đơn 1.939.999 trạng thái *Lập chứng từ* |
+
+Khác kế hoạch: so ký hiệu theo phần sau mẫu số (`1C26TAA` ≡ `C26TAA`), vì kế toán có thể đã gõ tay một trong hai dạng.
+
+Tổng số test: core 110, api 3, CSDL 62, E2E 11. **P4 hoàn tất.**
+

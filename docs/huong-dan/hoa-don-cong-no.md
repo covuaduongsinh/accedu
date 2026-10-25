@@ -1,6 +1,6 @@
 # Hướng dẫn lập hóa đơn và theo dõi công nợ
 
-Tài liệu dành cho Thầy và kế toán Dương Sinh. Áp dụng từ đợt P4a (25/10/2026); mục 4–5 từ đợt P4b.
+Tài liệu dành cho Thầy và kế toán Dương Sinh. Áp dụng từ đợt P4a (25/10/2026); mục 4–5 từ đợt P4b; mục 6 từ đợt P4c.
 
 ## 1. Khai báo danh mục hàng hóa, dịch vụ (làm một lần)
 
@@ -77,6 +77,27 @@ Lưu ý:
 
 Mọi báo cáo đều có nút **Xuất Excel**.
 
-## Sắp có (đợt P4c)
+## 6. Nhập hóa đơn đầu vào từ tệp XML
 
-- Kéo thả tệp XML hóa đơn điện tử đầu vào để tự tạo hóa đơn mua.
+Người bán gửi hóa đơn điện tử qua email thường kèm tệp **.xml** (hoặc một tệp **.zip** chứa .xml và .pdf). Tệp XML là dữ liệu gốc của hóa đơn theo TT78/2021, nên AccEdu đọc được chính xác từng dòng hàng và tiền thuế, không cần gõ lại.
+
+1. Vào **Mua hàng › Hóa đơn đầu vào (XML)**. Kéo thả một hay nhiều tệp `.xml` / `.zip` vào khung, hoặc bấm để chọn tệp.
+2. AccEdu hiện bảng xem trước, mỗi hóa đơn một dòng: nhà cung cấp và MST, ký hiệu, số, ngày, tiền hàng, thuế, tổng. Bấm mũi tên ở đầu dòng để xem từng mặt hàng.
+3. Kiểm tra cột **Trạng thái**:
+   - **Mới**: sẽ tạo hóa đơn mua. Nhãn **NCC mới** nghĩa là nhà cung cấp chưa có trong danh mục, AccEdu sẽ tự tạo, lấy mã bằng MST;
+   - **Đã có MHxxxx**: hóa đơn này đã nhập rồi, sẽ bỏ qua;
+   - **Lỗi**: không tạo được, ví dụ hóa đơn ngoại tệ, thuế suất khác, hóa đơn điều chỉnh giảm. Các trường hợp này nhập tay;
+   - **cảnh báo** (vàng) vẫn tạo được nhưng nên xem lại: MST người mua khác MST đơn vị, hóa đơn không có mã của cơ quan thuế, tổng tiền không khớp, hóa đơn thay thế/điều chỉnh.
+4. Chọn **Loại** cho từng hóa đơn. AccEdu đã gợi ý sẵn:
+   - **Mua hàng**: sách, bàn cờ về bán, ghi Nợ TK 1561 (TT133: 156);
+   - **Mua dịch vụ**: thuê sân, điện nước, cước phí, ghi Nợ TK 6427 (TT133: 6422).
+
+   Có thể sửa **TK Nợ** và **Ngày hạch toán** (mặc định là ngày hóa đơn).
+5. Bấm **Tạo N hóa đơn mua (nháp)**. Hóa đơn được tạo ở trạng thái *Lập chứng từ*. Vào **Mua hàng › Hóa đơn mua hàng** (hoặc *Hóa đơn mua dịch vụ*) để mở xem lại, rồi **Ghi sổ**.
+
+Lưu ý:
+- Tiền thuế từng dòng được chỉnh cho khớp đúng tổng tiền thuế trên hóa đơn của người bán.
+- Chiết khấu thương mại được trừ vào dòng hàng cùng thuế suất.
+- Lô hóa đơn được tạo trọn gói: chỉ cần một hóa đơn lỗi là chưa tạo hóa đơn nào. Sửa hoặc bỏ hóa đơn lỗi rồi bấm lại.
+- Tệp chỉ được đọc trên máy của Thầy. AccEdu lưu dữ liệu hóa đơn, không lưu tệp gốc, nên Thầy cần giữ tệp XML/PDF theo quy định lưu trữ chứng từ.
+- Chưa làm (để đợt P8): kiểm tra chữ ký số, tra cứu hóa đơn trên cổng của cơ quan thuế, cảnh báo doanh nghiệp rủi ro thuế.
