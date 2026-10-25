@@ -1,5 +1,5 @@
 import { api, friendlyError, qk } from "@accedu/api";
-import { useAccounts, useDb, useOpeningBalances, usePartners } from "@accedu/api/react";
+import { useAccounts, useDb, useItems, useOpeningBalances, usePartners, useStockOpenings, useWarehouses } from "@accedu/api/react";
 import { formatAmount, formatDateVN, parseAmount, type ImportKind } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CellValueChangedEvent, ColDef } from "ag-grid-community";
@@ -35,7 +35,7 @@ const newKey = () => `l${++lineSeq}`;
 /** Vào số dư đầu kỳ (tại ngày bắt đầu nhập liệu): tab tài khoản (loại 1–4) và tab công nợ theo đối tượng. */
 export function OpeningBalancesPage() {
   const { tenant, role } = useTenantCtx();
-  const [tab, setTab] = useState<"accounts" | "partners">("accounts");
+  const [tab, setTab] = useState<"accounts" | "partners" | "stock">("accounts");
   const [importKind, setImportKind] = useState<ImportKind | null>(null);
   const editable = canPost(role);
 
@@ -46,6 +46,7 @@ export function OpeningBalancesPage() {
           [
             ["accounts", "Số dư tài khoản"],
             ["partners", "Số dư công nợ (theo đối tượng)"],
+            ["stock", "Tồn kho (theo mặt hàng)"],
           ] as const
         ).map(([k, label]) => (
           <button
@@ -62,8 +63,10 @@ export function OpeningBalancesPage() {
       </div>
       {tab === "accounts" ? (
         <AccountBalances editable={editable} onImport={() => setImportKind("opening-accounts")} />
-      ) : (
+      ) : tab === "partners" ? (
         <PartnerBalances editable={editable} onImport={() => setImportKind("opening-partners")} />
+      ) : (
+        <StockOpenings editable={editable} onImport={() => setImportKind("opening-stock")} />
       )}
       {importKind ? <ImportDialog kind={importKind} open onClose={() => setImportKind(null)} /> : null}
       <p className="mt-2 text-xs text-muted">Ngày bắt đầu nhập liệu: {formatDateVN(tenant.start_date)} (đổi ở Thông tin đơn vị).</p>
@@ -326,6 +329,177 @@ function PartnerBalances({ editable, onImport }: { editable: boolean; onImport: 
         stopEditingWhenCellsLoseFocus
         onCellValueChanged={onChange}
         pinnedBottomRowData={[{ key: "", account: "", partnerCode: "", debit: totalDebit, credit: totalCredit }]}
+      />
+    </div>
+  );
+}
+
+interface StockLine {
+  key: string;
+  warehouseCode: string;
+  itemCode: string;
+  quantity: number;
+  amount: number;
+}
+
+/** Tồn kho đầu kỳ theo mặt hàng × kho; tổng giá trị đối chiếu với số dư đầu kỳ các TK vật tư (156…) */
+function StockOpenings({ editable, onImport }: { editable: boolean; onImport: () => void }) {
+  const { tenant } = useTenantCtx();
+  const accounts = useAccounts(tenant.id);
+  const items = useItems(tenant.id);
+  const warehouses = useWarehouses(tenant.id);
+  const openings = useStockOpenings(tenant.id);
+  const opening = useOpeningBalances(tenant.id);
+  const db = useDb();
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<StockLine[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const itemById = useMemo(() => new Map((items.data ?? []).map((i) => [i.id, i])), [items.data]);
+  const itemByCode = useMemo(() => new Map((items.data ?? []).map((i) => [i.code.toUpperCase(), i])), [items.data]);
+  const whById = useMemo(() => new Map((warehouses.data ?? []).map((w) => [w.id, w])), [warehouses.data]);
+  const whCodes = useMemo(() => (warehouses.data ?? []).filter((w) => w.is_active).map((w) => w.code), [warehouses.data]);
+
+  const saved = useMemo<StockLine[]>(
+    () =>
+      (openings.data ?? [])
+        .map((o) => ({
+          key: o.id,
+          warehouseCode: whById.get(o.warehouse_id)?.code ?? "",
+          itemCode: itemById.get(o.item_id)?.code ?? "",
+          quantity: Number(o.quantity),
+          amount: Number(o.amount),
+        }))
+        .toSorted((a, b) => a.warehouseCode.localeCompare(b.warehouseCode) || a.itemCode.localeCompare(b.itemCode)),
+    [openings.data, whById, itemById],
+  );
+  const lines = draft ?? saved;
+  const totalAmount = lines.reduce((s, l) => s + l.amount, 0);
+  const trackItem = useMemo(() => new Set((accounts.data ?? []).filter((a) => a.track_item).map((a) => a.code)), [accounts.data]);
+  const ledger = (opening.data ?? []).filter((o) => trackItem.has(o.account)).reduce((s, o) => s + Number(o.debit) - Number(o.credit), 0);
+
+  const cols = useMemo<ColDef<StockLine>[]>(
+    () => [
+      {
+        field: "warehouseCode",
+        headerName: "Mã kho",
+        width: 120,
+        editable: (p) => editable && !p.node.rowPinned,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: whCodes },
+      },
+      {
+        field: "itemCode",
+        headerName: "Mã hàng",
+        width: 150,
+        editable: (p) => editable && !p.node.rowPinned,
+        valueParser: (p) => String(p.newValue ?? "").trim().toUpperCase(),
+        cellClassRules: { "text-danger": (p) => !p.node.rowPinned && !!p.value && !itemByCode.get(String(p.value).toUpperCase())?.track_inventory },
+      },
+      {
+        headerName: "Tên hàng",
+        flex: 1,
+        minWidth: 220,
+        valueGetter: (p) => (p.node?.rowPinned ? "Tổng cộng" : (itemByCode.get(String(p.data?.itemCode ?? "").toUpperCase())?.name ?? "")),
+      },
+      { headerName: "Đvt", width: 80, valueGetter: (p) => itemByCode.get(String(p.data?.itemCode ?? "").toUpperCase())?.uom ?? "" },
+      amountCol("quantity", "Số lượng", { editable: (p) => editable && !p.node.rowPinned, valueParser: amountParser, width: 130 }),
+      amountCol("amount", "Giá trị", { editable: (p) => editable && !p.node.rowPinned, valueParser: amountParser, width: 170 }),
+    ],
+    [editable, whCodes, itemByCode],
+  );
+
+  function onChange(e: CellValueChangedEvent<StockLine>) {
+    if (!e.data) return;
+    const changed = e.data;
+    setDraft(lines.map((l) => (l.key === changed.key ? { ...changed, quantity: Number(changed.quantity) || 0, amount: Number(changed.amount) || 0 } : l)));
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      const rows = lines.map((l, i) => ({ row: i + 1, warehouse_code: l.warehouseCode, item_code: l.itemCode, quantity: l.quantity, amount: l.amount }));
+      const r = await api.importStockOpenings(db, tenant.id, rows);
+      if (!r.ok) {
+        toast.error(r.errors.map((e) => `Dòng ${e.row}: ${e.message}`).slice(0, 5).join(" · "));
+        return;
+      }
+      setDraft(null);
+      await qc.invalidateQueries({ queryKey: qk.stockOpenings(tenant.id) });
+      await qc.invalidateQueries({ queryKey: ["report", tenant.id] });
+      toast.success(`Đã lưu tồn kho đầu kỳ (${r.inserted} dòng)`);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Vào tồn kho đầu kỳ"
+        subtitle={`Số lượng và giá trị hàng tồn tại ngày ${formatDateVN(tenant.start_date)}, theo từng kho · lưu lại thì AccEdu tính lại giá vốn các phiếu xuất`}
+        actions={
+          editable ? (
+            <>
+              <Button
+                variant="secondary"
+                icon={<Plus size={14} />}
+                onClick={() => setDraft([...lines, { key: newKey(), warehouseCode: whCodes[0] ?? "KHO", itemCode: "", quantity: 0, amount: 0 }])}
+              >
+                Thêm dòng
+              </Button>
+              <Button variant="secondary" icon={<FileUp size={14} />} onClick={onImport}>
+                Nhập từ Excel
+              </Button>
+              <Button icon={<Save size={14} />} disabled={busy || draft === null} onClick={() => void save()}>
+                Lưu tồn kho đầu kỳ
+              </Button>
+            </>
+          ) : null
+        }
+      />
+      <p className="mb-2 text-xs" data-testid="stock-opening-recon">
+        Tổng giá trị tồn kho <b className="num">{formatAmount(totalAmount)}</b> · số dư đầu kỳ các TK vật tư <b className="num">{formatAmount(ledger)}</b>
+        {totalAmount !== ledger ? (
+          <span className="ml-1">
+            <Badge tone="gold">lệch {formatAmount(totalAmount - ledger)}</Badge>
+          </span>
+        ) : (
+          <span className="ml-1">
+            <Badge tone="green">khớp</Badge>
+          </span>
+        )}
+      </p>
+      <DataGrid<StockLine>
+        rowData={lines}
+        columnDefs={[
+          ...cols,
+          ...(editable
+            ? [
+                {
+                  headerName: "",
+                  width: 56,
+                  sortable: false,
+                  filter: false,
+                  cellRenderer: (p: { data?: StockLine; node: { rowPinned?: unknown } }) =>
+                    p.node.rowPinned ? null : (
+                      <button type="button" aria-label="Xóa dòng" className="text-muted hover:text-danger" onClick={() => p.data && setDraft(lines.filter((l) => l.key !== p.data!.key))}>
+                        <Trash2 size={14} />
+                      </button>
+                    ),
+                } satisfies ColDef<StockLine>,
+              ]
+            : []),
+        ]}
+        loading={openings.isLoading || items.isLoading || warehouses.isLoading}
+        getRowId={(p) => p.data.key || "__total"}
+        singleClickEdit
+        stopEditingWhenCellsLoseFocus
+        onCellValueChanged={onChange}
+        height="calc(100vh - 300px)"
+        pinnedBottomRowData={[{ key: "", warehouseCode: "", itemCode: "", quantity: lines.reduce((s, l) => s + l.quantity, 0), amount: totalAmount }]}
       />
     </div>
   );

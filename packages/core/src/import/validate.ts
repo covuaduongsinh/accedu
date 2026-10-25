@@ -7,7 +7,8 @@ import { cellText, normalizeHeader, parseFlag, parseLooseAmount, type Cell, type
 export interface ImportContext {
   accounts: ReadonlyArray<{ code: string; is_postable: boolean; track_partner: boolean }>;
   partners: ReadonlyArray<{ code: string }>;
-  items?: ReadonlyArray<{ code: string }>;
+  items?: ReadonlyArray<{ code: string; track_inventory?: boolean }>;
+  warehouses?: ReadonlyArray<{ code: string }>;
   /** Nhập từ trang Khách hàng hay Nhà cung cấp: loại mặc định của đối tượng mới */
   partnerDefault?: "customer" | "supplier";
 }
@@ -69,7 +70,17 @@ export interface ItemImportRow {
   barcode?: string | null;
 }
 
-export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow;
+/** Dòng gửi lên import_stock_openings */
+export interface StockOpeningImportRow {
+  row: number;
+  warehouse_code: string;
+  item_code: string;
+  quantity: number;
+  amount: number;
+  account?: string;
+}
+
+export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow | StockOpeningImportRow;
 
 const ITEM_KIND_WORDS: Record<string, NonNullable<ItemImportRow["kind"]>> = {
   "hang hoa": "goods",
@@ -588,6 +599,69 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
       r.status = "new";
       totals.debit = round2(totals.debit + debit);
       totals.credit = round2(totals.credit + credit);
+    }
+  }
+
+  if (kind === "opening-stock") {
+    const seen = new Map<string, number>();
+    const warehouses = new Set((ctx.warehouses ?? []).map((w) => w.code.toUpperCase()));
+    const items = new Map((ctx.items ?? []).map((i) => [i.code.toUpperCase(), i]));
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const wh = codeText(raw(cells, "warehouseCode"));
+      const code = codeText(raw(cells, "itemCode"));
+      r.values.warehouseCode = wh;
+      r.values.itemCode = code;
+      if (!code) {
+        if (looksLikeTotal(Object.values(r.values)) || !r.values.itemName) skip(r, "Không phải dòng hàng hóa");
+        else fail(r, "Thiếu mã hàng");
+        continue;
+      }
+      const qty = parseLooseAmount(raw(cells, "quantity") ?? null);
+      const amount = parseLooseAmount(raw(cells, "amount") ?? null);
+      if ((qty === null && cellText(raw(cells, "quantity")) !== "") || (amount === null && cellText(raw(cells, "amount")) !== "")) {
+        fail(r, "Số lượng / giá trị không hợp lệ");
+        continue;
+      }
+      if ((qty ?? 0) < 0 || (amount ?? 0) < 0) {
+        fail(r, "Số lượng, giá trị phải là số không âm");
+        continue;
+      }
+      if (!qty && !amount) {
+        skip(r, "Không có tồn");
+        continue;
+      }
+      if (!qty) {
+        fail(r, "Có giá trị nhưng số lượng bằng 0");
+        continue;
+      }
+      if (!wh) {
+        fail(r, "Thiếu mã kho");
+        continue;
+      }
+      if (ctx.warehouses && !warehouses.has(wh.toUpperCase())) {
+        fail(r, `Chưa có kho ${wh} — thêm ở Tồn kho › Danh mục kho`);
+        continue;
+      }
+      const it = items.get(code.toUpperCase());
+      if (ctx.items && !it) {
+        fail(r, `Chưa có mã hàng ${code} — nhập danh mục hàng hóa trước`);
+        continue;
+      }
+      if (it && it.track_inventory === false) {
+        fail(r, `Mặt hàng ${code} không theo dõi tồn kho`);
+        continue;
+      }
+      const account = has("account") ? accountCode(raw(cells, "account")) : "";
+      const key = `${wh.toUpperCase()}|${code.toUpperCase()}`;
+      const dup = seen.get(key);
+      if (dup) {
+        fail(r, `Trùng mã kho + mã hàng với dòng ${dup}`);
+        continue;
+      }
+      seen.set(key, r.row);
+      r.payload = { row: r.row, warehouse_code: wh, item_code: code, quantity: qty, amount: round2(amount ?? 0), ...(account ? { account } : {}) };
+      r.status = "new";
     }
   }
 

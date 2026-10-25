@@ -19,6 +19,7 @@ import {
   type ImportKind,
   type ItemImportRow,
   type OpeningImportRow,
+  type StockOpeningImportRow,
   type PartnerImportRow,
   type Preview,
   type PreviewRow,
@@ -155,9 +156,21 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
       const [accs, parts, items] = await Promise.all([
         qc.fetchQuery({ queryKey: qk.accounts(tenant.id), queryFn: () => api.accounts(db, tenant.id), staleTime: 0 }),
         qc.fetchQuery({ queryKey: qk.partners(tenant.id), queryFn: () => api.partners(db, tenant.id), staleTime: 0 }),
-        kind === "items" ? qc.fetchQuery({ queryKey: qk.items(tenant.id), queryFn: () => api.items(db, tenant.id), staleTime: 0 }) : Promise.resolve([]),
+        kind === "items" || kind === "opening-stock"
+          ? qc.fetchQuery({ queryKey: qk.items(tenant.id), queryFn: () => api.items(db, tenant.id), staleTime: 0 })
+          : Promise.resolve([]),
       ]);
-      setPreview(buildPreview(kind, table, header, map, { accounts: accs, partners: parts, items, ...(partnerDefault ? { partnerDefault } : {}) }));
+      const warehouses =
+        kind === "opening-stock" ? await qc.fetchQuery({ queryKey: qk.warehouses(tenant.id), queryFn: () => api.warehouses(db, tenant.id), staleTime: 0 }) : undefined;
+      setPreview(
+        buildPreview(kind, table, header, map, {
+          accounts: accs,
+          partners: parts,
+          items,
+          ...(warehouses ? { warehouses } : {}),
+          ...(partnerDefault ? { partnerDefault } : {}),
+        }),
+      );
       setStep("preview");
     } catch (e) {
       toast.error(friendlyError(e));
@@ -171,6 +184,19 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
     setBusy(true);
     try {
       const rows = payloadOf(preview);
+      if (kind === "opening-stock") {
+        const r = await api.importStockOpenings(db, tenant.id, rows as StockOpeningImportRow[]);
+        if (!r.ok) {
+          setPreview(applyServerErrors(preview, r.errors));
+          setOnlyProblems(true);
+          toast.error(`Máy chủ từ chối ${r.errors.length} dòng — chưa ghi gì. Sửa tệp rồi nhập lại.`);
+          return;
+        }
+        await Promise.all([qc.invalidateQueries({ queryKey: qk.stockOpenings(tenant.id) }), qc.invalidateQueries({ queryKey: ["report", tenant.id] })]);
+        toast.success(`Đã nhập tồn kho đầu kỳ: ${r.inserted} dòng, giá trị ${formatAmount(Number(r.amount))}`);
+        close();
+        return;
+      }
       let result: ImportResult;
       if (kind === "accounts") result = await api.importAccounts(db, tenant.id, rows as AccountImportRow[]);
       else if (kind === "partners") result = await api.importPartners(db, tenant.id, rows as PartnerImportRow[]);

@@ -204,6 +204,53 @@ export function useInvoicePayments(tenantId: string | undefined, invoiceId: stri
   });
 }
 
+export function useWarehouses(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.warehouses(tenantId ?? ""), queryFn: () => api.warehouses(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useStockOpenings(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.stockOpenings(tenantId ?? ""), queryFn: () => api.stockOpenings(db, tenantId as string), enabled: !!tenantId });
+}
+
+/** Tồn kho đến ngày (số lượng, giá trị theo mặt hàng × kho, kèm tổng mặt hàng để tính giá bình quân) */
+export function useStockBalances(tenantId: string | undefined, asOf?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "stock-balances", asOf ?? ""),
+    queryFn: () => api.stockBalances(db, tenantId as string, asOf),
+    enabled: !!tenantId,
+  });
+}
+
+export function useStockSummary(tenantId: string | undefined, from: string, to: string, warehouseId?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "stock-summary", from, to, warehouseId ?? ""),
+    queryFn: () => api.stockSummary(db, tenantId as string, from, to, warehouseId),
+    enabled: !!tenantId,
+  });
+}
+
+export function useStockCard(tenantId: string | undefined, itemId: string | undefined, from: string, to: string, warehouseId?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "stock-card", itemId ?? "", from, to, warehouseId ?? ""),
+    queryFn: () => api.stockCard(db, tenantId as string, itemId as string, from, to, warehouseId),
+    enabled: !!tenantId && !!itemId,
+  });
+}
+
+export function useStockVsLedger(tenantId: string | undefined, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "stock-vs-ledger", to),
+    queryFn: () => api.stockVsLedger(db, tenantId as string, to),
+    enabled: !!tenantId,
+  });
+}
+
 export function useAccountLedger(tenantId: string | undefined, account: string, from: string, to: string) {
   const db = useDb();
   return useQuery({
@@ -222,7 +269,7 @@ function invalidateLedger(qc: QueryClient, tenantId: string, voucherId?: string)
 export type SyncState = "connecting" | "live" | "offline";
 
 /** Bảng được theo dõi (đều nằm trong publication supabase_realtime) */
-const SYNC_TABLES = ["vouchers", "accounts", "partners", "items", "jobs", "opening_balances", "period_locks", "memberships"] as const;
+const SYNC_TABLES = ["vouchers", "accounts", "partners", "items", "jobs", "opening_balances", "period_locks", "memberships", "warehouses", "stock_openings"] as const;
 
 /**
  * Đồng bộ thời gian thực giữa web / desktop / mobile qua Supabase Realtime: khi bất kỳ thiết bị nào
@@ -301,6 +348,11 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
       return inv(qk.jobs(tenantId));
     case "items":
       return inv(qk.items(tenantId));
+    case "warehouses":
+      return inv(qk.warehouses(tenantId));
+    case "stock_openings":
+      inv(qk.stockOpenings(tenantId));
+      return inv(["report", tenantId]);
     case "opening_balances":
       inv(qk.opening(tenantId));
       return inv(["report", tenantId]);

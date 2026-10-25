@@ -28,7 +28,7 @@ describe("toVoucherPayload / fromVoucherRow", () => {
       contact_name: null, description: "Thu", currency: "VND", exchange_rate: "1.000000", header_account: "1111", original_documents: null,
       status: "draft", total_amount: "1000.00", total_amount_fc: "1000.00", source: "web", created_at: "", updated_at: "",
       posted_at: null, version: 3, invoice_series: null, invoice_number: null, invoice_date: null, due_date: null,
-      partner_tax_code: null, total_net: "1000.00", total_vat: "0.00",
+      partner_tax_code: null, total_net: "1000.00", total_vat: "0.00", to_warehouse_id: null,
       voucher_lines: [{
         id: "l1", voucher_id: "v1", tenant_id: "t1", line_no: 1, debit_account: "1111", credit_account: "131",
         amount: "1000.00", amount_fc: "1000.00", entry_group: 1, description: null, partner_id: "p1", job_id: null,

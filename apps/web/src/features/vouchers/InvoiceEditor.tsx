@@ -1,5 +1,5 @@
 import { friendlyError, fromVoucherRow, type ItemRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
-import { useAccounts, useInvoicePayments, useItems, useJobs, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
+import { useAccounts, useInvoicePayments, useItems, useJobs, usePartners, useSaveVoucher, useVoucher, useWarehouses } from "@accedu/api/react";
 import {
   VAT_CODES,
   amountInWords,
@@ -39,6 +39,8 @@ interface LineDraft {
   /** Tiền thuế nhập tay; rỗng = tự tính theo thuế suất */
   vatAmount: string;
   jobCode: string;
+  /** Hóa đơn mua hàng: kho nhập (mặt hàng theo dõi tồn kho) */
+  warehouseId: string;
 }
 
 interface HeaderDraft {
@@ -67,7 +69,7 @@ let seq = 0;
 const VAT_OPTIONS = Object.entries(VAT_CODES) as Array<[VatCode, (typeof VAT_CODES)[VatCode]]>;
 
 function blankLine(account: string, vatCode: VatCode): LineDraft {
-  return { key: `i${++seq}`, itemCode: "", description: "", uom: "", quantity: "", unitPrice: "", discount: "", amount: "", account, vatCode, vatAmount: "", jobCode: "" };
+  return { key: `i${++seq}`, itemCode: "", description: "", uom: "", quantity: "", unitPrice: "", discount: "", amount: "", account, vatCode, vatAmount: "", jobCode: "", warehouseId: "" };
 }
 
 const num = (s: string) => (s.trim() === "" ? null : parseAmount(s));
@@ -132,6 +134,7 @@ export function InvoiceEditor({ cfg, id, onClose }: { cfg: VoucherUiConfig; id: 
           vatCode: l.vatCode ?? "",
           vatAmount: l.vatAmount ? formatAmount(l.vatAmount) : "",
           jobCode: jobCode(l.jobId),
+          warehouseId: l.warehouseId ?? "",
         };
       }),
     };
@@ -179,6 +182,7 @@ function InvoiceForm({
   const partners = usePartners(tenant.id);
   const items = useItems(tenant.id);
   const jobs = useJobs(tenant.id);
+  const warehouses = useWarehouses(tenant.id);
   const save = useSaveVoucher(tenant.id, platform);
   const listId = useId();
   const sale = cfg.headerSide === "debit";
@@ -190,6 +194,10 @@ function InvoiceForm({
 
   const postable = useMemo(() => (accounts.data ?? []).filter((a) => a.is_postable && a.is_active), [accounts.data]);
   const byCode = useMemo(() => new Map((accounts.data ?? []).map((a) => [a.code, a])), [accounts.data]);
+  // Hóa đơn mua hàng: dòng có mặt hàng theo dõi tồn kho, ghi Nợ TK vật tư → chọn kho nhập
+  const withStock = cfg.type === "HDM";
+  const mainWarehouse = ((warehouses.data ?? []).find((w) => w.code === "KHO") ?? warehouses.data?.[0])?.id ?? "";
+  const stockLine = (item: ItemRow | undefined, account: string) => withStock && !!item?.track_inventory && !!byCode.get(account.trim())?.track_item;
   const partnerByCode = useMemo(() => new Map((partners.data ?? []).map((p) => [p.code.toUpperCase(), p])), [partners.data]);
   const itemByCode = useMemo(() => new Map((items.data ?? []).map((i) => [i.code.toUpperCase(), i])), [items.data]);
   const jobByCode = useMemo(() => new Map((jobs.data ?? []).map((j) => [j.code.toUpperCase(), j])), [jobs.data]);
@@ -232,6 +240,7 @@ function InvoiceForm({
           partnerId: partner?.id ?? null,
           itemId: item?.id ?? null,
           jobId: job?.id ?? null,
+          ...(stockLine(item, l.account) && l.warehouseId ? { warehouseId: l.warehouseId } : {}),
           quantity: qty !== null && price !== null ? qty : null,
           unitPrice: qty !== null && price !== null ? price : null,
           uom: l.uom,
@@ -260,6 +269,9 @@ function InvoiceForm({
     // Thuế đầu vào chỉ được khấu trừ khi có hóa đơn
     ...(!sale && totals.vat > 0 && !header.invoiceNumber.trim() ? ["Có thuế GTGT đầu vào — nhập số hóa đơn của nhà cung cấp"] : []),
     ...(preview.ok ? [] : preview.errors.map((e) => e.message)),
+    ...used.flatMap((c, i) =>
+      stockLine(itemByCode.get(c.draft.itemCode.trim().toUpperCase()), c.draft.account) && !c.draft.warehouseId ? [`Dòng ${i + 1}: chưa chọn kho nhập`] : [],
+    ),
   ];
 
   async function submit(post: boolean) {
@@ -283,6 +295,7 @@ function InvoiceForm({
       uom: it.uom,
       ...(fillPrice(it) ? { unitPrice: formatAmount(fillPrice(it) ?? 0), quantity: "1", amount: "" } : {}),
       account: (sale ? it.revenue_account : it.inventory_account) || (sale && it.kind === "service" ? "5113" : lineAccount),
+      ...(withStock && it.track_inventory ? { warehouseId: it.default_warehouse_id || mainWarehouse } : {}),
       vatCode: (it.vat_code as VatCode) || vatCode,
       vatAmount: "",
     });
@@ -416,6 +429,7 @@ function InvoiceForm({
               <th className="w-24 px-1 text-left">{cfg.lineAccountLabel}</th>
               <th className="w-28 px-1 text-left">Thuế suất</th>
               <th className="w-28 px-1 text-right">Tiền thuế</th>
+              {withStock ? <th className="w-36 px-1 text-left">Kho</th> : null}
               <th className="w-24 px-1 text-left">Lớp / vụ việc</th>
               <th className="w-8" />
             </tr>
@@ -474,6 +488,24 @@ function InvoiceForm({
                       onChange={(v) => setLine(l.key, { vatAmount: v })}
                     />
                   </td>
+                  {withStock ? (
+                    <td className="px-1">
+                      {stockLine(itemByCode.get(l.itemCode.trim().toUpperCase()), l.account) ? (
+                        <Select aria-label={`Kho dòng ${n}`} value={l.warehouseId} disabled={readOnly} onChange={(e) => setLine(l.key, { warehouseId: e.target.value })}>
+                          <option value="">—</option>
+                          {(warehouses.data ?? [])
+                            .filter((w) => w.is_active)
+                            .map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.code}
+                              </option>
+                            ))}
+                        </Select>
+                      ) : (
+                        <span className="px-1 text-xs text-muted">—</span>
+                      )}
+                    </td>
+                  ) : null}
                   <td className="px-1">
                     <Input list={`${listId}-job`} value={l.jobCode} disabled={readOnly} aria-label={`Vụ việc dòng ${n}`} onChange={(e) => setLine(l.key, { jobCode: e.target.value })} />
                   </td>

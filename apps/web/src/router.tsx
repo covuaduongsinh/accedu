@@ -45,12 +45,16 @@ export const featureRoute = createRoute({
   getParentRoute: () => tenantRoute,
   path: "$",
   component: FeaturePage,
-  validateSearch: (s: Record<string, unknown>): { edit?: string; account?: string; partner?: string; from?: string; to?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { edit?: string; account?: string; partner?: string; from?: string; to?: string; item?: string; warehouse?: string } => ({
     ...(typeof s.edit === "string" ? { edit: s.edit } : {}),
     ...(typeof s.account === "string" ? { account: s.account } : {}),
     ...(typeof s.partner === "string" ? { partner: s.partner } : {}),
     ...(typeof s.from === "string" ? { from: s.from } : {}),
     ...(typeof s.to === "string" ? { to: s.to } : {}),
+    ...(typeof s.item === "string" ? { item: s.item } : {}),
+    ...(typeof s.warehouse === "string" ? { warehouse: s.warehouse } : {}),
   }),
 });
 
