@@ -235,6 +235,51 @@ export type VatListingRow = {
   vat_amount: Numeric;
 };
 
+/** Kết quả nhập hóa đơn điện tử đầu vào (import_purchase_invoices) */
+export type EInvoiceImportResult = {
+  ok: boolean;
+  dry_run: boolean;
+  /** Số hóa đơn đã tạo (0 khi chạy thử hoặc có lỗi) */
+  created: number;
+  /** Số hóa đơn mới sẽ tạo / đã tạo */
+  new: number;
+  skipped: number;
+  errors: number;
+  partners_created: number;
+  results: Array<{
+    row: number;
+    status: "new" | "created" | "exists" | "error";
+    voucher_id?: string;
+    number?: string;
+    partner?: "new" | "existing" | null;
+    message?: string;
+  }>;
+};
+
+/** Một hóa đơn gửi lên import_purchase_invoices */
+export type PurchaseInvoiceImport = {
+  row: number;
+  voucher_type: "HDM" | "HMV";
+  posting_date: string;
+  invoice_date: string;
+  line_account: string;
+  seller: { name: string; tax_code: string; address?: string };
+  invoice_series: string;
+  invoice_series_short: string;
+  invoice_number: string;
+  description?: string;
+  lines: Array<{
+    description: string;
+    uom?: string;
+    quantity?: number | null;
+    unit_price?: number | null;
+    amount: number;
+    discount_amount?: number;
+    vat_code: string | null;
+    vat_amount: number;
+  }>;
+};
+
 /** Một dòng phiếu thu/chi đã trừ vào hóa đơn */
 export type InvoicePaymentRow = {
   voucher_id: string;
@@ -385,6 +430,10 @@ export type Database = {
         Returns: OpenInvoiceRow[];
       };
       rpt_aging: { Args: { p_tenant: string; p_side: "receivable" | "payable"; p_as_of: string; p_account?: string | null }; Returns: AgingRow[] };
+      import_purchase_invoices: {
+        Args: { p_tenant: string; p_invoices: PurchaseInvoiceImport[]; p_dry_run?: boolean };
+        Returns: EInvoiceImportResult;
+      };
       rpt_vat_listing: { Args: { p_tenant: string; p_direction: "out" | "in"; p_from: string; p_to: string }; Returns: VatListingRow[] };
       import_opening_balances: { Args: { p_tenant: string; p_scope: "account" | "partner"; p_rows: unknown[] }; Returns: ImportResult };
       rpt_trial_balance: {

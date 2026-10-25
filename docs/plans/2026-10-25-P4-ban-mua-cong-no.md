@@ -301,3 +301,173 @@ Cách làm như các đợt trước:
 Khác kế hoạch ban đầu: `invoice_id` không có khóa ngoại; `open_invoices` thay `p_exclude_voucher` bằng `p_include_paid` (lý do ghi ở mục CSDL bên trên).
 
 Tổng số test: core 102, api 3, CSDL 57, E2E 10.
+
+## Đợt P4c — chi tiết (25/10/2026)
+
+### Context
+
+P4a và P4b đã lên production. P4b được merge qua PR covuaduongsinh/accedu#5 vào `main` `598c02f`. Kết quả kiểm tra sau merge:
+- CI xanh;
+- migration 0009 đã áp lên VPS;
+- Vercel production READY (`dpl_4oLiJbpAkKNCjXd8CvFc4qLKJyeD`).
+
+Hiện kế toán phải gõ tay từng hóa đơn mua: tiền sách, bàn cờ, thuê mặt bằng, điện nước… Trong khi đó, mọi hóa đơn điện tử theo TT78/2021 đều có tệp XML chuẩn của Tổng cục Thuế (QĐ 1450/QĐ-TCT), người bán gửi qua email hoặc tải được từ cổng hóa đơn. FAO cũng có cụm chức năng "Hóa đơn đầu vào" (`docs/research/fao/01-cay-menu.md:430`).
+
+Thầy chọn **P4c** (đợt 3/3, khép lại P4). Kết quả mong muốn:
+- kéo thả nhiều tệp `.xml` / `.zip`;
+- AccEdu đọc, kiểm tra, rồi tạo **hóa đơn mua ở trạng thái nháp**: nhà cung cấp, ký hiệu/số/ngày, từng dòng hàng, thuế suất, tiền thuế khớp đúng hóa đơn;
+- nhà cung cấp chưa có thì tự tạo theo MST;
+- hóa đơn đã nhập rồi thì tự bỏ qua;
+- kế toán xem lại rồi mới ghi sổ.
+
+**Cách làm như các đợt trước:**
+- tách lại nhánh `claude/beautiful-pascal-y8xgxa` từ `origin/main` (`598c02f`);
+- bổ sung mục "Đợt P4c — chi tiết" vào `docs/plans/2026-10-25-P4-ban-mua-cong-no.md`;
+- mở PR mới; CI xanh thì **hỏi Thầy "merge"** trước khi gộp.
+
+### Core — `packages/core/src/import/einvoice.ts` (subpath `@accedu/core/einvoice`)
+
+- **Tách subpath riêng:**
+  - thêm `"./einvoice"` vào `exports` của `packages/core/package.json`;
+  - **không** re-export từ `index.ts`, để bản mobile không phải mang thư viện XML.
+- **Thư viện:**
+  - dependency `fast-xml-parser`, chọn bản 5.x mới nhất đã phát hành ≥ 2 tuần (kiểm tra registry lúc làm);
+  - cấu hình: `ignoreAttributes: true`, `parseTagValue: false` (giữ chuỗi để không mất số 0 đầu hay sai số lớn), `removeNSPrefix: true`.
+- **`parseEInvoiceXml(xml: string, opts: { buyerTaxCode?: string | null }): EInvoiceParse`:**
+  - **Tìm `HDon` ở mọi độ sâu.** Có tệp gói trong `TDiep/DLieu/HDon`.
+  - **Các thẻ cần đọc:**
+    - `TTChung`: KHMSHDon, KHHDon, SHDon, NLap, DVTTe, TGia, TTHDLQuan/TCHDon;
+    - `NDHDon/NBan` (Ten, MST, DChi), `NMua/MST`;
+    - `DSHHDVu/HHDVu` (TChat, THHDVu, DVTinh, SLuong, DGia, STCKhau, ThTien, TSuat);
+    - `TToan` (THTTLTSuat/LTSuat, TgTCThue, TgTThue, TgTTTBSo);
+    - `MCCQT`.
+  - **Ký hiệu** lưu dạng đầy đủ `KHMSHDon + KHHDon` (ví dụ `1C26TAA`), như cách in trên hóa đơn và như test P4a.
+  - **Loại dòng (TChat):**
+    - 1: hàng hóa/dịch vụ;
+    - 2: khuyến mại — bỏ nếu thành tiền bằng 0;
+    - 3: chiết khấu thương mại — trừ vào dòng lớn nhất cùng thuế suất, ghi vào `discountAmount`; không trừ được thì báo lỗi;
+    - 4: ghi chú — bỏ.
+  - **Thuế suất:**
+    - dùng lại `parseVatCode` (`packages/core/src/import/validate.ts`) cho `10%`, `8%`, `5%`, `0%`, `KCT`, `KKKNT`;
+    - `KHAC:x%` → lỗi "nhập tay";
+    - hóa đơn bán hàng (KHMSHDon = 2) → dòng không có mã thuế.
+  - **Tiền thuế theo dòng:**
+    - tính bằng `computeInvoiceLine` (`accounting/invoice.ts`);
+    - sau đó dồn chênh làm tròn vào dòng lớn nhất của từng thuế suất, để tổng khớp `LTSuat/TThue` (thiếu thì khớp `TgTThue`);
+    - `save_voucher` chấp nhận lệch ≤ max(10đ, 1%).
+  - **Kết quả trả về:** `{ invoice, errors[], warnings[] }`.
+    - `invoice`: seller {name, taxCode, address}, series, number, date, lines[{description, uom, quantity, unitPrice, amount, discount, vatCode, vatAmount}], totals {net, vat, total}, hasAuthorityCode.
+    - **Lỗi** (không cho tạo): không phải XML hóa đơn; ngoại tệ (DVTTe ≠ VND); dòng âm hoặc hóa đơn điều chỉnh giảm; thuế suất khác; thiếu MST người bán, số hoặc ngày.
+    - **Cảnh báo** (vẫn tạo được):
+      - MST người mua khác MST đơn vị, hoặc để trống;
+      - tổng dòng ≠ `TgTCThue`;
+      - tổng thanh toán ≠ `TgTTTBSo`;
+      - không có mã CQT;
+      - hóa đơn thay thế/điều chỉnh.
+- **`einvoiceKey(seller MST, series, number)`:**
+  - chuẩn hóa: bỏ khoảng trắng, bỏ số 0 đầu của số hóa đơn;
+  - dùng để phát hiện tệp trùng trong cùng một lô.
+- **Test `packages/core/test/einvoice.test.ts`:**
+  - fixtures XML **giả hoàn toàn** viết ngay trong test, gồm 6 trường hợp: sách 5% + bàn cờ 10%; dịch vụ KCT; 8% có dòng chiết khấu; vỏ `TDiep`; thiếu MCCQT; hóa đơn ngoại tệ;
+  - kiểm tra: tổng thuế khớp `TgTThue` sau khi dồn chênh; các cảnh báo/lỗi; số không mất số 0 đầu.
+
+### CSDL — migration `supabase/migrations/20261026000010_einvoice_import.sql`
+
+- **`public.import_purchase_invoices(p_tenant uuid, p_invoices jsonb, p_dry_run boolean default false) returns jsonb`** (`security definer`, `search_path = ''`):
+  - **Quyền:** `app.require(app.has_role(p_tenant, array['owner','admin','chief_accountant','accountant']), …)`; kiểm tra số dòng bằng `app.import_check_rows`.
+  - **Mỗi hóa đơn** `{row, voucher_type 'HDM'|'HMV', posting_date, line_account, seller{name,tax_code,address}, invoice_series, invoice_number, invoice_date, lines[...]}`:
+    1. **Tìm nhà cung cấp:** theo `tax_code`, rồi theo `code`; không có thì `insert` mới (code = MST, `is_supplier`, `tax_code`, `address`), ghi nhận "NCC mới".
+    2. **Đã có hóa đơn** (HDM/HMV cùng đối tượng, `invoice_series` ∈ {ký hiệu đầy đủ, KHHDon}, `ltrim(invoice_number,'0')` bằng nhau, chưa hủy) → trạng thái `exists`, bỏ qua.
+    3. **Tạo hóa đơn:** gọi `public.save_voucher(…, false)` với:
+       - `source 'import'`, `header_account` mặc định của loại;
+       - các dòng `debit_account = line_account` (TK hàng hóa/chi phí của dòng hóa đơn mua), kèm `vat_code`/`vat_amount`/`quantity`/`unit_price`/`uom`/`discount_amount`;
+       - diễn giải "Mua theo HĐ {ký hiệu}-{số} của {tên NCC}".
+       Bọc mỗi hóa đơn trong `begin … exception when others` để gom lỗi theo dòng.
+  - **Nguyên khối (như P2.5):** có lỗi, hoặc `p_dry_run`, thì `raise` một mã riêng để rollback cả lô.
+    - Biến kết quả plpgsql vẫn giữ sau rollback.
+    - Bộ đếm số chứng từ (`voucher_book_counters`) cũng rollback, nên chạy thử không làm nhảy số.
+  - **Trả về:** `{ok, dry_run, created, skipped, partners_created, results:[{row, status:'created'|'exists'|'error', voucher_id?, number?, partner:'existing'|'new', message?}]}`.
+- `revoke … from public, anon`; `grant execute … to authenticated`.
+- **Bản web cũ không bị ảnh hưởng:** chỉ thêm hàm mới.
+- **Test `supabase/tests/einvoice.test.ts`:**
+  - chạy thử: có trạng thái `new`/`exists`, NCC mới, nhưng không ghi gì (số chứng từ, đối tượng, bộ đếm không đổi);
+  - chạy thật:
+    - tạo HDM nháp đúng dòng, thuế, `partner_tax_code`;
+    - NCC mới có MST;
+    - NCC cũ tìm thấy theo MST;
+  - nhập lại cùng hóa đơn → `exists` (kể cả khi số có số 0 đầu khác nhau);
+  - một hóa đơn lỗi (TK sai) → cả lô không ghi;
+  - vai trò viewer bị chặn;
+  - ghi sổ hóa đơn đã nhập → bút toán Nợ 1561 + 1331 / Có 331.
+
+### API — `packages/api`
+
+- **Kiểu:** `EInvoiceImportResult` trong `database.types.ts`, kèm khai báo RPC.
+- **Hàm:** `api.importPurchaseInvoices(db, tenantId, invoices, { dryRun })` trong `queries.ts`, dùng lại `checkBatch`.
+
+### Web — trang `purchase/input-invoices` (`apps/web/src/features/einvoice/InputInvoicesPage.tsx`)
+
+- **Vùng kéo thả + nút chọn tệp:**
+  - nhận `.xml` và `.zip`, nhiều tệp;
+  - giải nén zip bằng `fflate` (`unzipSync`, thêm dependency web), chỉ lấy tệp `.xml`;
+  - giới hạn 2 MB mỗi tệp, 200 hóa đơn mỗi lô.
+- **Đọc và kiểm tra:**
+  1. Parse từng tệp bằng `parseEInvoiceXml` (MST người mua so với `tenant.tax_code`), loại trùng trong lô bằng `einvoiceKey`.
+  2. Gọi chạy thử (`dryRun`) để lấy trạng thái Mới / Đã có / Lỗi và NCC mới/cũ.
+- **Bảng xem trước**, mỗi hóa đơn một dòng, bấm để mở các dòng hàng:
+  - Nhà cung cấp (tên, MST, nhãn "NCC mới");
+  - Ký hiệu, Số, Ngày;
+  - Tiền hàng, Thuế, Tổng;
+  - **Loại** (select Mua hàng HDM / Mua dịch vụ HMV);
+  - **TK Nợ**: mặc định theo `invoiceDefaults(regime, type).lineAccount`, có datalist tài khoản;
+  - **Ngày hạch toán**: mặc định = ngày hóa đơn;
+  - Trạng thái kèm cảnh báo (badge vàng) hoặc lỗi (đỏ).
+- **Đổi Loại / TK / Ngày** thì chạy thử lại (debounce).
+- **Nút "Tạo N hóa đơn mua (nháp)":**
+  - chỉ áp cho các hóa đơn Mới, không lỗi;
+  - xong thì toast kèm link "Mở danh sách hóa đơn mua", rồi invalidate `vouchers`, `partners`, `report`.
+- **Đăng ký chức năng:**
+  - `modules.ts`: `purchase/input-invoices` đặt `ready: true`;
+  - `routes/feature.tsx`: đăng ký trang.
+- **Dùng lại:**
+  - `Button`, `Badge`, `Card`, `PageHeader`, `Select`, `Input` (`components/ui.tsx`);
+  - `useAccounts`, `usePartners`, `useTenantCtx`;
+  - mẫu kéo thả và xem trước của `features/import/ImportDialog.tsx`.
+
+### Kiểm thử & đưa lên
+
+- **Kiểm tra máy:** `pnpm check` (lint, typecheck, core, api, CSDL); `pnpm db:test`.
+- **E2E** (thêm vào `apps/web/e2e/accounting.spec.ts`, trước test "khóa sổ"):
+  1. Tạo 2 XML giả trong test, đưa qua `setInputFiles` (buffer): NCC01 đã có, sách 5%; nhà cung cấp mới, dịch vụ 10%.
+  2. Xem trước hiện 2 dòng "Mới", 1 nhãn "NCC mới".
+  3. Bấm "Tạo 2 hóa đơn mua" → danh sách hóa đơn mua có 2 hóa đơn nháp, đúng tổng tiền.
+  4. Thả lại cùng tệp → "Đã có".
+  5. Chụp ảnh màn hình.
+- **Chạy trên Supabase local:** `supabase db reset` để áp 0010; Edge Function cần mount CA như trước.
+- **Đưa lên:**
+  - push → PR mới → subscribe → CI 4/4 + `supabase-deploy` xanh;
+  - **hỏi Thầy "merge"**;
+  - sau merge kiểm tra CI `main`, deploy, Vercel production.
+- **Tài liệu:**
+  - mục 6 "Nhập hóa đơn đầu vào từ XML" trong `docs/huong-dan/hoa-don-cong-no.md`;
+  - kết quả P4c trong kế hoạch P4;
+  - file tiến độ: P4 hoàn tất.
+- **Ngoài phạm vi** (giữ trong backlog P8):
+  - kiểm tra chữ ký số;
+  - tra cứu trên cổng hóa đơn của cơ quan thuế;
+  - cảnh báo doanh nghiệp rủi ro;
+  - tự khớp mã hàng của NCC với danh mục hàng hóa;
+  - hóa đơn ngoại tệ, điều chỉnh giảm.
+
+## Kết quả đợt P4c (25/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Core `@accedu/core/einvoice`: đọc XML TT78 (cả vỏ `TDiep`), dòng hàng, thuế suất, chiết khấu thương mại, dồn chênh làm tròn cho khớp tiền thuế của người bán, cảnh báo/lỗi; `einvoiceKey`, `guessPurchaseType` | Xong | 8 test với XML giả |
+| Migration 0010 `import_purchase_invoices`: tìm/tạo NCC theo MST, bỏ qua hóa đơn đã có (ký hiệu bỏ mẫu số, số bỏ số 0 đầu), tạo HDM/HMV nháp qua `save_voucher`, kiểm tra TK; nguyên khối, chạy thử không ghi gì (kể cả bộ đếm số chứng từ) | Xong | Test CSDL `einvoice.test.ts` (5 test): chạy thử, tạo thật + ghi sổ Nợ 1561 + 1331 / Có 331, nhập lại → đã có, một hóa đơn lỗi thì cả lô không ghi, vai trò chỉ xem bị chặn |
+| Web: trang *Mua hàng › Hóa đơn đầu vào (XML)* | Xong | E2E 11/11: 1 tệp XML + 1 tệp ZIP → 2 hóa đơn nháp MH/MV, 2 NCC mới; thả lại → "Đã có"; danh sách hóa đơn mua có hóa đơn 1.939.999 trạng thái *Lập chứng từ* |
+
+Khác kế hoạch: so ký hiệu theo phần sau mẫu số (`1C26TAA` ≡ `C26TAA`), vì kế toán có thể đã gõ tay một trong hai dạng.
+
+Tổng số test: core 110, api 3, CSDL 62, E2E 11. **P4 hoàn tất.**
+
