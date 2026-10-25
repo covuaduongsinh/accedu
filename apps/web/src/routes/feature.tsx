@@ -6,6 +6,7 @@ import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { ItemsPage } from "../features/catalogs/ItemsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
 import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
+import { InputInvoicesPage } from "../features/einvoice/InputInvoicesPage";
 import { MigrationPage } from "../features/import/MigrationPage";
 import { CompanyPage, PeriodLockCard } from "../features/system/CompanyPage";
 import { UsersPage } from "../features/system/UsersPage";
@@ -39,6 +40,7 @@ const PAGES: Record<string, ComponentType> = {
   "sales/service-invoices": () => <VoucherModule type="HDV" />,
   "purchase/invoices": () => <VoucherModule type="HDM" />,
   "purchase/service-invoices": () => <VoucherModule type="HMV" />,
+  "purchase/input-invoices": InputInvoicesPage,
   "sales/receivable-ledger": () => <PartnerLedgerPage side="receivable" />,
   "sales/receivable-summary": () => <PartnerBalancesPage side="receivable" />,
   "purchase/payable-ledger": () => <PartnerLedgerPage side="payable" />,

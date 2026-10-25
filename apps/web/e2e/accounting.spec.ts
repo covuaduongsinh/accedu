@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { strToU8, zipSync } from "fflate";
 import readXlsxFile from "read-excel-file/node";
 import writeXlsxFile from "write-excel-file/node";
 
@@ -47,6 +48,15 @@ async function changeTempPassword(page: Page, newPassword: string) {
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
+}
+
+/** Tệp XML hóa đơn điện tử (TT78) giả lập hóa đơn người bán gửi — dữ liệu giả hoàn toàn */
+function einvoiceXml(o: { mst: string; seller: string; number: string; lines: Array<[string, string, number, number, string]>; tax: number }): string {
+  const lines = o.lines
+    .map(([name, uom, qty, price, rate], i) => `<HHDVu><TChat>1</TChat><STT>${i + 1}</STT><THHDVu>${name}</THHDVu><DVTinh>${uom}</DVTinh><SLuong>${qty}</SLuong><DGia>${price}</DGia><ThTien>${qty * price}</ThTien><TSuat>${rate}</TSuat></HHDVu>`)
+    .join("");
+  const net = o.lines.reduce((s, [, , q, p]) => s + q * p, 0);
+  return `<?xml version="1.0" encoding="UTF-8"?><HDon><DLHDon Id="data"><TTChung><PBan>2.0.1</PBan><KHMSHDon>1</KHMSHDon><KHHDon>C26TSM</KHHDon><SHDon>${o.number}</SHDon><NLap>2026-10-20</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung><NDHDon><NBan><Ten>${o.seller}</Ten><MST>${o.mst}</MST><DChi>Số 1 Phố Mẫu, Hà Nội</DChi></NBan><NMua><Ten>Đơn vị E2E</Ten><MST>0108888888</MST></NMua><DSHHDVu>${lines}</DSHHDVu><TToan><TgTCThue>${net}</TgTCThue><TgTThue>${o.tax}</TgTThue><TgTTTBSo>${net + o.tax}</TgTTTBSo></TToan></NDHDon></DLHDon><MCCQT>00E2E0000000000000000000000000000</MCCQT></HDon>`;
 }
 
 /** Tệp Excel giả lập tệp FAO xuất ra (dữ liệu giả hoàn toàn) */
@@ -372,6 +382,58 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByText("Hàng hóa, dịch vụ chịu thuế suất 5%")).toBeVisible();
     await expect(page.locator(".ag-row", { hasText: "Sách cờ vua nhập môn" }).first()).toContainText("12.000");
     await shot(page, "20-bang-ke-ban-ra");
+  });
+
+  test("nhập hóa đơn điện tử đầu vào từ XML/ZIP: xem trước, tạo hóa đơn mua nháp, bỏ qua hóa đơn đã có", async ({ page }) => {
+    await signIn(page);
+    const goods = einvoiceXml({
+      mst: "0109999991",
+      seller: "Công ty TNHH Văn phòng phẩm Mẫu",
+      number: "123",
+      lines: [
+        ["Sách cờ vua nhập môn", "Cuốn", 10, 80_000, "5%"],
+        ["Bàn cờ gỗ tiêu chuẩn", "Bộ", 3, 333_333, "10%"],
+      ],
+      tax: 140_000,
+    });
+    const service = einvoiceXml({ mst: "0107777777", seller: "Công ty Dịch vụ Sân Mẫu", number: "45", lines: [["Phí thuê sân thi đấu", "Buổi", 2, 2_500_000, "10%"]], tax: 500_000 });
+    const zip = Buffer.from(zipSync({ "hd-45.xml": strToU8(service), "hd-45.pdf": strToU8("%PDF-1.4 gia") }));
+
+    await page.goto(`/${slug}/purchase/input-invoices`);
+    await page.getByLabel("Chọn tệp hóa đơn XML").setInputFiles([
+      { name: "hd-123.xml", mimeType: "text/xml", buffer: Buffer.from(goods) },
+      { name: "hd-45.zip", mimeType: "application/zip", buffer: zip },
+    ]);
+    await expect(page.getByTestId("status-123")).toContainText("Mới");
+    await expect(page.getByTestId("status-45")).toContainText("Mới");
+    await expect(page.getByText("NCC mới")).toHaveCount(2);
+    // Gợi ý loại: sách, bàn cờ → mua hàng; thuê sân → mua dịch vụ (TK mặc định theo TT133)
+    await expect(page.getByLabel("Loại hóa đơn 123")).toHaveValue("HDM");
+    await expect(page.getByLabel("TK Nợ hóa đơn 123")).toHaveValue("156");
+    await expect(page.getByLabel("Loại hóa đơn 45")).toHaveValue("HMV");
+    await expect(page.getByLabel("TK Nợ hóa đơn 45")).toHaveValue("6422");
+    await expect(page.getByText("1.939.999")).toBeVisible();
+    await page.getByRole("button", { name: "Chi tiết hóa đơn 123" }).click();
+    await expect(page.getByText("Bàn cờ gỗ tiêu chuẩn")).toBeVisible();
+    await shot(page, "21-hoa-don-dau-vao-xem-truoc");
+
+    await page.getByRole("button", { name: "Tạo 2 hóa đơn mua (nháp)" }).click();
+    await expect(page.getByText("Đã tạo 2 hóa đơn mua nháp, 2 nhà cung cấp mới")).toBeVisible();
+    await expect(page.getByTestId("status-123")).toContainText(/Đã tạo MH\d+/);
+    await expect(page.getByTestId("status-45")).toContainText(/Đã tạo MV\d+/);
+    await shot(page, "22-hoa-don-dau-vao-da-tao");
+
+    // Thả lại cùng tệp: đã có, không tạo trùng
+    await page.getByRole("button", { name: "Xóa danh sách" }).click();
+    await page.getByLabel("Chọn tệp hóa đơn XML").setInputFiles([{ name: "hd-123.xml", mimeType: "text/xml", buffer: Buffer.from(goods) }]);
+    await expect(page.getByTestId("status-123")).toContainText(/Đã có MH\d+/);
+    await expect(page.getByRole("button", { name: "Tạo 0 hóa đơn mua (nháp)" })).toBeDisabled();
+
+    // Hóa đơn mua nháp đúng tổng tiền, chờ kế toán ghi sổ
+    await page.goto(`/${slug}/purchase/invoices`);
+    const row = page.locator(".ag-row", { hasText: "1.939.999" }).first();
+    await expect(row).toContainText("Lập chứng từ");
+    await shot(page, "23-hoa-don-mua-nhap");
   });
 
   test("khóa sổ, lớp học", async ({ page }) => {

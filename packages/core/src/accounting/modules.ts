@@ -89,7 +89,7 @@ export const MODULES: ModuleDef[] = [
       { path: "purchase/invoices", title: "Hóa đơn mua hàng", kind: "voucher", phase: "P4", ready: true },
       { path: "purchase/service-invoices", title: "Hóa đơn mua dịch vụ", kind: "voucher", phase: "P4", ready: true },
       { path: "purchase/suppliers", title: "Danh mục nhà cung cấp", kind: "catalog", phase: "P2", ready: true },
-      { path: "purchase/input-invoices", title: "Hóa đơn đầu vào (XML)", kind: "process", phase: "P4", mobile: true },
+      { path: "purchase/input-invoices", title: "Hóa đơn đầu vào (XML)", kind: "process", phase: "P4", ready: true },
       { path: "purchase/payable-ledger", title: "Sổ chi tiết công nợ nhà cung cấp", kind: "report", phase: "P4", ready: true },
       { path: "purchase/payable-summary", title: "Tổng hợp công nợ phải trả", kind: "report", phase: "P4", ready: true },
       { path: "purchase/aging", title: "Tuổi nợ phải trả", kind: "report", phase: "P4", ready: true },
