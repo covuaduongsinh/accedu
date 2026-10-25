@@ -494,6 +494,17 @@ function tt99Rows(): Array<[string, string]> {
   return [...rows, ...parse(TT99_ADD)];
 }
 
+/** Suy ra loại, tính chất, theo dõi công nợ/vật tư của một số hiệu tài khoản (dùng khi nhập từ Excel thiếu cột) */
+export function inferAccount(code: string): Pick<CoaAccount, "kind" | "normalSide" | "trackPartner" | "trackItem"> {
+  const kind = kindOf(code);
+  return {
+    kind,
+    normalSide: sideOf(code, kind),
+    trackPartner: PARTNER.some((p) => code.startsWith(p)),
+    trackItem: ITEM.some((p) => code.startsWith(p)),
+  };
+}
+
 export const COA_TT99: readonly CoaAccount[] = build(tt99Rows());
 export const COA_TT133: readonly CoaAccount[] = build(parse(TT133));
 

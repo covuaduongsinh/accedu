@@ -209,6 +209,11 @@ export type LedgerRow = {
   balance_credit: Numeric | null;
 };
 
+/** Kết quả các hàm nhập từ Excel (import_accounts / import_partners / import_opening_balances) */
+export type ImportResult =
+  | { ok: false; errors: Array<{ row: number; message: string }> }
+  | { ok: true; inserted: number; updated?: number; unchanged?: number; skipped?: number; debit?: number; credit?: number };
+
 export type Database = {
   public: {
     Tables: {
@@ -241,6 +246,9 @@ export type Database = {
         Args: { p_tenant: string; p_rows: Array<{ account: string; partner_id?: string | null; debit: number; credit: number }> };
         Returns: number;
       };
+      import_accounts: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: ImportResult };
+      import_partners: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: ImportResult };
+      import_opening_balances: { Args: { p_tenant: string; p_scope: "account" | "partner"; p_rows: unknown[] }; Returns: ImportResult };
       rpt_trial_balance: {
         Args: { p_tenant: string; p_from: string; p_to: string; p_max_level?: number };
         Returns: TrialBalanceRow[];

@@ -11,3 +11,6 @@ export * from "./schemas/voucher";
 export * from "./schemas/catalog";
 export * from "./accounting/coa";
 export * from "./auth/password";
+export * from "./import/table";
+export * from "./import/specs";
+export * from "./import/validate";

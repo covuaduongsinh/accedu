@@ -3,13 +3,14 @@ import { useAccounts, useDb } from "@accedu/api/react";
 import { accountSchema, type AccountInput } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
-import { FileDown, Pencil, Plus } from "lucide-react";
+import { FileDown, FileUp, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataGrid } from "../../components/DataGrid";
 import { Badge, Button, Field, Input, Modal, PageHeader, Select } from "../../components/ui";
-import { downloadCsv } from "../../lib/export";
-import { useTenantCtx } from "../../lib/tenant";
+import { downloadXlsx } from "../../lib/export";
+import { ImportDialog } from "../import/ImportDialog";
+import { canPost, useTenantCtx } from "../../lib/tenant";
 
 const KIND_LABEL: Record<AccountRow["kind"], string> = {
   asset: "Tài sản",
@@ -26,7 +27,8 @@ export function AccountsPage() {
   const accounts = useAccounts(tenant.id);
   const [editing, setEditing] = useState<AccountRow | "new" | null>(null);
   const [selected, setSelected] = useState<AccountRow | null>(null);
-  const canEdit = role !== "viewer" && role !== "cashier";
+  const [importing, setImporting] = useState(false);
+  const canEdit = canPost(role);
 
   const cols = useMemo<ColDef<AccountRow>[]>(
     () => [
@@ -67,16 +69,28 @@ export function AccountsPage() {
                 <Button variant="secondary" icon={<Pencil size={14} />} disabled={!selected} onClick={() => selected && setEditing(selected)}>
                   Sửa
                 </Button>
+                <Button variant="secondary" icon={<FileUp size={14} />} onClick={() => setImporting(true)}>
+                  Nhập từ Excel
+                </Button>
               </>
             ) : null}
             <Button
               variant="secondary"
               icon={<FileDown size={14} />}
               onClick={() =>
-                downloadCsv(
-                  `he-thong-tai-khoan-${tenant.slug}.csv`,
-                  ["Tài khoản", "Tên tài khoản", "Tk mẹ", "Bậc", "Loại", "Công nợ"],
-                  (accounts.data ?? []).map((a) => [a.code, a.name, a.parent_code ?? "", a.level, KIND_LABEL[a.kind], a.track_partner ? "x" : ""]),
+                downloadXlsx(
+                  `he-thong-tai-khoan-${tenant.slug}.xlsx`,
+                  ["Tài khoản", "Tên tài khoản", "Tên tiếng Anh", "Tk mẹ", "Bậc", "Loại", "Tính chất", "Theo dõi công nợ"],
+                  (accounts.data ?? []).map((a) => [
+                    a.code,
+                    a.name,
+                    a.name_en ?? "",
+                    a.parent_code ?? "",
+                    a.level,
+                    KIND_LABEL[a.kind],
+                    SIDE_LABEL[a.normal_side],
+                    a.track_partner ? 1 : 0,
+                  ]),
                 )
               }
             >
@@ -94,6 +108,7 @@ export function AccountsPage() {
         onSelectionChanged={(e) => setSelected(e.api.getSelectedRows()[0] ?? null)}
         onRowDoubleClicked={(e) => canEdit && e.data && setEditing(e.data)}
       />
+      <ImportDialog kind="accounts" open={importing} onClose={() => setImporting(false)} />
       <Modal open={editing !== null} title={editing === "new" ? "Thêm tài khoản" : "Sửa tài khoản"} onClose={() => setEditing(null)}>
         {editing !== null ? (
           <AccountForm account={editing === "new" ? null : editing} parentHint={selected} onDone={() => setEditing(null)} />

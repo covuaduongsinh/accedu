@@ -8,7 +8,7 @@ import { useId, useMemo, useState } from "react";
 import { DataGrid, amountCol, dateCol } from "../../components/DataGrid";
 import { Button, Field, Input, PageHeader } from "../../components/ui";
 import { monthRange } from "../../lib/dates";
-import { downloadCsv } from "../../lib/export";
+import { downloadXlsx } from "../../lib/export";
 import { useTenantCtx } from "../../lib/tenant";
 import { ReportFilter } from "./ReportFilter";
 
@@ -53,8 +53,8 @@ export function LedgerPage({ defaultAccount = "111", title = "Sổ chi tiết c�
             variant="secondary"
             icon={<FileDown size={14} />}
             onClick={() =>
-              downloadCsv(
-                `so-chi-tiet-${account}-${range.from}-${range.to}.csv`,
+              downloadXlsx(
+                `so-chi-tiet-${account}-${range.from}-${range.to}.xlsx`,
                 ["Ngày", "Số CT", "Diễn giải", "TK", "TK đối ứng", "Nợ", "Có", "Dư Nợ", "Dư Có"],
                 (rows.data ?? []).map((r) => [r.posting_date, r.voucher_number ?? "", r.description ?? "", r.account, r.contra_account ?? "", Number(r.debit ?? 0), Number(r.credit ?? 0), Number(r.balance_debit ?? 0), Number(r.balance_credit ?? 0)]),
               )

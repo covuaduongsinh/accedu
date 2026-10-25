@@ -5,6 +5,7 @@ import type { ComponentType } from "react";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
 import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
+import { MigrationPage } from "../features/import/MigrationPage";
 import { CompanyPage, PeriodLockCard } from "../features/system/CompanyPage";
 import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
@@ -24,6 +25,7 @@ const PAGES: Record<string, ComponentType> = {
     </div>
   ),
   "general/opening-balances": OpeningBalancesPage,
+  "system/import": MigrationPage,
   "project/jobs": JobsPage,
   "general/accounts": AccountsPage,
   "sales/customers": () => <PartnersPage kind="customer" />,
