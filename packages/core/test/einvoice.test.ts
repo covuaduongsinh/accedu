@@ -20,8 +20,9 @@ interface Fx {
   related?: { kind: 1 | 2; series: string; number: string };
 }
 
+const tag = (name: string, v: string | number | undefined) => (v === undefined ? "" : `<${name}>${v}</${name}>`);
+
 function xml(f: Fx): string {
-  const tag = (name: string, v: string | number | undefined) => (v === undefined ? "" : `<${name}>${v}</${name}>`);
   const lines = f.lines
     .map(
       (l, i) =>

@@ -244,11 +244,12 @@ function readInvoice(h: Node, opts: { buyerTaxCode?: string | null }): EInvoiceP
 
 const SERVICE_WORDS = ["dich vu", "thue", "cuoc", "phi", "dien", "nuoc", "internet", "van chuyen", "quang cao", "sua chua", "bao tri", "tu van", "dao tao", "ve sinh", "bao ve"];
 
+const isService = (description: string) => {
+  const n = ` ${normalizeHeader(description)} `;
+  return SERVICE_WORDS.some((w) => n.includes(` ${w} `));
+};
+
 /** Gợi ý loại hóa đơn mua: mọi dòng đều là dịch vụ (thuê, cước, phí, điện nước…) → HMV, còn lại → HDM */
 export function guessPurchaseType(invoice: Pick<EInvoice, "lines">): "HDM" | "HMV" {
-  const isService = (d: string) => {
-    const n = ` ${normalizeHeader(d)} `;
-    return SERVICE_WORDS.some((w) => n.includes(` ${w} `));
-  };
   return invoice.lines.length > 0 && invoice.lines.every((l) => isService(l.description)) ? "HMV" : "HDM";
 }

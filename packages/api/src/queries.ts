@@ -3,6 +3,7 @@ import type { AccEduClient } from "./client";
 import type {
   AccountRow,
   AgingRow,
+  EInvoiceImportResult,
   ImportResult,
   InvoicePaymentRow,
   ItemRow,
@@ -17,6 +18,7 @@ import type {
   PartnerBalanceRow,
   PartnerLedgerRow,
   PartnerRow,
+  PurchaseInvoiceImport,
   TenantRow,
   TrialBalanceRow,
   VatListingRow,
@@ -273,6 +275,14 @@ export const api = {
   },
   async partnerBalances(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<PartnerBalanceRow[]> {
     return unwrap(await db.rpc("rpt_partner_balances", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));
+  },
+  /**
+   * Nhập hóa đơn điện tử đầu vào thành hóa đơn mua nháp (nguyên khối: có lỗi thì không ghi gì).
+   * dryRun: chỉ kiểm tra, trả trạng thái từng hóa đơn (mới / đã có / lỗi) để xem trước.
+   */
+  async importPurchaseInvoices(db: AccEduClient, tenantId: string, invoices: PurchaseInvoiceImport[], opts: { dryRun?: boolean } = {}): Promise<EInvoiceImportResult> {
+    if (invoices.length > 500) throw new Error("Tối đa 500 hóa đơn mỗi lần nhập");
+    return unwrap(await db.rpc("import_purchase_invoices", { p_tenant: tenantId, p_invoices: invoices, p_dry_run: opts.dryRun ?? false }));
   },
   /** Hóa đơn đã ghi sổ còn nợ; includePaid: cả hóa đơn đã trả đủ */
   async openInvoices(
