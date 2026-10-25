@@ -173,20 +173,40 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
   useEffect(() => {
     if (!tenantId) return;
     const filter = `tenant_id=eq.${tenantId}`;
+    // Gom thay đổi trong 300 ms (nhập Excel hàng trăm dòng → mỗi bảng chỉ làm mới một lần)
+    const pending = new Map<string, Set<string | null>>();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flush = () => {
+      timer = undefined;
+      for (const [table, ids] of pending) {
+        if (ids.size > 20) {
+          applyChange(qc, tenantId, table, null);
+          if (table === "vouchers") void qc.invalidateQueries({ queryKey: ["voucher"] });
+        } else for (const id of ids) applyChange(qc, tenantId, table, id);
+      }
+      pending.clear();
+    };
     let channel = db.channel(`tenant:${tenantId}`);
     for (const table of SYNC_TABLES) {
       channel = channel.on("postgres_changes", { event: "*", schema: "public", table, filter }, (payload) => {
         const row = (payload.new ?? payload.old) as { id?: string } | null;
-        applyChange(qc, tenantId, table, row?.id ?? null);
+        // Bảng khác vouchers chỉ cần làm mới cả danh sách: không cần giữ id
+        const ids = pending.get(table) ?? new Set<string | null>();
+        ids.add(table === "vouchers" ? (row?.id ?? null) : null);
+        pending.set(table, ids);
+        timer ??= setTimeout(flush, 300);
       });
     }
     channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "tenants", filter: `id=eq.${tenantId}` }, () =>
       applyChange(qc, tenantId, "tenants", null),
     );
     let wasLive = false;
+    const started = Date.now();
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        if (wasLive) applyChange(qc, tenantId, "*", null);
+        // Lần đầu: làm mới dữ liệu khôi phục từ bộ nhớ đệm (thiết bị khác có thể đã sửa khi app đang đóng);
+        // nối lại sau khi mất kết nối: làm mới toàn bộ để bù các thay đổi bị lỡ
+        applyChange(qc, tenantId, "*", null, wasLive ? undefined : started);
         wasLive = true;
         setState("live");
       } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -194,6 +214,7 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
       }
     });
     return () => {
+      if (timer) clearTimeout(timer);
       void db.removeChannel(channel);
     };
   }, [db, qc, tenantId]);
@@ -201,7 +222,7 @@ export function useRealtimeSync(tenantId: string | undefined): SyncState {
   return state;
 }
 
-function applyChange(qc: QueryClient, tenantId: string, table: string, id: string | null) {
+function applyChange(qc: QueryClient, tenantId: string, table: string, id: string | null, olderThan?: number) {
   const inv = (queryKey: readonly unknown[]) => void qc.invalidateQueries({ queryKey });
   switch (table) {
     case "vouchers":
@@ -224,11 +245,12 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "tenants":
       inv(qk.tenants());
       return inv(["tenant"]);
-    case "*":
-      // Vừa nối lại sau khi mất kết nối: làm mới mọi dữ liệu của đơn vị
-      inv(qk.tenants());
-      inv(["tenant"]);
-      return void qc.invalidateQueries({ predicate: (q) => q.queryKey.includes(tenantId) || q.queryKey[0] === "voucher" });
+    case "*": {
+      // Làm mới mọi dữ liệu của đơn vị (chỉ dữ liệu tải trước mốc olderThan nếu có)
+      const stale = (q: { state: { dataUpdatedAt: number } }) => olderThan === undefined || q.state.dataUpdatedAt < olderThan;
+      void qc.invalidateQueries({ predicate: (q) => stale(q) && (q.queryKey[0] === "tenants" || q.queryKey[0] === "tenant") });
+      return void qc.invalidateQueries({ predicate: (q) => stale(q) && (q.queryKey.includes(tenantId) || q.queryKey[0] === "voucher") });
+    }
     default:
       return;
   }

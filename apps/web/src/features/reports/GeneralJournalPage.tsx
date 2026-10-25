@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { DataGrid, amountCol, dateCol } from "../../components/DataGrid";
 import { Button, PageHeader } from "../../components/ui";
 import { monthRange } from "../../lib/dates";
-import { downloadCsv } from "../../lib/export";
+import { downloadXlsx } from "../../lib/export";
 import { useTenantCtx } from "../../lib/tenant";
 import { ReportFilter } from "./ReportFilter";
 
@@ -41,8 +41,8 @@ export function GeneralJournalPage() {
             variant="secondary"
             icon={<FileDown size={14} />}
             onClick={() =>
-              downloadCsv(
-                `nhat-ky-chung-${range.from}-${range.to}.csv`,
+              downloadXlsx(
+                `nhat-ky-chung-${range.from}-${range.to}.xlsx`,
                 ["Ngày ghi sổ", "Số CT", "Ngày CT", "Diễn giải", "TK", "TK đối ứng", "Nợ", "Có"],
                 (rows.data ?? []).map((r) => [r.posting_date, r.voucher_number, r.issue_date, r.description ?? "", r.account, r.contra_account ?? "", Number(r.debit), Number(r.credit)]),
               )

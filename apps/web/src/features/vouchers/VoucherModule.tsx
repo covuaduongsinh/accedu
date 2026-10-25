@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataGrid, amountCol, dateCol } from "../../components/DataGrid";
 import { Badge, Button, Modal, PageHeader } from "../../components/ui";
-import { downloadCsv } from "../../lib/export";
+import { downloadXlsx } from "../../lib/export";
 import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, VOUCHER_UI } from "./config";
 import { PrintVoucher } from "./PrintVoucher";
@@ -110,8 +110,8 @@ export function VoucherModule({ type }: { type: keyof typeof VOUCHER_UI }) {
               variant="secondary"
               icon={<FileDown size={14} />}
               onClick={() =>
-                downloadCsv(
-                  `${cfg.type}-${tenant.slug}.csv`,
+                downloadXlsx(
+                  `${cfg.type}-${tenant.slug}.xlsx`,
                   ["Ngày", "Số", "Đối tượng", "Diễn giải", "Tiền", "Trạng thái"],
                   (vouchers.data ?? []).map((v) => [v.posting_date, v.number, v.partner_name ?? "", v.description ?? "", Number(v.total_amount), STATUS_BADGE[v.status].label]),
                 )

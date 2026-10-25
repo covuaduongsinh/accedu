@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { DataGrid, amountCol } from "../../components/DataGrid";
 import { Button, Field, PageHeader, Select } from "../../components/ui";
 import { monthRange } from "../../lib/dates";
-import { downloadCsv } from "../../lib/export";
+import { downloadXlsx } from "../../lib/export";
 import { useTenantCtx } from "../../lib/tenant";
 import { ReportFilter } from "./ReportFilter";
 
@@ -59,8 +59,8 @@ export function TrialBalancePage() {
               variant="secondary"
               icon={<FileDown size={14} />}
               onClick={() =>
-                downloadCsv(
-                  `can-doi-phat-sinh-${range.from}-${range.to}.csv`,
+                downloadXlsx(
+                  `can-doi-phat-sinh-${range.from}-${range.to}.xlsx`,
                   ["Tài khoản", "Tên tài khoản", "Dư Nợ đầu kỳ", "Dư Có đầu kỳ", "PS Nợ", "PS Có", "Dư Nợ cuối kỳ", "Dư Có cuối kỳ"],
                   (tb.data ?? []).map((r) => [r.account_code, r.account_name, ...NUM_KEYS.map((k) => Number(r[k]))]),
                 )

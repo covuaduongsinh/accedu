@@ -32,6 +32,7 @@ export const MODULES: ModuleDef[] = [
       { path: "system/users", title: "Người sử dụng & phân quyền", kind: "setting", phase: "P1", ready: true },
       { path: "system/voucher-books", title: "Quyển chứng từ", kind: "catalog", phase: "P2" },
       { path: "system/periods", title: "Kỳ kế toán & khóa sổ", kind: "setting", phase: "P2", ready: true },
+      { path: "system/import", title: "Chuyển dữ liệu từ FAO (nhập Excel)", kind: "process", phase: "P2", ready: true },
       { path: "system/currencies", title: "Tiền tệ & tỷ giá", kind: "catalog", phase: "P2" },
       { path: "system/audit", title: "Nhật ký hệ thống", kind: "report", phase: "P2" },
     ],
@@ -42,7 +43,7 @@ export const MODULES: ModuleDef[] = [
     features: [
       { path: "general/journal-vouchers", title: "Phiếu kế toán", kind: "voucher", phase: "P2", ready: true },
       { path: "general/accounts", title: "Danh mục tài khoản", kind: "catalog", phase: "P2", ready: true, mobile: true },
-      { path: "general/opening-balances", title: "Số dư đầu kỳ tài khoản", kind: "process", phase: "P2", ready: true },
+      { path: "general/opening-balances", title: "Số dư đầu kỳ tài khoản & công nợ", kind: "process", phase: "P2", ready: true },
       { path: "general/general-journal", title: "Sổ nhật ký chung", kind: "report", phase: "P2", ready: true },
       { path: "general/ledger", title: "Sổ cái tài khoản", kind: "report", phase: "P2", ready: true, mobile: true },
       { path: "general/trial-balance", title: "Bảng cân đối phát sinh", kind: "report", phase: "P2", ready: true, mobile: true },

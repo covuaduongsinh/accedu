@@ -3,13 +3,14 @@ import { useDb, usePartners } from "@accedu/api/react";
 import { partnerSchema, type PartnerInput } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
-import { FileDown, Pencil, Plus } from "lucide-react";
+import { FileDown, FileUp, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataGrid } from "../../components/DataGrid";
 import { Button, Field, Input, Modal, PageHeader } from "../../components/ui";
-import { downloadCsv } from "../../lib/export";
-import { useTenantCtx } from "../../lib/tenant";
+import { downloadXlsx } from "../../lib/export";
+import { ImportDialog } from "../import/ImportDialog";
+import { canPost, useTenantCtx } from "../../lib/tenant";
 
 export function PartnersPage({ kind }: { kind: "customer" | "supplier" }) {
   const { tenant, role } = useTenantCtx();
@@ -17,7 +18,8 @@ export function PartnersPage({ kind }: { kind: "customer" | "supplier" }) {
   const [editing, setEditing] = useState<PartnerRow | "new" | null>(null);
   const [selected, setSelected] = useState<PartnerRow | null>(null);
   const rows = (partners.data ?? []).filter((p) => (kind === "customer" ? p.is_customer || p.is_student : p.is_supplier));
-  const canEdit = role !== "viewer";
+  const [importing, setImporting] = useState(false);
+  const canEdit = canPost(role);
   const title = kind === "customer" ? "Danh mục khách hàng" : "Danh mục nhà cung cấp";
 
   const cols = useMemo<ColDef<PartnerRow>[]>(
@@ -47,13 +49,20 @@ export function PartnersPage({ kind }: { kind: "customer" | "supplier" }) {
                 <Button variant="secondary" icon={<Pencil size={14} />} disabled={!selected} onClick={() => selected && setEditing(selected)}>
                   Sửa
                 </Button>
+                <Button variant="secondary" icon={<FileUp size={14} />} onClick={() => setImporting(true)}>
+                  Nhập từ Excel
+                </Button>
               </>
             ) : null}
             <Button
               variant="secondary"
               icon={<FileDown size={14} />}
               onClick={() =>
-                downloadCsv(`${kind}-${tenant.slug}.csv`, ["Mã", "Tên", "MST", "Điện thoại", "Email", "Địa chỉ"], rows.map((p) => [p.code, p.name, p.tax_code ?? "", p.phone ?? "", p.email ?? "", p.address ?? ""]))
+                downloadXlsx(
+                  `${kind === "customer" ? "khach-hang" : "nha-cung-cap"}-${tenant.slug}.xlsx`,
+                  ["Mã", "Tên", "Mã số thuế", "Điện thoại", "Email", "Địa chỉ", "Người liên hệ", "Loại"],
+                  rows.map((p) => [p.code, p.name, p.tax_code ?? "", p.phone ?? "", p.email ?? "", p.address ?? "", p.contact_name ?? "", partnerTypes(p)]),
+                )
               }
             >
               Xuất Excel
@@ -70,11 +79,17 @@ export function PartnersPage({ kind }: { kind: "customer" | "supplier" }) {
         onSelectionChanged={(e) => setSelected(e.api.getSelectedRows()[0] ?? null)}
         onRowDoubleClicked={(e) => canEdit && e.data && setEditing(e.data)}
       />
+      <ImportDialog kind="partners" partnerDefault={kind} open={importing} onClose={() => setImporting(false)} />
       <Modal open={editing !== null} title={editing === "new" ? `${title} — thêm mới` : "Sửa đối tượng"} onClose={() => setEditing(null)}>
         {editing !== null ? <PartnerForm partner={editing === "new" ? null : editing} kind={kind} onDone={() => setEditing(null)} /> : null}
       </Modal>
     </div>
   );
+}
+
+/** "KH,NCC" — cùng ký hiệu cột Loại của mẫu nhập Excel để xuất ra rồi nhập lại được */
+function partnerTypes(p: PartnerRow): string {
+  return [p.is_customer && "KH", p.is_supplier && "NCC", p.is_employee && "NV", p.is_student && "HV"].filter(Boolean).join(",");
 }
 
 function PartnerForm({ partner, kind, onDone }: { partner: PartnerRow | null; kind: "customer" | "supplier"; onDone: () => void }) {

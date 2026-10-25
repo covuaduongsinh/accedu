@@ -1,5 +1,10 @@
 import { execFileSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import readXlsxFile from "read-excel-file/node";
+import writeXlsxFile from "write-excel-file/node";
 
 const SHOTS = process.env.E2E_SHOTS;
 const stamp = Date.now().toString(36);
@@ -42,6 +47,14 @@ async function changeTempPassword(page: Page, newPassword: string) {
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
+}
+
+/** Tệp Excel giả lập tệp FAO xuất ra (dữ liệu giả hoàn toàn) */
+const fixtures = mkdtempSync(join(tmpdir(), "accedu-e2e-"));
+async function xlsx(name: string, rows: Array<Array<string | number | null>>): Promise<string> {
+  const path = join(fixtures, name);
+  await writeXlsxFile(rows.map((r) => r.map((v) => (v === null ? null : { value: v, type: typeof v === "number" ? Number : String })))).toFile(path);
+  return path;
 }
 
 async function signIn(page: Page) {
@@ -155,7 +168,7 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await staff.close();
   });
 
-  test("số dư đầu kỳ nhập trên lưới, khóa sổ, lớp học", async ({ page }) => {
+  test("số dư đầu kỳ nhập trên lưới", async ({ page }) => {
     await signIn(page);
     await page.goto(`/${slug}/general/opening-balances`);
     const editCell = async (code: string, col: "debit" | "credit", value: string) => {
@@ -175,7 +188,102 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await page.getByRole("button", { name: "Lưu số dư" }).click();
     await expect(page.getByText(/Đã lưu số dư đầu kỳ \(2 tài khoản\)/)).toBeVisible();
     await shot(page, "08-so-du-dau-ky");
+  });
 
+  test("chuyển dữ liệu từ FAO: nhập tài khoản, đối tượng, số dư công nợ và số dư tài khoản từ Excel", async ({ page }) => {
+    await signIn(page);
+    // 1. Danh mục tài khoản: tệp có tên báo cáo phía trên dòng tiêu đề như FAO
+    await page.goto(`/${slug}/general/accounts`);
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Chọn tệp Excel").setInputFiles(
+      await xlsx("danh-muc-tai-khoan.xlsx", [
+        ["DANH MỤC TÀI KHOẢN", null, null],
+        [null, null, null],
+        ["Tài khoản", "Tên tài khoản", "Tk theo dõi công nợ"],
+        ["11211", "TGNH mẫu A", 0],
+        ["11212", "TGNH mẫu B", 0],
+        ["1111", "Tiền Việt Nam", 0],
+      ]),
+    );
+    await expect(dialog.getByLabel("Cột cho Tài khoản", { exact: true })).toHaveValue("0");
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await expect(dialog.getByText("Mới 2")).toBeVisible();
+    await expect(dialog.getByText("Cập nhật 1")).toBeVisible();
+    await shot(page, "10-nhap-excel-xem-truoc");
+    await dialog.getByRole("button", { name: "Nhập 3 dòng" }).click();
+    await expect(page.getByText(/thêm 2, cập nhật 0, không đổi 1/)).toBeVisible();
+    await expect(page.getByRole("gridcell", { name: "TGNH mẫu B" })).toBeVisible();
+
+    // 2. Đối tượng: dán thẳng từ Excel (tab)
+    await page.goto(`/${slug}/sales/customers`);
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog.getByLabel("Dữ liệu dán từ Excel").fill("Mã khách\tTên khách hàng\tLoại\nHV002\tHọc viên Mẫu Hai\tHV\nNCC01\tCông ty Sách Mẫu\tNCC");
+    await dialog.getByRole("button", { name: "Dùng dữ liệu đã dán" }).click();
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await dialog.getByRole("button", { name: "Nhập 2 dòng" }).click();
+    await expect(page.getByRole("gridcell", { name: "Học viên Mẫu Hai" })).toBeVisible();
+
+    // 3. Số dư công nợ theo đối tượng
+    await page.goto(`/${slug}/general/opening-balances`);
+    await page.getByRole("tab", { name: /Số dư công nợ/ }).click();
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog.getByLabel("Chọn tệp Excel").setInputFiles(
+      await xlsx("so-du-cong-no.xlsx", [
+        ["Tài khoản", "Mã khách", "Tên khách hàng", "Dư nợ", "Dư có"],
+        ["131", "HV002", "Học viên Mẫu Hai", 3_000_000, 0],
+        ["331", "NCC01", "Công ty Sách Mẫu", 0, 3_000_000],
+      ]),
+    );
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await expect(dialog.getByText("Cân", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Nhập 2 dòng" }).click();
+    await expect(page.getByRole("gridcell", { name: "Công ty Sách Mẫu" })).toBeVisible();
+
+    // 4. Số dư tài khoản lấy thẳng từ Bảng cân đối phát sinh (tiêu đề 2 tầng), chọn cột cuối kỳ
+    await page.getByRole("tab", { name: "Số dư tài khoản" }).click();
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog.getByLabel("Chọn tệp Excel").setInputFiles(
+      await xlsx("can-doi-phat-sinh.xlsx", [
+        ["BẢNG CÂN ĐỐI SỐ PHÁT SINH", null, null, null, null, null, null, null],
+        ["Tài khoản", "Tên tài khoản", "Số dư đầu kỳ", null, "Phát sinh trong kỳ", null, "Số dư cuối kỳ", null],
+        [null, null, "Nợ", "Có", "Nợ", "Có", "Nợ", "Có"],
+        ["112", "Tiền gửi ngân hàng", 1, 0, 0, 0, 20_000_000, 0],
+        ["1111", "Tiền Việt Nam", 1, 0, 0, 0, 50_000_000, 0],
+        ["11211", "TGNH mẫu A", 0, 0, 0, 0, 20_000_000, 0],
+        ["131", "Phải thu của khách hàng", 0, 0, 0, 0, 3_000_000, 0],
+        ["331", "Phải trả cho người bán", 0, 0, 0, 0, 0, 3_000_000],
+        ["4111", "Vốn góp của chủ sở hữu", 0, 2, 0, 0, 0, 70_000_000],
+        ["Tổng cộng", null, null, null, null, null, 93_000_000, 73_000_000],
+      ]),
+    );
+    await dialog.getByRole("radio", { name: "Cuối kỳ" }).check();
+    await expect(dialog.getByLabel("Cột cho Dư Nợ")).toHaveValue("6");
+    await shot(page, "11-ghep-cot-can-doi-phat-sinh");
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await expect(dialog.getByText("Tính cả công nợ thì tổng Nợ = tổng Có.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Nhập 3 dòng" }).click();
+    await expect(page.getByText("Cân: Nợ = Có")).toBeVisible();
+
+    await page.getByRole("tab", { name: /Số dư công nợ/ }).click();
+    await expect(page.getByRole("gridcell", { name: "Học viên Mẫu Hai" })).toBeVisible();
+    await shot(page, "12-so-du-cong-no");
+
+    await page.goto(`/${slug}/system/import`);
+    await expect(page.getByText(/Tổng dư Nợ 73\.000\.000 · Tổng dư Có 73\.000\.000/)).toBeVisible();
+    await shot(page, "13-chuyen-du-lieu-fao");
+
+    // Tệp mẫu là .xlsx thật, nhập ngược lại được
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Tệp mẫu" }).first().click();
+    const file = await (await download).path();
+    const [sheet] = await readXlsxFile(file);
+    expect(sheet?.sheet).toBe("Nhập liệu");
+    expect(sheet?.data[0]?.slice(0, 2)).toEqual(["Tài khoản", "Tên tài khoản"]);
+  });
+
+  test("khóa sổ, lớp học", async ({ page }) => {
+    await signIn(page);
     await page.goto(`/${slug}/project/jobs`);
     await page.getByRole("button", { name: "Mới", exact: true }).click();
     await page.getByLabel("Mã", { exact: true }).fill("TOT-K12");

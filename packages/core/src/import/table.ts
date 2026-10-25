@@ -152,6 +152,11 @@ export interface HeaderGuess {
   headers: string[];
 }
 
+/** Tiêu đề cột khi chọn dòng tiêu đề `row` (từ 0), một hoặc hai tầng */
+export function headersAt(rows: Table, row: number, height: 1 | 2): string[] {
+  return height === 1 ? (rows[row] ?? []).map(cellText) : combine(rows[row] ?? [], rows[row + 1] ?? []);
+}
+
 /** Ghép tiêu đề 2 tầng: ô gộp ở tầng trên được kéo sang phải cho đến ô có chữ tiếp theo */
 function combine(top: readonly Cell[], bottom: readonly Cell[]): string[] {
   const n = Math.max(top.length, bottom.length);

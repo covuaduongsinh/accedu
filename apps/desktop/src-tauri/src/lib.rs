@@ -7,6 +7,12 @@ fn save_export(path: PathBuf, contents: String) -> Result<(), String> {
     fs::write(&path, contents.as_bytes()).map_err(|e| format!("Không ghi được file {}: {e}", path.display()))
 }
 
+/// Ghi file nhị phân (Excel .xlsx) ra đường dẫn người dùng đã chọn qua hộp thoại lưu.
+#[tauri::command]
+fn save_export_bytes(path: PathBuf, data: Vec<u8>) -> Result<(), String> {
+    fs::write(&path, data).map_err(|e| format!("Không ghi được file {}: {e}", path.display()))
+}
+
 /// Thông tin môi trường desktop hiển thị ở mục "Thông tin sản phẩm".
 #[tauri::command]
 fn app_info() -> serde_json::Value {
@@ -36,7 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![save_export, app_info])
+        .invoke_handler(tauri::generate_handler![save_export, save_export_bytes, app_info])
         .run(tauri::generate_context!())
         .expect("Không khởi động được AccEdu desktop");
 }
