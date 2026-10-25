@@ -15,6 +15,7 @@ import type {
   AccountRow,
   AgingRow,
   EInvoiceImportResult,
+  GrossProfitRow,
   ImportResult,
   InvoicePaymentRow,
   ItemRow,
@@ -182,6 +183,10 @@ export const api = {
   },
   async stockVsLedger(db: AccEduClient, tenantId: string, to: string): Promise<StockVsLedgerRow[]> {
     return unwrap(await db.rpc("rpt_stock_vs_ledger", { p_tenant: tenantId, p_to: to }));
+  },
+  /** Lãi gộp theo mặt hàng hoặc khách hàng: doanh thu 511 − giảm trừ 521 − giá vốn 632 */
+  async grossProfit(db: AccEduClient, tenantId: string, from: string, to: string, by: "item" | "customer"): Promise<GrossProfitRow[]> {
+    return unwrap(await db.rpc("rpt_gross_profit", { p_tenant: tenantId, p_from: from, p_to: to, p_by: by }));
   },
   /** Tính lại giá vốn hàng xuất từ ngày (bỏ trống: từ ngày bắt đầu) — trả số chứng từ thay đổi */
   async recostInventory(db: AccEduClient, tenantId: string, from?: string | null): Promise<number> {

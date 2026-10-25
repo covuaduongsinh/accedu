@@ -1,6 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
-import { IMPORT_SPECS, autoMap, buildPreview, costMovements, detectHeader, estimateIssueCost, stockDefaults, type StockMovement, type Table } from "../src";
+import { IMPORT_SPECS, autoMap, buildPreview, costMovements, detectHeader, estimateIssueCost, grossMargin, stockDefaults, type StockMovement, type Table } from "../src";
 
 describe("giá vốn hàng xuất kho (khớp app.stock_recost)", () => {
   const opening = { quantity: 10, amount: 800_000 };
@@ -143,5 +143,14 @@ describe("nhập tồn kho đầu kỳ từ Excel", () => {
       ["error", "Có giá trị nhưng số lượng bằng 0"],
     ]);
     expect(p.rows[0]?.payload).toEqual({ row: 2, warehouse_code: "kho", item_code: "sach-nm", quantity: 10, amount: 800_000 });
+  });
+});
+
+describe("tỷ suất lãi gộp", () => {
+  it("làm tròn 1 chữ số, doanh thu thuần bằng 0 thì không tính", () => {
+    expect(grossMargin(600_000, 120_000)).toBe(20);
+    expect(grossMargin(360_000, 105_000)).toBe(29.2);
+    expect(grossMargin(100_000, -50_000)).toBe(-50);
+    expect(grossMargin(0, -80_000)).toBeNull();
   });
 });

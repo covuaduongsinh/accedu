@@ -65,8 +65,13 @@ export interface VoucherWithLines extends VoucherRow {
   voucher_lines: VoucherLineRow[];
 }
 
+/** Dòng chứng từ khi mở lại để xem/sửa: thêm giá vốn hàng bán do máy chủ tính (chỉ đọc) */
+export type VoucherFormLine = VoucherInput["lines"][number] & { costAmount: number | null };
+
 /** Chuyển bản ghi DB về dữ liệu form để sửa. */
-export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string; version: number; status: VoucherRow["status"] } {
+export function fromVoucherRow(
+  v: VoucherWithLines,
+): Omit<VoucherInput, "lines"> & { id: string; version: number; status: VoucherRow["status"]; lines: VoucherFormLine[] } {
   return {
     id: v.id,
     version: v.version,
@@ -116,6 +121,7 @@ export function fromVoucherRow(v: VoucherWithLines): VoucherInput & { id: string
         vatAmount: Number(l.vat_amount ?? 0),
         vatAccount: l.vat_account,
         invoiceId: l.invoice_id ?? null,
+        costAmount: l.cost_amount === null || l.cost_amount === undefined ? null : Number(l.cost_amount),
       })),
   };
 }
