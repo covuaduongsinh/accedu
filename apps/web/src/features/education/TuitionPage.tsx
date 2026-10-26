@@ -92,7 +92,7 @@ export function TuitionPage() {
       { field: "class_code", headerName: "Lớp", width: 115 },
       { field: "student_code", headerName: "Mã HV", width: 105 },
       { field: "student_name", headerName: "Học viên", flex: 1, minWidth: 170 },
-      { headerName: "Kỳ", width: 120, valueGetter: (p) => (p.data ? periodLabel(p.data) : "") },
+      { headerName: "Kỳ", width: 135, valueGetter: (p) => (p.data && !p.node?.rowPinned ? periodLabel(p.data) : "") },
       { field: "guardian_phone", headerName: "SĐT phụ huynh", width: 130 },
       { field: "invoice_number", headerName: "Hóa đơn", width: 105 },
       amountCol("amount", "Học phí", { width: 120 }),
@@ -101,7 +101,8 @@ export function TuitionPage() {
       {
         headerName: "Trạng thái",
         width: 125,
-        valueGetter: (p) => (!p.data ? "" : p.data.invoice_status === "draft" ? "Nháp" : Number(p.data.remaining) > 0 ? "Chưa đóng" : "Đã đóng"),
+        valueGetter: (p) =>
+          !p.data || p.node?.rowPinned ? "" : p.data.invoice_status === "draft" ? "Nháp" : Number(p.data.remaining) > 0 ? "Chưa đóng" : "Đã đóng",
         cellRenderer: (p: { value: string }) =>
           p.value ? <Badge tone={p.value === "Đã đóng" ? "green" : p.value === "Nháp" ? "gray" : "gold"}>{p.value}</Badge> : null,
       },

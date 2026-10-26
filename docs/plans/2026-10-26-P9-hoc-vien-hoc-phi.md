@@ -163,3 +163,41 @@ Có sẵn để dùng lại:
   - `docs/huong-dan/hoc-vien-hoc-phi.md`: khai báo lớp, ghi danh, lập và thu học phí, VietQR, điểm danh, phân bổ;
   - ghi kết quả vào kế hoạch P9 và file tiến độ.
 - **Tương thích:** chỉ thêm bảng, cột, hàm. Hóa đơn HDV cũ ghi 5113 giữ nguyên. Đổi `app.is_member` (P9b) chỉ ảnh hưởng vai trò mới `coach`.
+
+---
+
+## Kết quả đợt P9a (26/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Migration 0013: học viên, lớp, ghi danh, lập học phí (Có 3387), thu học phí, tài khoản VietQR | Xong | Test CSDL `education.test.ts` (10 test); 87 test cũ giữ xanh |
+| Core: cấp Tốt → Vua, VietQR (EMVCo + CRC-16), ma trận QR (`qrcode-generator` 2.0.4), mẫu nhập học viên | Xong | `education.test.ts` (7 test) |
+| Web: Học viên, Lớp học & ghi danh, Học phí (lập / thu / thông báo VietQR), tài khoản nhận học phí | Xong | E2E 13/13 trên Supabase local |
+| Mobile: màn hình Học phí, mã VietQR cho phụ huynh quét | Xong | Typecheck, bundle Expo trong CI |
+
+**Test CSDL `education.test.ts` kiểm:**
+- lớp theo tháng / theo khóa;
+- nhập học viên từ Excel: lỗi theo dòng, ghi danh luôn;
+- học phí riêng; chặn ghi danh trùng;
+- chạy thử không ghi gì;
+- lập học phí: HDV Nợ 131 / Có 3387 mang mã lớp; chạy lại không trùng;
+- tháng sau: học viên đã kết thúc không lập, lớp khóa không lập lại;
+- thu tiền mặt / chuyển khoản mỗi học viên một phiếu; học phí nháp được ghi sổ trước khi thu;
+- số dư 3387 và 131 khớp;
+- phân quyền;
+- BIN ngân hàng hợp lệ.
+
+**E2E:**
+1. khai báo tài khoản nhận học phí;
+2. tạo lớp TOT-K15 (600.000 / tháng);
+3. dán 2 học viên từ Excel, ghi danh luôn;
+4. lập học phí tháng: 2 phiếu, tổng 1.200.000, ghi sổ;
+5. thu tiền mặt HV101 → PT;
+6. thông báo học phí HV102 có VietQR, nội dung `HP HV102 DV…`;
+7. tổng hợp công nợ HV102 còn 600.000.
+
+**Khác kế hoạch:**
+- Ghi danh, lớp, học viên chỉ ghi qua hàm (`save_*`), không mở ghi trực tiếp bảng.
+- Lớp theo khóa lập học phí một lần cho mỗi ghi danh; gia hạn khóa mới bằng một ghi danh mới (tự động gia hạn sẽ làm ở P9b cùng số buổi còn lại).
+
+Tổng số test: core 128, api 3, CSDL 97, E2E 13.

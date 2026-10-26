@@ -107,7 +107,7 @@ function BankCard() {
       title="Tài khoản nhận học phí (VietQR)"
       actions={
         canManage ? (
-          <Button icon={<Save size={14} />} disabled={!!form.bin && !valid} onClick={() => void save()}>
+          <Button icon={<Save size={14} />} aria-label="Lưu tài khoản nhận học phí" disabled={!!form.bin && !valid} onClick={() => void save()}>
             Lưu
           </Button>
         ) : null
