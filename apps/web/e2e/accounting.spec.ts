@@ -14,6 +14,7 @@ const tempPassword = "TamThoi2026";
 const password = "VuiTriTue@2026";
 const slug = `ds-${stamp}`;
 const staffEmail = `ketoan-${stamp}@duongsinh.test`;
+const coachEmail = `hlv-${stamp}@duongsinh.test`;
 
 /** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng GoTrue admin API (như workflow triển khai) + app.bootstrap_owner */
 test.beforeAll(async () => {
@@ -632,5 +633,65 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     // Sổ công nợ: còn phải thu 600.000 của HV102
     await page.goto(`/${slug}/sales/receivable-summary`);
     await expect(page.locator(".ag-row", { hasText: "HV102" })).toContainText("600.000");
+  });
+
+  test("HLV điểm danh trên tài khoản riêng, kế toán phân bổ doanh thu học phí 3387 → 5113", async ({ page, browser }) => {
+    await signIn(page);
+    const dialog = page.getByRole("dialog");
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+
+    // Quản trị tạo tài khoản HLV
+    await page.goto(`/${slug}/system/users`);
+    await page.getByLabel("Email", { exact: true }).fill(coachEmail);
+    await page.getByLabel("Họ và tên").fill("HLV Mẫu E2E");
+    await page.getByLabel("Vai trò").selectOption("coach");
+    await page.getByRole("button", { name: "Tạo / thêm" }).click();
+    const issued = page.getByRole("status").filter({ hasText: coachEmail });
+    await expect(issued).toBeVisible();
+    const temp = (await issued.locator("code").textContent())?.trim() ?? "";
+
+    // Gán HLV điểm danh cho lớp TOT-K15
+    await page.goto(`/${slug}/education/classes`);
+    await page.getByRole("gridcell", { name: "TOT-K15" }).click();
+    await page.getByRole("button", { name: "Sửa", exact: true }).click();
+    await dialog.getByLabel("HLV điểm danh", { exact: true }).selectOption({ label: "HLV Mẫu E2E · Huấn luyện viên" });
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.locator(".ag-row", { hasText: "TOT-K15" })).toContainText("HLV Mẫu E2E");
+
+    // HLV đăng nhập: chỉ thấy Điểm danh, không vào được sổ sách
+    const coach = await browser.newPage();
+    await coach.goto("/login");
+    await coach.getByLabel("Email").fill(coachEmail);
+    await coach.getByLabel("Mật khẩu").fill(temp);
+    await coach.getByRole("button", { name: "Đăng nhập" }).click();
+    await changeTempPassword(coach, "HuanLuyen2026");
+    await coach.getByText(`/${slug.toUpperCase()} · TT133`).click();
+    await expect(coach.getByRole("heading", { name: "Điểm danh", exact: true })).toBeVisible();
+    await expect(coach).toHaveURL(new RegExp(`/${slug}/education/attendance$`));
+    await expect(coach.getByRole("button", { name: "Đào tạo" })).toBeVisible();
+    await expect(coach.getByRole("button", { name: "Tổng hợp" })).toHaveCount(0);
+    await coach.getByTestId("att-HV101-present").click();
+    await coach.getByTestId("att-HV102-excused").click();
+    await coach.getByLabel("Nội dung buổi học").fill("Khai cuộc Ý");
+    await coach.getByTestId("att-save").click();
+    await expect(coach.getByText(/Đã lưu điểm danh .*: 2 học viên/)).toBeVisible();
+    await expect(coach.getByTestId(`cell-HV101-${today}`)).toHaveText("✓");
+    await expect(coach.getByTestId(`cell-HV102-${today}`)).toHaveText("P");
+    await shot(coach, "34-hlv-diem-danh");
+    await coach.goto(`/${slug}/general/trial-balance`);
+    await expect(coach).toHaveURL(new RegExp(`/${slug}/education/attendance$`));
+    await coach.close();
+
+    // Kế toán phân bổ doanh thu tháng này: 2 × 600.000 vào 5113, số dư 3387 về 0
+    await page.goto(`/${slug}/education/revenue`);
+    await page.getByLabel("Tháng phân bổ").fill(today.slice(0, 7));
+    await page.getByRole("button", { name: "Xem trước" }).click();
+    await expect(page.getByText(/Xem trước tháng .*: 2 dòng, 1.200.000/)).toBeVisible();
+    await page.getByRole("button", { name: "Lập phiếu phân bổ" }).click();
+    await expect(page.getByText(/Đã lập phiếu PK\d+: 1.200.000 vào doanh thu 5113/)).toBeVisible();
+    await expect(page.getByTestId("deferred-total")).toHaveText("0");
+    await expect(page.getByTestId("deferred-ledger")).toHaveText("0");
+    await expect(page.getByText("Khớp sổ cái")).toBeVisible();
+    await shot(page, "35-phan-bo-doanh-thu");
   });
 });
