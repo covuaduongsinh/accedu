@@ -305,6 +305,12 @@ language sql stable set search_path = '' as $$
   from tot t left join u on u.student_id = t.student_id
 $$;
 
+-- Ngày hôm nay theo giờ Việt Nam (máy chủ chạy UTC; HLV điểm danh sáng sớm vẫn đúng ngày)
+create or replace function app.today_vn() returns date
+language sql stable set search_path = '' as $$
+  select (now() at time zone 'Asia/Ho_Chi_Minh')::date
+$$;
+
 -- Ngày đã khóa sổ (khóa chung hoặc khóa phiếu kế toán) → không sửa điểm danh (đã dùng để phân bổ doanh thu)
 create or replace function app.attendance_locked(p_tenant uuid, p_date date)
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -341,7 +347,7 @@ returns table (student_id uuid, student_code text, student_name text, guardian_n
                enrollment_status text, status text, note text, sessions integer, used integer, remaining integer)
 language plpgsql stable security definer set search_path = '' as $$
 declare
-  v_date date := coalesce(p_date, current_date);
+  v_date date := coalesce(p_date, app.today_vn());
 begin
   perform app.require(app.can_attend(p_tenant, p_class) or app.is_member(p_tenant), 'Bạn không phụ trách lớp này');
   return query
@@ -387,7 +393,7 @@ declare
 begin
   perform app.require(app.can_attend(p_tenant, p_class), 'Bạn không phụ trách lớp này');
   if p_date is null then raise exception 'Chưa chọn ngày học' using errcode = 'P0001'; end if;
-  if p_date > current_date then
+  if p_date > app.today_vn() then
     raise exception 'Chưa đến ngày học % — không điểm danh trước', to_char(p_date, 'DD/MM/YYYY') using errcode = 'P0001';
   end if;
   if app.attendance_locked(p_tenant, p_date) then
@@ -457,7 +463,7 @@ begin
 
   v_start := coalesce(p_start,
     (select min(cs.held_on) from app.course_sessions(p_tenant, e.class_id) cs where cs.enrollment_id = e.id and cs.overflow),
-    current_date);
+    app.today_vn());
   if v_start <= e.start_date then
     raise exception 'Ngày bắt đầu khóa mới phải sau ngày vào lớp %', to_char(e.start_date, 'DD/MM/YYYY') using errcode = 'P0001';
   end if;
@@ -699,7 +705,7 @@ revoke execute on function public.rpt_attendance(uuid, uuid, date) from public, 
 revoke execute on function public.rpt_deferred_tuition(uuid, date) from public, anon;
 grant execute on function app.is_coach(uuid), app.is_coach_of(uuid, uuid), app.can_attend(uuid, uuid),
   app.course_enrollments(uuid, uuid), app.course_sessions(uuid, uuid), app.course_remaining(uuid, uuid),
-  app.attendance_locked(uuid, date) to authenticated, service_role;
+  app.attendance_locked(uuid, date), app.today_vn() to authenticated, service_role;
 grant execute on function public.save_class(uuid, jsonb, uuid) to authenticated;
 grant execute on function public.my_classes(uuid) to authenticated;
 grant execute on function public.class_roster(uuid, uuid, date) to authenticated;

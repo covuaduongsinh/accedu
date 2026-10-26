@@ -34,6 +34,3 @@ export function isCoach(role: MyTenantRow["role"]): boolean {
 export function canPost(role: MyTenantRow["role"]): boolean {
   return role === "owner" || role === "admin" || role === "chief_accountant" || role === "accountant";
 }
-
-/** Sửa danh mục (lớp, học viên, ghi danh) và điểm danh mọi lớp */
-export const canEditCatalog = canPost;

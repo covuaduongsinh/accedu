@@ -144,6 +144,7 @@ export function RevenueAllocationPage() {
             getRowId={(p) => p.data.bill_id}
             pinnedBottomRowData={[
               {
+                bill_id: "tong-cong",
                 class_code: "",
                 student_name: "Tổng cộng",
                 bill_amount: sum("bill_amount"),
@@ -187,7 +188,11 @@ function DeferredCard({ rows, asOf, ledger }: { rows: DeferredTuitionRow[]; asOf
           {diff === 0 ? "Khớp sổ cái" : `Chênh ${formatAmount(diff)} (khoản 3387 khác ngoài học phí)`}
         </span>
       </div>
-      <DataGrid<DeferredTuitionRow> rowData={open} columnDefs={cols} height={260} getRowId={(p) => p.data.bill_id} />
+      {open.length ? (
+        <DataGrid<DeferredTuitionRow> rowData={open} columnDefs={cols} height={260} getRowId={(p) => p.data.bill_id} />
+      ) : (
+        <p className="text-sm text-muted">Không còn học phí chờ phân bổ.</p>
+      )}
     </Card>
   );
 }

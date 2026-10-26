@@ -84,26 +84,33 @@ function SessionCard({ classId, course, date, onDate }: { classId: string; cours
   }
 
   return (
-    <Card
-      title={`Buổi học ${formatDateVN(date)}`}
-      actions={
-        <div className="flex items-end gap-2">
+    <Card title={`Buổi học ${formatDateVN(date)}`}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="w-44">
           <Input type="date" aria-label="Ngày học" value={date} max={todayVN()} onChange={(e) => e.target.value && onDate(e.target.value)} />
-          <Input aria-label="Nội dung buổi học" placeholder="Nội dung buổi học" className="w-56" value={topic} onChange={(e) => setTopic(e.target.value)} />
-          <Button
-            variant="secondary"
-            icon={<CheckCheck size={14} />}
-            disabled={!rows.length || future}
-            onClick={() => setEdits(Object.fromEntries(rows.map((r) => [r.student_id, "present" as const])))}
-          >
-            Có mặt tất cả
-          </Button>
-          <Button icon={<Save size={14} />} data-testid="att-save" disabled={save.isPending || !rows.length || future} onClick={() => void submit()}>
-            Lưu điểm danh
-          </Button>
         </div>
-      }
-    >
+        <div className="w-72">
+          <Input aria-label="Nội dung buổi học" placeholder="Nội dung buổi học" value={topic} onChange={(e) => setTopic(e.target.value)} />
+        </div>
+        <Button
+          variant="secondary"
+          className="whitespace-nowrap"
+          icon={<CheckCheck size={14} />}
+          disabled={!rows.length || future}
+          onClick={() => setEdits(Object.fromEntries(rows.map((r) => [r.student_id, "present" as const])))}
+        >
+          Có mặt tất cả
+        </Button>
+        <Button
+          className="whitespace-nowrap"
+          icon={<Save size={14} />}
+          data-testid="att-save"
+          disabled={save.isPending || !rows.length || future}
+          onClick={() => void submit()}
+        >
+          Lưu điểm danh
+        </Button>
+      </div>
       {roster.isLoading ? <p className="text-sm text-muted">Đang tải…</p> : null}
       {!roster.isLoading && rows.length === 0 ? <p className="text-sm text-muted">Lớp chưa có học viên đang học vào ngày này.</p> : null}
       {future ? <p className="mb-2 text-sm text-danger">Chưa đến ngày học — không điểm danh trước.</p> : null}

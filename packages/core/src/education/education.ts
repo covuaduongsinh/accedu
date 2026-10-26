@@ -113,13 +113,6 @@ export const enrollmentSchema = z.object({
   note: optionalText(512, "Ghi chú"),
 });
 
-export const attendanceRowSchema = z.object({
-  studentId: z.uuid(),
-  status: z.enum(["present", "absent", "excused"]).nullable(),
-  note: optionalText(256, "Ghi chú"),
-});
-
 export type StudentInput = z.input<typeof studentSchema>;
 export type ClassInput = z.input<typeof classSchema>;
 export type EnrollmentInput = z.input<typeof enrollmentSchema>;
-export type AttendanceRowInput = z.input<typeof attendanceRowSchema>;
