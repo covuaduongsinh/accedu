@@ -114,3 +114,9 @@ export function estimateIssueCost(stock: { quantity: number; amount: number }, q
 
 /** tenants.costing_method → phương pháp tính giá đang dùng */
 export const costMethodOf = (costing: string | null | undefined): CostMethod => (costing === "weighted_period" ? "monthly" : "moving");
+
+/** Tỷ suất lãi gộp (%) trên doanh thu thuần, làm tròn 1 chữ số; doanh thu thuần bằng 0 thì không tính */
+export function grossMargin(netRevenue: number, grossProfit: number): number | null {
+  if (netRevenue === 0) return null;
+  return Math.round((grossProfit * 1000) / netRevenue) / 10;
+}

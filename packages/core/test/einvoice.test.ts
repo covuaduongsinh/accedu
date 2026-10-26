@@ -10,7 +10,7 @@ interface Fx {
   currency?: string;
   seller?: { name: string; mst: string };
   buyerMst?: string;
-  lines: Array<{ tchat?: number; name: string; uom?: string; qty?: number; price?: number; ck?: number; amount: number; rate?: string }>;
+  lines: Array<{ tchat?: number; code?: string; name: string; uom?: string; qty?: number; price?: number; ck?: number; amount: number; rate?: string }>;
   rates?: Array<{ rate: string; net: number; tax: number }>;
   net?: number;
   tax?: number;
@@ -26,7 +26,7 @@ function xml(f: Fx): string {
   const lines = f.lines
     .map(
       (l, i) =>
-        `<HHDVu>${tag("TChat", l.tchat ?? 1)}${tag("STT", i + 1)}${tag("THHDVu", l.name)}${tag("DVTinh", l.uom)}${tag("SLuong", l.qty)}${tag("DGia", l.price)}${tag("STCKhau", l.ck)}${tag("ThTien", l.amount)}${tag("TSuat", l.rate)}</HHDVu>`,
+        `<HHDVu>${tag("TChat", l.tchat ?? 1)}${tag("STT", i + 1)}${tag("MHHDVu", l.code)}${tag("THHDVu", l.name)}${tag("DVTinh", l.uom)}${tag("SLuong", l.qty)}${tag("DGia", l.price)}${tag("STCKhau", l.ck)}${tag("ThTien", l.amount)}${tag("TSuat", l.rate)}</HHDVu>`,
     )
     .join("");
   const rates = f.rates
@@ -42,7 +42,7 @@ function xml(f: Fx): string {
 
 const books: Fx = {
   lines: [
-    { name: "Sách cờ vua nhập môn", uom: "Cuốn", qty: 10, price: 80_000, amount: 800_000, rate: "5%" },
+    { code: "SCV-01", name: "Sách cờ vua nhập môn", uom: "Cuốn", qty: 10, price: 80_000, amount: 800_000, rate: "5%" },
     { name: "Bàn cờ gỗ tiêu chuẩn", uom: "Bộ", qty: 3, price: 333_333, amount: 999_999, rate: "10%" },
   ],
   rates: [
@@ -67,6 +67,8 @@ describe("đọc XML hóa đơn điện tử (TT78)", () => {
       // 999.999 × 10% = 99.999,9 → 100.000 theo hóa đơn
       ["Bàn cờ gỗ tiêu chuẩn", 3, 333_333, 999_999, "10", 100_000],
     ]);
+    // Mã hàng của người bán (MHHDVu) — dùng để gắn mã hàng khi nhập
+    expect(inv.lines.map((l) => l.itemCode)).toEqual(["SCV-01", null]);
     expect(inv.totals).toEqual({ net: 1_799_999, vat: 140_000, total: 1_939_999 });
     expect(guessPurchaseType(inv)).toBe("HDM");
   });

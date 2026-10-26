@@ -19,6 +19,7 @@ export default function TenantLayout() {
       <Stack.Screen name="quick" options={{ title: "Thu / chi nhanh" }} />
       <Stack.Screen name="trial-balance" options={{ title: "Cân đối phát sinh" }} />
       <Stack.Screen name="receivables" options={{ title: "Công nợ phải thu" }} />
+      <Stack.Screen name="stock" options={{ title: "Tồn kho" }} />
     </Stack>
   );
 }

@@ -93,7 +93,11 @@ Người bán gửi hóa đơn điện tử qua email thường kèm tệp **.xm
    - **Mua dịch vụ**: thuê sân, điện nước, cước phí, ghi Nợ TK 6427 (TT133: 6422).
 
    Có thể sửa **TK Nợ** và **Ngày hạch toán** (mặc định là ngày hóa đơn).
-5. Bấm **Tạo N hóa đơn mua (nháp)**. Hóa đơn được tạo ở trạng thái *Lập chứng từ*. Vào **Mua hàng › Hóa đơn mua hàng** (hoặc *Hóa đơn mua dịch vụ*) để mở xem lại, rồi **Ghi sổ**.
+5. Cột **Mã hàng** cho biết bao nhiêu dòng đã gắn được mã hàng (ví dụ 1/2). AccEdu so **mã hàng của người bán** trên XML với mã hàng trong danh mục trước, không khớp thì so **tên hàng**.
+   - Tên được so chính xác, bỏ khoảng trắng thừa, không phân biệt chữ hoa, chữ thường. Chỉ nhận khi khớp đúng một mặt hàng.
+   - Dòng khớp được thì có mã hàng, TK kho và kho mặc định của mặt hàng, nên khi ghi sổ tự nhập kho.
+   - Dòng chưa khớp thì mở hóa đơn nháp để chọn mã hàng. Muốn lần sau tự khớp, đặt tên mặt hàng trong danh mục trùng với tên trên hóa đơn của nhà cung cấp.
+6. Bấm **Tạo N hóa đơn mua (nháp)**. Hóa đơn được tạo ở trạng thái *Lập chứng từ*. Vào **Mua hàng › Hóa đơn mua hàng** (hoặc *Hóa đơn mua dịch vụ*) để mở xem lại, rồi **Ghi sổ**.
 
 Lưu ý:
 - Tiền thuế từng dòng được chỉnh cho khớp đúng tổng tiền thuế trên hóa đơn của người bán.

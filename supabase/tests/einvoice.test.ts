@@ -85,8 +85,8 @@ describe("nhập hóa đơn điện tử đầu vào", () => {
     const r = await run([books, rent], true);
     expect(r).toMatchObject({ ok: true, dry_run: true, created: 0, new: 2, skipped: 0, partners_created: 1 });
     expect(r.results).toEqual([
-      { row: 1, status: "new", partner: "existing" },
-      { row: 2, status: "new", partner: "new" },
+      { row: 1, status: "new", partner: "existing", items: { matched: 0, lines: 2 } },
+      { row: 2, status: "new", partner: "new", items: { matched: 0, lines: 1 } },
     ]);
     expect(await counts()).toEqual(before);
   });
@@ -150,7 +150,7 @@ describe("nhập hóa đơn điện tử đầu vào", () => {
     const badVat = { ...rent, row: 3, invoice_number: "47", lines: [{ description: "Phí", amount: 100, vat_code: "7" }] };
     const r = await run([good, badAccount, badVat], false);
     expect(r).toMatchObject({ ok: false, created: 0, new: 1, errors: 2 });
-    expect(r.results[0]).toEqual({ row: 1, status: "new", partner: "new" });
+    expect(r.results[0]).toEqual({ row: 1, status: "new", partner: "new", items: { matched: 0, lines: 2 } });
     expect(r.results[1]).toMatchObject({ row: 2, status: "error", message: "TK 999 không tồn tại hoặc không phải tài khoản chi tiết" });
     expect(r.results[2]?.message).toMatch(/mã thuế 7 không hợp lệ/);
     expect(await counts()).toEqual(before);

@@ -11,6 +11,8 @@ import { parseVatCode } from "./validate";
 
 export interface EInvoiceLine {
   lineNo: number;
+  /** Mã hàng hóa, dịch vụ của người bán (MHHDVu) — dùng để gắn mã hàng khi nhập */
+  itemCode: string | null;
   description: string;
   uom: string;
   quantity: number | null;
@@ -160,6 +162,7 @@ function readInvoice(h: Node, opts: { buyerTaxCode?: string | null }): EInvoiceP
     }
     lines.push({
       lineNo: lines.length + 1,
+      itemCode: text(l.MHHDVu) || null,
       description: text(l.THHDVu) || `Dòng ${stt}`,
       uom: text(l.DVTinh),
       quantity,

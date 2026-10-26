@@ -251,6 +251,15 @@ export function useStockVsLedger(tenantId: string | undefined, to: string) {
   });
 }
 
+export function useGrossProfit(tenantId: string | undefined, from: string, to: string, by: "item" | "customer") {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "gross-profit", from, to, by),
+    queryFn: () => api.grossProfit(db, tenantId as string, from, to, by),
+    enabled: !!tenantId,
+  });
+}
+
 export function useAccountLedger(tenantId: string | undefined, account: string, from: string, to: string) {
   const db = useDb();
   return useQuery({

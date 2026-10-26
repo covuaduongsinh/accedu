@@ -134,6 +134,10 @@ export type VoucherLineRow = {
   vat_account: string | null;
   /** Hóa đơn mà dòng thu/chi này trừ vào */
   invoice_id: string | null;
+  /** Hóa đơn bán: giá vốn hàng xuất kho của dòng (hệ thống tính khi ghi sổ) */
+  cost_amount?: Numeric | null;
+  /** Hóa đơn bán: TK Nợ giá vốn */
+  cost_account?: string | null;
 };
 
 export type ItemRow = {
@@ -257,6 +261,8 @@ export type EInvoiceImportResult = {
     number?: string;
     partner?: "new" | "existing" | null;
     message?: string;
+    /** Số dòng đã gắn được mã hàng / tổng số dòng */
+    items?: { matched: number; lines: number };
   }>;
 };
 
@@ -273,6 +279,8 @@ export type PurchaseInvoiceImport = {
   invoice_number: string;
   description?: string;
   lines: Array<{
+    /** Mã hàng của người bán (MHHDVu) — khớp với mã hàng trước khi khớp theo tên */
+    item_code?: string | null;
     description: string;
     uom?: string;
     quantity?: number | null;
@@ -349,6 +357,21 @@ export type StockCardRow = {
 };
 
 export type StockVsLedgerRow = { account: string; stock_amount: Numeric; ledger_amount: Numeric; difference: Numeric };
+
+/** Lãi gộp theo mặt hàng / khách hàng (rpt_gross_profit) */
+export type GrossProfitRow = {
+  key_id: string | null;
+  code: string | null;
+  name: string;
+  uom: string | null;
+  quantity: Numeric;
+  revenue: Numeric;
+  deductions: Numeric;
+  net_revenue: Numeric;
+  cogs: Numeric;
+  gross_profit: Numeric;
+  margin: Numeric | null;
+};
 
 export type StockOpeningImportResult =
   | { ok: true; inserted: number; skipped: number; quantity: Numeric; amount: Numeric }
@@ -514,6 +537,7 @@ export type Database = {
         Returns: StockCardRow[];
       };
       rpt_stock_vs_ledger: { Args: { p_tenant: string; p_to: string }; Returns: StockVsLedgerRow[] };
+      rpt_gross_profit: { Args: { p_tenant: string; p_from: string; p_to: string; p_by?: "item" | "customer" }; Returns: GrossProfitRow[] };
       recost_inventory: { Args: { p_tenant: string; p_from?: string | null }; Returns: number };
       set_stock_cost_method: { Args: { p_tenant: string; p_method: "moving" | "monthly" }; Returns: number };
       import_purchase_invoices: {

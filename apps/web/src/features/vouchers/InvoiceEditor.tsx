@@ -1,10 +1,11 @@
 import { friendlyError, fromVoucherRow, type ItemRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
-import { useAccounts, useInvoicePayments, useItems, useJobs, usePartners, useSaveVoucher, useVoucher, useWarehouses } from "@accedu/api/react";
+import { useAccounts, useInvoicePayments, useItems, useJobs, usePartners, useSaveVoucher, useStockBalances, useVoucher, useWarehouses } from "@accedu/api/react";
 import {
   VAT_CODES,
   amountInWords,
   buildLedgerEntries,
   computeInvoiceLine,
+  estimateIssueCost,
   formatAmount,
   formatDateVN,
   invoiceDefaults,
@@ -23,6 +24,7 @@ import { platform } from "../../lib/supabase";
 import { canPost, useTenantCtx } from "../../lib/tenant";
 import { STATUS_BADGE, type VoucherUiConfig } from "./config";
 import { AccountName, AmountInput, PartnerName } from "./VoucherEditor";
+import { formatQty, shortageMessage, stockOf } from "./stock-check";
 
 interface LineDraft {
   key: string;
@@ -39,8 +41,10 @@ interface LineDraft {
   /** Tiền thuế nhập tay; rỗng = tự tính theo thuế suất */
   vatAmount: string;
   jobCode: string;
-  /** Hóa đơn mua hàng: kho nhập (mặt hàng theo dõi tồn kho) */
+  /** Mặt hàng theo dõi tồn kho: kho nhập (hóa đơn mua) / kho xuất (hóa đơn bán) */
   warehouseId: string;
+  /** Hóa đơn bán đã ghi sổ: giá vốn do máy chủ tính */
+  savedCost?: number | null;
 }
 
 interface HeaderDraft {
@@ -135,6 +139,7 @@ export function InvoiceEditor({ cfg, id, onClose }: { cfg: VoucherUiConfig; id: 
           vatAmount: l.vatAmount ? formatAmount(l.vatAmount) : "",
           jobCode: jobCode(l.jobId),
           warehouseId: l.warehouseId ?? "",
+          savedCost: l.costAmount,
         };
       }),
     };
@@ -194,18 +199,32 @@ function InvoiceForm({
 
   const postable = useMemo(() => (accounts.data ?? []).filter((a) => a.is_postable && a.is_active), [accounts.data]);
   const byCode = useMemo(() => new Map((accounts.data ?? []).map((a) => [a.code, a])), [accounts.data]);
-  // Hóa đơn mua hàng: dòng có mặt hàng theo dõi tồn kho, ghi Nợ TK vật tư → chọn kho nhập
-  const withStock = cfg.type === "HDM";
+  // Hóa đơn mua hàng: dòng có mặt hàng theo dõi tồn kho, ghi Nợ TK vật tư → chọn kho nhập.
+  // Hóa đơn bán hàng: dòng có mặt hàng theo dõi tồn kho → xuất kho, giá vốn tính khi ghi sổ.
+  const issue = cfg.type === "HDB";
+  const withStock = cfg.type === "HDM" || issue;
   const mainWarehouse = ((warehouses.data ?? []).find((w) => w.code === "KHO") ?? warehouses.data?.[0])?.id ?? "";
-  const stockLine = (item: ItemRow | undefined, account: string) => withStock && !!item?.track_inventory && !!byCode.get(account.trim())?.track_item;
+  const stockLine = (item: ItemRow | undefined, account: string) =>
+    withStock && !!item?.track_inventory && (issue || !!byCode.get(account.trim())?.track_item);
+  const balances = useStockBalances(issue ? tenant.id : undefined, header.postingDate || null);
   const partnerByCode = useMemo(() => new Map((partners.data ?? []).map((p) => [p.code.toUpperCase(), p])), [partners.data]);
   const itemByCode = useMemo(() => new Map((items.data ?? []).map((i) => [i.code.toUpperCase(), i])), [items.data]);
   const jobByCode = useMemo(() => new Map((jobs.data ?? []).map((j) => [j.code.toUpperCase(), j])), [jobs.data]);
   const partner = partnerByCode.get(header.partnerCode.trim().toUpperCase());
 
-  const computed = lines.map((l) => ({ draft: l, ...calc(l) }));
+  const computed = lines.map((l) => {
+    const item = itemByCode.get(l.itemCode.trim().toUpperCase());
+    const stocked = issue && stockLine(item, l.account);
+    const qty = num(l.quantity) ?? 0;
+    const stock = stockOf(balances.data, item?.id, l.warehouseId);
+    // Giá vốn: đã ghi sổ thì lấy số máy chủ tính; đang lập thì ước tính theo giá bình quân hiện tại
+    const cost = !stocked ? 0 : status === "posted" && l.savedCost != null ? l.savedCost : estimateIssueCost(stock.item, qty);
+    return { draft: l, item, stocked, qty, stock, cost, ...calc(l) };
+  });
   const used = computed.filter((c) => c.draft.account.trim() && (c.amount > 0 || c.draft.description || c.draft.itemCode));
   const totals = invoiceTotals(used);
+  const totalCost = used.reduce((s, c) => s + c.cost, 0);
+  const hasStock = used.some((c) => c.stocked);
 
   function toInput(): VoucherInput & { id?: string; version?: number } {
     return {
@@ -241,7 +260,8 @@ function InvoiceForm({
           itemId: item?.id ?? null,
           jobId: job?.id ?? null,
           ...(stockLine(item, l.account) && l.warehouseId ? { warehouseId: l.warehouseId } : {}),
-          quantity: qty !== null && price !== null ? qty : null,
+          // Dòng xuất kho (hóa đơn bán) luôn gửi số lượng, kể cả khi nhập thành tiền tay
+          quantity: qty !== null && (price !== null || (issue && stockLine(item, l.account))) ? qty : null,
           unitPrice: qty !== null && price !== null ? price : null,
           uom: l.uom,
           discountAmount: num(l.discount) ?? 0,
@@ -269,9 +289,14 @@ function InvoiceForm({
     // Thuế đầu vào chỉ được khấu trừ khi có hóa đơn
     ...(!sale && totals.vat > 0 && !header.invoiceNumber.trim() ? ["Có thuế GTGT đầu vào — nhập số hóa đơn của nhà cung cấp"] : []),
     ...(preview.ok ? [] : preview.errors.map((e) => e.message)),
-    ...used.flatMap((c, i) =>
-      stockLine(itemByCode.get(c.draft.itemCode.trim().toUpperCase()), c.draft.account) && !c.draft.warehouseId ? [`Dòng ${i + 1}: chưa chọn kho nhập`] : [],
-    ),
+    ...used.flatMap((c, i) => {
+      if (!stockLine(c.item, c.draft.account)) return [];
+      const n = i + 1;
+      if (!c.draft.warehouseId) return [`Dòng ${n}: chưa chọn kho ${issue ? "xuất" : "nhập"}`];
+      if (!issue) return [];
+      if (c.qty <= 0) return [`Dòng ${n}: chưa nhập số lượng bán`];
+      return status !== "posted" && c.item && c.qty > c.stock.quantity ? [shortageMessage(n, c.item, c.stock.quantity)] : [];
+    }),
   ];
 
   async function submit(post: boolean) {
@@ -415,7 +440,7 @@ function InvoiceForm({
       </div>
 
       <div className="overflow-x-auto rounded-md border border-line">
-        <table className="w-full min-w-[1240px] text-sm">
+        <table className={`w-full ${issue ? "min-w-[1360px]" : "min-w-[1240px]"} text-sm`}>
           <thead className="bg-navy-50 text-xs text-navy-700">
             <tr>
               <th className="w-8 px-2 py-1.5 text-left">#</th>
@@ -429,13 +454,14 @@ function InvoiceForm({
               <th className="w-24 px-1 text-left">{cfg.lineAccountLabel}</th>
               <th className="w-28 px-1 text-left">Thuế suất</th>
               <th className="w-28 px-1 text-right">Tiền thuế</th>
-              {withStock ? <th className="w-36 px-1 text-left">Kho</th> : null}
+              {withStock ? <th className="w-36 px-1 text-left">{issue ? "Kho xuất" : "Kho"}</th> : null}
+              {issue ? <th className="w-28 px-1 text-right">Giá vốn</th> : null}
               <th className="w-24 px-1 text-left">Lớp / vụ việc</th>
               <th className="w-8" />
             </tr>
           </thead>
           <tbody>
-            {computed.map(({ draft: l, amount, vatAmount, vatRate }, i) => {
+            {computed.map(({ draft: l, amount, vatAmount, vatRate, stocked, stock, cost }, i) => {
               const n = i + 1;
               const byQty = num(l.quantity) !== null && num(l.unitPrice) !== null;
               return (
@@ -504,6 +530,16 @@ function InvoiceForm({
                       ) : (
                         <span className="px-1 text-xs text-muted">—</span>
                       )}
+                      {stocked ? (
+                        <div className="px-1 text-xs text-muted">
+                          Tồn <span data-testid={`ton-${n}`}>{formatQty(stock.quantity)}</span>
+                        </div>
+                      ) : null}
+                    </td>
+                  ) : null}
+                  {issue ? (
+                    <td className="num px-1 text-right" data-testid={`gia-von-${n}`} title={status === "posted" ? "Giá vốn khi ghi sổ" : "Ước tính theo giá bình quân hiện tại — chốt khi ghi sổ"}>
+                      {stocked ? formatAmount(cost) : ""}
                     </td>
                   ) : null}
                   <td className="px-1">
@@ -559,6 +595,22 @@ function InvoiceForm({
                 {totals.total > 0 ? amountInWords(totals.total) : ""}
               </td>
             </tr>
+            {issue && hasStock ? (
+              <>
+                <tr className="border-t border-line">
+                  <td className="pr-4 pt-1 text-muted">{status === "posted" ? "Giá vốn" : "Giá vốn (ước tính)"}</td>
+                  <td className="num pt-1 text-right" data-testid="invoice-cogs">
+                    {formatAmount(totalCost)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="pr-4 text-muted">Lãi gộp</td>
+                  <td className={`num text-right font-medium ${totals.net - totalCost < 0 ? "text-danger" : "text-success"}`} data-testid="invoice-gross-profit">
+                    {formatAmount(totals.net - totalCost)}
+                  </td>
+                </tr>
+              </>
+            ) : null}
           </tbody>
         </table>
       </div>
