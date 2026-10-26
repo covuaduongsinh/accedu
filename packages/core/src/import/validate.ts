@@ -213,6 +213,9 @@ function accountCode(c: Cell): string {
 }
 
 /** Mã đối tượng: số nguyên trong ô Excel → chuỗi không có phần thập phân */
+/** Trường tùy chọn: chỉ đưa vào payload khi có giá trị */
+const optField = (key: string, value: string | null | undefined) => (value ? { [key]: value } : {});
+
 /** Ô ngày: Date, số ngày kiểu Excel, "dd/mm/yyyy" hoặc "yyyy-mm-dd" → ISO; trống → ""; sai → null */
 function dateText(c: Cell): string | null {
   if (c === null || c === undefined || c === "") return "";
@@ -742,19 +745,18 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
         continue;
       }
       seen.set(code, r.row);
-      const opt = (key: string, value: string | null | undefined) => (value ? { [key]: value } : {});
       r.payload = {
         row: r.row,
         code,
         name,
-        ...opt("birth_date", birth),
-        ...opt("guardian_name", text(cells, "guardianName")),
-        ...opt("guardian_phone", text(cells, "guardianPhone")),
-        ...opt("school", text(cells, "school")),
-        ...opt("level", level),
-        ...opt("address", text(cells, "address")),
-        ...opt("class_code", classCode),
-        ...opt("start_date", start),
+        ...optField("birth_date", birth),
+        ...optField("guardian_name", text(cells, "guardianName")),
+        ...optField("guardian_phone", text(cells, "guardianPhone")),
+        ...optField("school", text(cells, "school")),
+        ...optField("level", level),
+        ...optField("address", text(cells, "address")),
+        ...optField("class_code", classCode),
+        ...optField("start_date", start),
       } as StudentImportRow;
       r.status = existing.has(code) ? "update" : "new";
     }

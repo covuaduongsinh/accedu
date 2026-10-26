@@ -139,9 +139,9 @@ export const MODULES: ModuleDef[] = [
     key: "education",
     title: "Đào tạo",
     features: [
-      { path: "education/students", title: "Học viên", kind: "catalog", phase: "P9", mobile: true },
-      { path: "education/classes", title: "Lớp học (Tốt → Vua)", kind: "catalog", phase: "P9", mobile: true },
-      { path: "education/tuition", title: "Học phí & VietQR", kind: "process", phase: "P9", mobile: true },
+      { path: "education/students", title: "Học viên", kind: "catalog", phase: "P9", ready: true, mobile: true },
+      { path: "education/classes", title: "Lớp học (Tốt → Vua)", kind: "catalog", phase: "P9", ready: true, mobile: true },
+      { path: "education/tuition", title: "Học phí & VietQR", kind: "process", phase: "P9", ready: true, mobile: true },
     ],
   },
 ];

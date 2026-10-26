@@ -1,4 +1,4 @@
-import qrcode from "qrcode-generator";
+import makeQr from "qrcode-generator";
 
 /**
  * Mã VietQR (chuẩn EMVCo QR của NAPAS) để phụ huynh quét chuyển khoản học phí bằng ứng dụng ngân hàng.
@@ -49,11 +49,11 @@ export function vietQrPayload({ bin, accountNo, amount, note }: VietQrInput): st
 
 /** Ma trận điểm của mã QR (true = ô đen), mức sửa lỗi M — vẽ bằng SVG (web) hoặc View (mobile) */
 export function qrMatrix(text: string): boolean[][] {
-  const qr = qrcode(0, "M");
+  const qr = makeQr(0, "M");
   qr.addData(text, "Byte");
   qr.make();
   const n = qr.getModuleCount();
-  return Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => qr.isDark(r, c)));
+  return Array.from({ length: n }, (_row, r) => Array.from({ length: n }, (_cell, c) => qr.isDark(r, c)));
 }
 
 /** Ngân hàng phổ biến (BIN NAPAS) để chọn nhanh khi khai báo tài khoản nhận học phí */

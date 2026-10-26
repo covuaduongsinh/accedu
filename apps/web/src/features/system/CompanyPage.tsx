@@ -1,11 +1,12 @@
 import { api, friendlyError, qk } from "@accedu/api";
 import { useDb, usePeriodLocks } from "@accedu/api/react";
-import { ACCOUNTING_REGIMES, formatDateVN, todayVN } from "@accedu/core";
+import { ACCOUNTING_REGIMES, VIETQR_BANKS, formatDateVN, todayVN, vietQrPayload } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Lock, Save } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Card, Field, Input, PageHeader } from "../../components/ui";
+import { QrCode } from "../../components/QrCode";
+import { Button, Card, Field, Input, PageHeader, Select } from "../../components/ui";
 import { useTenantCtx } from "../../lib/tenant";
 
 export function CompanyPage() {
@@ -67,8 +68,82 @@ export function CompanyPage() {
           </Field>
         </div>
       </Card>
+      <BankCard />
       <PeriodLockCard />
     </div>
+  );
+}
+
+/** Tài khoản nhận học phí: in mã VietQR trên thông báo học phí để phụ huynh quét chuyển khoản */
+function BankCard() {
+  const { tenant, role } = useTenantCtx();
+  const db = useDb();
+  const qc = useQueryClient();
+  const canManage = role === "owner" || role === "admin";
+  const [form, setForm] = useState({
+    bin: tenant.bank_bin ?? "",
+    accountNo: tenant.bank_account_no ?? "",
+    accountName: tenant.bank_account_name ?? "",
+  });
+  const known = VIETQR_BANKS.some((b) => b.bin === form.bin);
+  const valid = /^\d{6}$/.test(form.bin) && /^[0-9A-Za-z]{1,19}$/.test(form.accountNo);
+
+  async function save() {
+    try {
+      await api.updateTenant(db, tenant.id, {
+        bank_bin: form.bin || null,
+        bank_account_no: form.accountNo.trim() || null,
+        bank_account_name: form.accountName.trim().toUpperCase() || null,
+      });
+      await qc.invalidateQueries({ queryKey: qk.tenant(tenant.slug) });
+      toast.success("Đã lưu tài khoản nhận học phí");
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  return (
+    <Card
+      title="Tài khoản nhận học phí (VietQR)"
+      actions={
+        canManage ? (
+          <Button icon={<Save size={14} />} disabled={!!form.bin && !valid} onClick={() => void save()}>
+            Lưu
+          </Button>
+        ) : null
+      }
+    >
+      <div className="flex flex-wrap gap-6">
+        <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label="Ngân hàng">
+            <Select aria-label="Ngân hàng nhận học phí" value={known ? form.bin : form.bin ? "other" : ""} disabled={!canManage} onChange={(e) => setForm({ ...form, bin: e.target.value === "other" ? "" : e.target.value })}>
+              <option value="">—</option>
+              {VIETQR_BANKS.map((b) => (
+                <option key={b.bin} value={b.bin}>
+                  {b.name}
+                </option>
+              ))}
+              <option value="other">Ngân hàng khác (nhập mã BIN)</option>
+            </Select>
+          </Field>
+          <Field label="Mã ngân hàng (BIN)" hint="6 số theo NAPAS">
+            <Input value={form.bin} disabled={!canManage} onChange={(e) => setForm({ ...form, bin: e.target.value.replaceAll(/\D/g, "").slice(0, 6) })} />
+          </Field>
+          <Field label="Số tài khoản">
+            <Input value={form.accountNo} disabled={!canManage} onChange={(e) => setForm({ ...form, accountNo: e.target.value.replaceAll(/\s/g, "") })} />
+          </Field>
+          <Field label="Tên chủ tài khoản">
+            <Input value={form.accountName} disabled={!canManage} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+          </Field>
+        </div>
+        {valid ? (
+          <div className="text-center text-xs text-muted">
+            <QrCode value={vietQrPayload({ bin: form.bin, accountNo: form.accountNo })} size={132} label="Mã VietQR tài khoản nhận học phí" />
+            Quét thử bằng ứng dụng ngân hàng
+          </div>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 

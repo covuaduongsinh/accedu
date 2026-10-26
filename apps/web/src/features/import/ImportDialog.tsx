@@ -20,6 +20,7 @@ import {
   type ItemImportRow,
   type OpeningImportRow,
   type StockOpeningImportRow,
+  type StudentImportRow,
   type PartnerImportRow,
   type Preview,
   type PreviewRow,
@@ -162,12 +163,17 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
       ]);
       const warehouses =
         kind === "opening-stock" ? await qc.fetchQuery({ queryKey: qk.warehouses(tenant.id), queryFn: () => api.warehouses(db, tenant.id), staleTime: 0 }) : undefined;
+      const classes =
+        kind === "students"
+          ? (await qc.fetchQuery({ queryKey: qk.classes(tenant.id), queryFn: () => api.classes(db, tenant.id), staleTime: 0 })).map((c) => ({ code: c.jobs.code }))
+          : undefined;
       setPreview(
         buildPreview(kind, table, header, map, {
           accounts: accs,
           partners: parts,
           items,
           ...(warehouses ? { warehouses } : {}),
+          ...(classes ? { classes } : {}),
           ...(partnerDefault ? { partnerDefault } : {}),
         }),
       );
@@ -194,6 +200,23 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
         }
         await Promise.all([qc.invalidateQueries({ queryKey: qk.stockOpenings(tenant.id) }), qc.invalidateQueries({ queryKey: ["report", tenant.id] })]);
         toast.success(`Đã nhập tồn kho đầu kỳ: ${r.inserted} dòng, giá trị ${formatAmount(Number(r.amount))}`);
+        close();
+        return;
+      }
+      if (kind === "students") {
+        const r = await api.importStudents(db, tenant.id, rows as StudentImportRow[]);
+        if (!r.ok) {
+          setPreview(applyServerErrors(preview, r.errors));
+          setOnlyProblems(true);
+          toast.error(`Máy chủ từ chối ${r.errors.length} dòng — chưa ghi gì. Sửa tệp rồi nhập lại.`);
+          return;
+        }
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: qk.students(tenant.id) }),
+          qc.invalidateQueries({ queryKey: qk.partners(tenant.id) }),
+          qc.invalidateQueries({ queryKey: qk.enrollments(tenant.id) }),
+        ]);
+        toast.success(`Đã nhập học viên: thêm ${r.inserted}, cập nhật ${r.updated}, ghi danh ${r.enrolled}`);
         close();
         return;
       }
@@ -393,7 +416,7 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge tone="green">Mới {preview.counts.new}</Badge>
-            {kind === "accounts" || kind === "partners" || kind === "items" ? <Badge tone="navy">Cập nhật {preview.counts.update}</Badge> : null}
+            {kind === "accounts" || kind === "partners" || kind === "items" || kind === "students" ? <Badge tone="navy">Cập nhật {preview.counts.update}</Badge> : null}
             <Badge tone="gray">Bỏ qua {preview.counts.skip}</Badge>
             <Badge tone={preview.counts.error ? "red" : "gray"}>Lỗi {preview.counts.error}</Badge>
             {preview.totals ? (
