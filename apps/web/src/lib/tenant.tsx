@@ -22,8 +22,18 @@ export const ROLE_LABEL: Record<MyTenantRow["role"], string> = {
   accountant: "Kế toán",
   cashier: "Thủ quỹ",
   viewer: "Chỉ xem",
+  coach: "Huấn luyện viên",
 };
+
+/** HLV chỉ dùng chức năng điểm danh — không xem số liệu kế toán */
+export const COACH_HOME = "education/attendance";
+export function isCoach(role: MyTenantRow["role"]): boolean {
+  return role === "coach";
+}
 
 export function canPost(role: MyTenantRow["role"]): boolean {
   return role === "owner" || role === "admin" || role === "chief_accountant" || role === "accountant";
 }
+
+/** Sửa danh mục (lớp, học viên, ghi danh) và điểm danh mọi lớp */
+export const canEditCatalog = canPost;

@@ -1,16 +1,26 @@
-import { useTenant, useTrialBalance, useVouchers } from "@accedu/api/react";
+import { useTenant, useTenants, useTrialBalance, useVouchers } from "@accedu/api/react";
 import { formatAmount, formatDateVN, todayVN, voucherType } from "@accedu/core";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { MyClasses } from "../../src/MyClasses";
 import { Button } from "../../src/ui";
 import { colors, s } from "../../src/theme";
 
-export default function Dashboard() {
+export default function Home() {
   const { tenant: slug } = useLocalSearchParams<{ tenant: string }>();
   const tenant = useTenant(slug);
+  const tenants = useTenants();
+  const role = tenants.data?.find((t) => t.slug === slug?.toLowerCase())?.role;
+  // HLV không xem số liệu kế toán: màn hình chính là danh sách lớp để điểm danh
+  if (role === "coach") return <MyClasses slug={slug} tenantId={tenant.data?.id} />;
+  if (!role) return null;
+  return <Dashboard slug={slug} tenantId={tenant.data?.id} />;
+}
+
+function Dashboard({ slug, tenantId }: { slug: string; tenantId: string | undefined }) {
   const today = todayVN();
-  const tb = useTrialBalance(tenant.data?.id, `${today.slice(0, 4)}-01-01`, today, 1);
-  const vouchers = useVouchers(tenant.data?.id, ["PT", "PC", "BC", "BN", "PK"]);
+  const tb = useTrialBalance(tenantId, `${today.slice(0, 4)}-01-01`, today, 1);
+  const vouchers = useVouchers(tenantId, ["PT", "PC", "BC", "BN", "PK"]);
   const row = (c: string) => tb.data?.find((r) => r.account_code === c);
   const bal = (c: string) => Number(row(c)?.closing_debit ?? 0) - Number(row(c)?.closing_credit ?? 0);
 
@@ -59,6 +69,9 @@ export default function Dashboard() {
           <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Tồn kho ›</Text>
         </Pressable>
       </View>
+      <Pressable onPress={() => router.push({ pathname: "/[tenant]/classes", params: { tenant: slug } })}>
+        <Text style={{ color: colors.navy[500], fontWeight: "600" }}>Điểm danh lớp học ›</Text>
+      </Pressable>
       <Text style={[s.title, { fontSize: 16 }]}>Chứng từ gần đây</Text>
       {(vouchers.data ?? []).slice(0, 15).map((v) => (
         <View key={v.id} style={[s.card, s.row]}>

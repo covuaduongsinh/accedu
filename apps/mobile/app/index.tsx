@@ -10,6 +10,7 @@ const ROLE: Record<string, string> = {
   accountant: "Kế toán",
   cashier: "Thủ quỹ",
   viewer: "Chỉ xem",
+  coach: "Huấn luyện viên",
 };
 
 export default function Tenants() {

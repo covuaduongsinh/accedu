@@ -15,6 +15,7 @@ const ROLE_HELP: Record<MemberRow["role"], string> = {
   accountant: "Lập, ghi sổ chứng từ; sửa danh mục",
   cashier: "Chỉ lập phiếu thu/chi (chưa ghi sổ)",
   viewer: "Chỉ xem số liệu, báo cáo",
+  coach: "Huấn luyện viên: điểm danh lớp mình phụ trách, không xem số liệu kế toán",
 };
 
 export function UsersPage() {
@@ -79,7 +80,7 @@ export function UsersPage() {
             </Field>
             <Field label="Vai trò">
               <Select value={newRole} onChange={(e) => setNewRole(e.target.value as MemberRow["role"])}>
-                {(["admin", "chief_accountant", "accountant", "cashier", "viewer"] as const).map((r) => (
+                {(["admin", "chief_accountant", "accountant", "cashier", "viewer", "coach"] as const).map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABEL[r]}
                   </option>
@@ -124,7 +125,7 @@ export function UsersPage() {
                       className="w-44"
                       onChange={(e) => void run(() => api.setMember(db, tenant.id, m.email as string, e.target.value), "Đã đổi vai trò")}
                     >
-                      {(["admin", "chief_accountant", "accountant", "cashier", "viewer"] as const).map((r) => (
+                      {(["admin", "chief_accountant", "accountant", "cashier", "viewer", "coach"] as const).map((r) => (
                         <option key={r} value={r}>
                           {ROLE_LABEL[r]}
                         </option>

@@ -8,7 +8,7 @@ import { useDb } from "@accedu/api/react";
 import { Empty } from "../components/ui";
 import { useSession } from "../lib/session";
 import { platform } from "../lib/supabase";
-import { ROLE_LABEL, TenantContext } from "../lib/tenant";
+import { COACH_HOME, ROLE_LABEL, TenantContext, isCoach } from "../lib/tenant";
 
 const t = getDictionary("vi");
 
@@ -43,6 +43,11 @@ export function AppShell() {
   if (!ctx) return <Empty>Không tìm thấy đơn vị “{slug}” hoặc bạn chưa được cấp quyền.</Empty>;
 
   const live = online && sync === "live";
+  const coach = isCoach(ctx.role);
+  // HLV chỉ thấy Đào tạo › Điểm danh
+  const menu = coach
+    ? MODULES.filter((m) => m.key === "education").map((m) => ({ ...m, features: m.features.filter((f) => f.path === COACH_HOME) }))
+    : MODULES;
 
   return (
     <TenantContext.Provider value={ctx}>
@@ -56,7 +61,7 @@ export function AppShell() {
             <span className="text-gold-300">{ctx.tenant.name}</span>
             <span className="rounded bg-navy-700 px-1.5 py-0.5">/{ctx.slug.toUpperCase()}</span>
             <div className="ml-auto flex items-center gap-3">
-              <FeatureSearch slug={ctx.slug} />
+              {coach ? null : <FeatureSearch slug={ctx.slug} />}
               <span className="flex items-center gap-1" title={live ? "Đồng bộ thời gian thực" : "Ngoại tuyến — dữ liệu từ bộ nhớ đệm"}>
                 {live ? <Cloud size={14} className="text-gold-300" /> : <CloudOff size={14} className="text-red-200" />}
                 {live ? t.common.online : t.common.offline}
@@ -75,7 +80,7 @@ export function AppShell() {
               </button>
             </div>
           </div>
-          <MegaMenu slug={ctx.slug} />
+          <MegaMenu slug={ctx.slug} modules={menu} />
         </header>
         <main className="flex-1 p-4">
           <Outlet />
@@ -85,11 +90,11 @@ export function AppShell() {
   );
 }
 
-function MegaMenu({ slug }: { slug: string }) {
+function MegaMenu({ slug, modules }: { slug: string; modules: typeof MODULES }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <nav className="relative flex border-t border-navy-400 bg-navy-600 px-2" onMouseLeave={() => setOpen(null)}>
-      {MODULES.map((m) => (
+      {modules.map((m) => (
         <div key={m.key} className="relative" onMouseEnter={() => setOpen(m.key)}>
           <button
             type="button"
