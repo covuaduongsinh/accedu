@@ -4,10 +4,13 @@ import {
   autoMap,
   buildPreview,
   classSchema,
+  countsAsSession,
   crc16,
   detectHeader,
   parseLevel,
   qrMatrix,
+  recognizeCourse,
+  remainingLabel,
   tuitionTransferNote,
   vietQrPayload,
   type Table,
@@ -106,5 +109,27 @@ describe("nhập danh sách học viên từ Excel", () => {
     });
     // Số ngày kiểu Excel: 42370 = 01/01/2016
     expect(p.rows[1]?.payload).toMatchObject({ code: "HV002", birth_date: "2016-01-01" });
+  });
+});
+
+describe("điểm danh, phân bổ doanh thu lớp theo khóa", () => {
+  it("có mặt / vắng không phép trừ buổi; vắng có phép không trừ", () => {
+    expect([countsAsSession("present"), countsAsSession("absent"), countsAsSession("excused"), countsAsSession(null)]).toEqual([true, true, false, false]);
+    expect([remainingLabel(3), remainingLabel(0), remainingLabel(-1), remainingLabel(null)]).toEqual(["Còn 3 buổi", "Hết khóa", "Vượt 1 buổi", ""]);
+  });
+
+  it("chia học phí theo buổi; buổi cuối nhận phần dư làm tròn; không vượt học phí", () => {
+    const fee = 1_000_000;
+    const m1 = recognizeCourse({ fee, sessions: 3, usedThrough: 2, recognizedBefore: 0 });
+    expect(m1).toBe(666_667);
+    const m2 = recognizeCourse({ fee, sessions: 3, usedThrough: 3, recognizedBefore: m1 });
+    expect(m2).toBe(333_333);
+    expect(m1 + m2).toBe(fee);
+    // học vượt khóa: không ghi nhận thêm
+    expect(recognizeCourse({ fee, sessions: 3, usedThrough: 5, recognizedBefore: fee })).toBe(0);
+    // tháng không học buổi nào
+    expect(recognizeCourse({ fee, sessions: 3, usedThrough: 2, recognizedBefore: 666_667 })).toBe(0);
+    // chạy lại tháng trước khi tháng sau đã ghi nhận: không vượt phần còn lại
+    expect(recognizeCourse({ fee, sessions: 3, usedThrough: 3, recognizedBefore: 0, recognizedOther: 500_000 })).toBe(500_000);
   });
 });

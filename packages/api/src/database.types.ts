@@ -435,7 +435,7 @@ export type MyTenantRow = {
   name: string;
   regime: "TT99" | "TT133";
   tax_code: string | null;
-  role: "owner" | "admin" | "chief_accountant" | "accountant" | "cashier" | "viewer";
+  role: "owner" | "admin" | "chief_accountant" | "accountant" | "cashier" | "viewer" | "coach";
 };
 
 export type TrialBalanceRow = {
@@ -512,6 +512,8 @@ export type ClassInfoRow = {
   schedule: string | null;
   location: string | null;
   coach_partner_id: string | null;
+  /** Tài khoản HLV điểm danh lớp */
+  coach_user_id: string | null;
   capacity: number | null;
 };
 export type ClassRow = ClassInfoRow & { jobs: JobRow };
@@ -586,6 +588,149 @@ export type StudentImportResult =
   | { ok: false; errors: Array<{ row: number; message: string }> }
   | { ok: true; inserted: number; updated: number; enrolled: number };
 
+export type AttendanceStatus = "present" | "absent" | "excused";
+
+/** Buổi học (mỗi lớp mỗi ngày một buổi) */
+export type ClassSessionRow = {
+  id: string;
+  tenant_id: string;
+  class_id: string;
+  held_on: DateStr;
+  topic: string | null;
+  coach_user_id: string | null;
+};
+
+export type AttendanceRow = {
+  id: string;
+  tenant_id: string;
+  session_id: string;
+  student_id: string;
+  status: AttendanceStatus;
+  note: string | null;
+};
+
+/** Lớp của tôi (my_classes): HLV thấy lớp mình phụ trách */
+export type MyClassRow = {
+  class_id: string;
+  code: string;
+  name: string;
+  level: StudentProfileRow["level"];
+  billing: "monthly" | "course";
+  sessions_per_course: number | null;
+  schedule: string | null;
+  location: string | null;
+  students: number;
+  last_held_on: DateStr | null;
+  is_mine: boolean;
+};
+
+/** Học viên của lớp tại một ngày (class_roster) — không có số tiền */
+export type RosterRow = {
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  enrollment_status: EnrollmentRow["status"] | null;
+  status: AttendanceStatus | null;
+  note: string | null;
+  /** Lớp theo khóa: tổng số buổi các khóa, đã trừ, còn lại */
+  sessions: number | null;
+  used: number | null;
+  remaining: number | null;
+};
+
+export type RecordAttendanceResult = { ok: boolean; session_id: string | null; saved: number; removed: number };
+
+/** Ma trận điểm danh tháng (rpt_attendance): học viên × buổi */
+export type AttendanceReportRow = {
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  enrollment_status: EnrollmentRow["status"] | null;
+  remaining: number | null;
+  session_id: string | null;
+  held_on: DateStr | null;
+  topic: string | null;
+  status: AttendanceStatus | null;
+  note: string | null;
+};
+
+/** Số buổi từng khóa (rpt_course_balance) */
+export type CourseBalanceRow = {
+  enrollment_id: string;
+  class_id: string;
+  class_code: string;
+  class_name: string;
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  guardian_phone: string | null;
+  start_date: DateStr;
+  end_date: DateStr | null;
+  status: EnrollmentRow["status"];
+  sessions: number;
+  used: number;
+  excused: number;
+  remaining: number;
+  billed: boolean;
+  invoice_number: string | null;
+  last_held_on: DateStr | null;
+};
+
+/** Học phí chờ phân bổ (rpt_deferred_tuition): số dư 3387 theo phiếu học phí */
+export type DeferredTuitionRow = {
+  bill_id: string;
+  class_id: string;
+  class_code: string;
+  class_name: string;
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  billing: "monthly" | "course";
+  period_start: DateStr;
+  sessions: number | null;
+  invoice_number: string;
+  amount: Numeric;
+  recognized: Numeric;
+  balance: Numeric;
+};
+
+/** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
+export type AllocationResult = {
+  ok: boolean;
+  dry_run: boolean;
+  month: DateStr;
+  count: number;
+  total: Numeric;
+  voucher_id: string | null;
+  number: string | null;
+  posted: boolean;
+  /** Số phiếu phân bổ cũ của tháng đã được thay */
+  replaced: string[];
+  /** Số tháng sau đã phân bổ (nên lập lại nếu điểm danh thay đổi) */
+  later_months: number;
+  items: Array<{
+    bill_id: string;
+    class_id: string;
+    class_code: string;
+    class_name: string;
+    student_id: string;
+    student_code: string;
+    student_name: string;
+    billing: "monthly" | "course";
+    period_start: DateStr;
+    invoice_number: string;
+    bill_amount: Numeric;
+    recognized_before: Numeric;
+    amount: Numeric;
+    remaining: Numeric;
+    sessions: number | null;
+    used_in_month: number | null;
+    used_through: number | null;
+  }>;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -602,6 +747,8 @@ export type Database = {
       student_profiles: Table<StudentProfileRow>;
       classes: Table<ClassInfoRow>;
       enrollments: Table<EnrollmentRow>;
+      class_sessions: Table<ClassSessionRow>;
+      attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
     Views: {
@@ -651,6 +798,17 @@ export type Database = {
         Args: { p_tenant: string; p_as_of?: string | null; p_class?: string | null; p_month?: string | null };
         Returns: TuitionStatusRow[];
       };
+      my_classes: { Args: { p_tenant: string }; Returns: MyClassRow[] };
+      class_roster: { Args: { p_tenant: string; p_class: string; p_date?: string | null }; Returns: RosterRow[] };
+      record_attendance: {
+        Args: { p_tenant: string; p_class: string; p_date: string; p_rows: Array<{ student_id: string; status: AttendanceStatus | null; note?: string | null }>; p_topic?: string | null };
+        Returns: RecordAttendanceResult;
+      };
+      renew_course: { Args: { p_tenant: string; p_enrollment: string; p_start?: string | null }; Returns: string };
+      allocate_tuition_revenue: { Args: { p_tenant: string; p_month: string; p_post?: boolean; p_dry_run?: boolean }; Returns: AllocationResult };
+      rpt_course_balance: { Args: { p_tenant: string; p_class?: string | null }; Returns: CourseBalanceRow[] };
+      rpt_attendance: { Args: { p_tenant: string; p_class: string; p_month: string }; Returns: AttendanceReportRow[] };
+      rpt_deferred_tuition: { Args: { p_tenant: string; p_as_of?: string | null }; Returns: DeferredTuitionRow[] };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {
