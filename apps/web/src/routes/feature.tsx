@@ -12,6 +12,9 @@ import { MigrationPage } from "../features/import/MigrationPage";
 import { CompanyPage, PeriodLockCard } from "../features/system/CompanyPage";
 import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
+import { ClassesPage } from "../features/education/ClassesPage";
+import { StudentsPage } from "../features/education/StudentsPage";
+import { TuitionPage } from "../features/education/TuitionPage";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { GrossProfitPage } from "../features/reports/GrossProfitPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
@@ -57,6 +60,9 @@ const PAGES: Record<string, ComponentType> = {
   "purchase/payable-summary": () => <PartnerBalancesPage side="payable" />,
   "sales/aging": () => <AgingPage side="receivable" />,
   "sales/gross-profit": GrossProfitPage,
+  "education/students": StudentsPage,
+  "education/classes": ClassesPage,
+  "education/tuition": TuitionPage,
   "purchase/aging": () => <AgingPage side="payable" />,
   "general/vat-out": () => <VatListingPage direction="out" />,
   "general/vat-in": () => <VatListingPage direction="in" />,

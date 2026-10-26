@@ -10,6 +10,8 @@ export * from "./accounting/settlement";
 export * from "./accounting/stock";
 export * from "./accounting/ledger";
 export * from "./accounting/modules";
+export * from "./education/education";
+export * from "./money/vietqr";
 export * from "./schemas/voucher";
 export * from "./schemas/catalog";
 export * from "./accounting/coa";

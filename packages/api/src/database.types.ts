@@ -30,6 +30,10 @@ export type TenantRow = {
   fiscal_year_start_month: number;
   start_date: DateStr;
   settings: Record<string, unknown>;
+  /** Tài khoản nhận học phí (VietQR): mã ngân hàng BIN, số tài khoản, tên chủ tài khoản */
+  bank_bin?: string | null;
+  bank_account_no?: string | null;
+  bank_account_name?: string | null;
   created_at: Timestamp;
 };
 
@@ -481,6 +485,107 @@ export type ImportResult =
   | { ok: false; errors: Array<{ row: number; message: string }> }
   | { ok: true; inserted: number; updated?: number; unchanged?: number; skipped?: number; debit?: number; credit?: number };
 
+/** Hồ sơ học viên (đối tượng partners.is_student) */
+export type StudentProfileRow = {
+  partner_id: string;
+  tenant_id: string;
+  birth_date: DateStr | null;
+  gender: "M" | "F" | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  school: string | null;
+  level: "tot" | "ma" | "tuong" | "xe" | "hau" | "vua" | null;
+  joined_on: DateStr | null;
+};
+
+/** Học viên = đối tượng + hồ sơ */
+export type StudentRow = PartnerRow & { student_profiles: StudentProfileRow | null };
+
+/** Lớp học = vụ việc kind class + thông tin lớp */
+export type ClassInfoRow = {
+  job_id: string;
+  tenant_id: string;
+  level: StudentProfileRow["level"];
+  billing: "monthly" | "course";
+  fee: Numeric;
+  sessions_per_course: number | null;
+  schedule: string | null;
+  location: string | null;
+  coach_partner_id: string | null;
+  capacity: number | null;
+};
+export type ClassRow = ClassInfoRow & { jobs: JobRow };
+
+export type EnrollmentRow = {
+  id: string;
+  tenant_id: string;
+  class_id: string;
+  student_id: string;
+  start_date: DateStr;
+  end_date: DateStr | null;
+  status: "active" | "paused" | "finished" | "dropped";
+  fee: Numeric | null;
+  note: string | null;
+};
+
+/** Tình hình học phí (rpt_tuition_status): mỗi phiếu học phí một dòng */
+export type TuitionStatusRow = {
+  bill_id: string;
+  enrollment_id: string;
+  class_id: string;
+  class_code: string;
+  class_name: string;
+  billing: "monthly" | "course";
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  period_start: DateStr;
+  period_end: DateStr | null;
+  sessions: number | null;
+  amount: Numeric;
+  invoice_id: string;
+  invoice_number: string;
+  invoice_status: "draft" | "posted" | "cancelled";
+  invoice_date: DateStr;
+  due_date: DateStr | null;
+  paid: Numeric;
+  remaining: Numeric;
+};
+
+/** Kết quả lập học phí (generate_tuition) */
+export type TuitionGenerateResult = {
+  ok: boolean;
+  dry_run: boolean;
+  new: number;
+  created: number;
+  existing: number;
+  total: Numeric;
+  items: Array<{
+    enrollment_id: string;
+    class_code: string;
+    class_name: string;
+    student_code: string;
+    student_name: string;
+    period_start: DateStr;
+    amount: Numeric;
+    status: "new" | "created" | "exists";
+    voucher_id?: string;
+    number?: string;
+  }>;
+};
+
+export type PayTuitionResult = {
+  ok: boolean;
+  total: Numeric;
+  vouchers: Array<{ voucher_id: string; number: string; student_name: string; amount: Numeric }>;
+};
+
+export type StudentImportResult =
+  | { ok: false; errors: Array<{ row: number; message: string }> }
+  | { ok: true; inserted: number; updated: number; enrolled: number };
+
 export type Database = {
   public: {
     Tables: {
@@ -494,6 +599,9 @@ export type Database = {
       opening_balances: Table<OpeningBalanceRow>;
       warehouses: Table<WarehouseRow, Partial<WarehouseRow> & Pick<WarehouseRow, "tenant_id" | "code" | "name">>;
       stock_openings: Table<StockOpeningRow>;
+      student_profiles: Table<StudentProfileRow>;
+      classes: Table<ClassInfoRow>;
+      enrollments: Table<EnrollmentRow>;
       period_locks: Table<PeriodLockRow>;
     };
     Views: {
@@ -530,6 +638,19 @@ export type Database = {
       };
       rpt_aging: { Args: { p_tenant: string; p_side: "receivable" | "payable"; p_as_of: string; p_account?: string | null }; Returns: AgingRow[] };
       import_stock_openings: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: StockOpeningImportResult };
+      save_student: { Args: { p_tenant: string; p_student: Record<string, unknown>; p_id?: string | null }; Returns: string };
+      save_class: { Args: { p_tenant: string; p_class: Record<string, unknown>; p_id?: string | null }; Returns: string };
+      save_enrollment: { Args: { p_tenant: string; p_row: Record<string, unknown>; p_id?: string | null }; Returns: string };
+      import_students: { Args: { p_tenant: string; p_rows: unknown[] }; Returns: StudentImportResult };
+      generate_tuition: {
+        Args: { p_tenant: string; p_month: string; p_class?: string | null; p_date?: string | null; p_post?: boolean; p_dry_run?: boolean };
+        Returns: TuitionGenerateResult;
+      };
+      pay_tuition: { Args: { p_tenant: string; p_bills: string[]; p_method?: "cash" | "bank"; p_date?: string | null }; Returns: PayTuitionResult };
+      rpt_tuition_status: {
+        Args: { p_tenant: string; p_as_of?: string | null; p_class?: string | null; p_month?: string | null };
+        Returns: TuitionStatusRow[];
+      };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

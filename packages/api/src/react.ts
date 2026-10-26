@@ -215,6 +215,30 @@ export function useStockOpenings(tenantId: string | undefined) {
 }
 
 /** Tồn kho đến ngày (số lượng, giá trị theo mặt hàng × kho, kèm tổng mặt hàng để tính giá bình quân) */
+export function useStudents(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.students(tenantId ?? ""), queryFn: () => api.students(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useClasses(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.classes(tenantId ?? ""), queryFn: () => api.classes(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useEnrollments(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.enrollments(tenantId ?? ""), queryFn: () => api.enrollments(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useTuitionStatus(tenantId: string | undefined, opts: { classId?: string | null; month?: string | null } = {}) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "tuition-status", opts.classId ?? "", opts.month ?? ""),
+    queryFn: () => api.tuitionStatus(db, tenantId as string, opts),
+    enabled: !!tenantId,
+  });
+}
+
 export function useStockBalances(tenantId: string | undefined, asOf?: string | null) {
   const db = useDb();
   return useQuery({
@@ -278,7 +302,22 @@ function invalidateLedger(qc: QueryClient, tenantId: string, voucherId?: string)
 export type SyncState = "connecting" | "live" | "offline";
 
 /** Bảng được theo dõi (đều nằm trong publication supabase_realtime) */
-const SYNC_TABLES = ["vouchers", "accounts", "partners", "items", "jobs", "opening_balances", "period_locks", "memberships", "warehouses", "stock_openings"] as const;
+const SYNC_TABLES = [
+  "vouchers",
+  "accounts",
+  "partners",
+  "items",
+  "jobs",
+  "opening_balances",
+  "period_locks",
+  "memberships",
+  "warehouses",
+  "stock_openings",
+  "student_profiles",
+  "classes",
+  "enrollments",
+  "tuition_bills",
+] as const;
 
 /**
  * Đồng bộ thời gian thực giữa web / desktop / mobile qua Supabase Realtime: khi bất kỳ thiết bị nào
@@ -352,9 +391,19 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
       inv(qk.accounts(tenantId));
       return inv(["report", tenantId]);
     case "partners":
+      inv(qk.students(tenantId));
       return inv(qk.partners(tenantId));
     case "jobs":
+      inv(qk.classes(tenantId));
       return inv(qk.jobs(tenantId));
+    case "student_profiles":
+      return inv(qk.students(tenantId));
+    case "classes":
+      return inv(qk.classes(tenantId));
+    case "enrollments":
+      return inv(qk.enrollments(tenantId));
+    case "tuition_bills":
+      return inv(["report", tenantId]);
     case "items":
       return inv(qk.items(tenantId));
     case "warehouses":

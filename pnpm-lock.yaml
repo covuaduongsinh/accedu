@@ -200,6 +200,9 @@ importers:
       fast-xml-parser:
         specifier: 5.11.2
         version: 5.11.2
+      qrcode-generator:
+        specifier: 2.0.4
+        version: 2.0.4
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3032,6 +3035,9 @@ packages:
   pure-rand@8.4.2:
     resolution: {integrity: sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==}
 
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
+
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
     engines: {node: '>= 0.6'}
@@ -4965,7 +4971,9 @@ snapshots:
       metro-runtime: 0.87.1
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-colors@0.88.0': {}
 
@@ -6634,6 +6642,8 @@ snapshots:
       react-is: 16.13.1
 
   pure-rand@8.4.2: {}
+
+  qrcode-generator@2.0.4: {}
 
   range-parser@1.2.1: {}
 

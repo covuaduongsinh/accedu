@@ -565,4 +565,72 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByText(/đang khóa đến hết ngày/)).toBeVisible();
     await expect(page.getByText("31/01/2026").first()).toBeVisible();
   });
+
+  test("học viên & học phí: lớp theo tháng, nhập học viên từ Excel, lập học phí (3387), thu tiền, thông báo VietQR", async ({ page }) => {
+    await signIn(page);
+    const dialog = page.getByRole("dialog");
+
+    // Tài khoản nhận học phí (VietQR)
+    await page.goto(`/${slug}/system/company`);
+    await page.getByLabel("Ngân hàng nhận học phí").selectOption("970436");
+    await page.getByLabel("Số tài khoản").fill("0123456789");
+    await page.getByLabel("Tên chủ tài khoản").fill("Cong ty CP Co vua Mau");
+    await expect(page.getByRole("img", { name: "Mã VietQR tài khoản nhận học phí" })).toBeVisible();
+    await page.getByRole("button", { name: "Lưu tài khoản nhận học phí" }).click();
+    await expect(page.getByText("Đã lưu tài khoản nhận học phí")).toBeVisible();
+
+    // Lớp theo tháng 600.000
+    await page.goto(`/${slug}/education/classes`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã lớp").fill("TOT-K15");
+    await dialog.getByLabel("Tên lớp").fill("Lớp Tốt K15 — chiều chủ nhật");
+    await dialog.getByLabel("Cấp").selectOption("tot");
+    await dialog.getByLabel("Học phí mỗi tháng").fill("600000");
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByRole("gridcell", { name: "Lớp Tốt K15 — chiều chủ nhật" })).toBeVisible();
+
+    // Nhập 2 học viên từ Excel, ghi danh vào lớp
+    await page.goto(`/${slug}/education/students`);
+    await page.getByRole("button", { name: "Nhập từ Excel" }).click();
+    await dialog
+      .getByLabel("Dữ liệu dán từ Excel")
+      .fill("Mã HV\tHọ tên học viên\tPhụ huynh\tSĐT phụ huynh\tCấp\tMã lớp\nHV101\tHọc viên Mẫu Linh\tPhụ huynh Linh\t0900000101\tTốt\tTOT-K15\nHV102\tHọc viên Mẫu Khang\tPhụ huynh Khang\t0900000102\tTốt\tTOT-K15");
+    await dialog.getByRole("button", { name: "Dùng dữ liệu đã dán" }).click();
+    await dialog.getByRole("button", { name: "Xem trước" }).click();
+    await dialog.getByRole("button", { name: "Nhập 2 dòng" }).click();
+    await expect(page.getByText("Đã nhập học viên: thêm 2, cập nhật 0, ghi danh 2")).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "HV101" })).toContainText("TOT-K15");
+    await shot(page, "31-hoc-vien");
+
+    // Lập học phí tháng này: 2 phiếu × 600.000, ghi sổ luôn
+    await page.goto(`/${slug}/education/tuition`);
+    await page.getByRole("button", { name: "Lập học phí" }).click();
+    await expect(dialog.getByText(/Sẽ lập 2 phiếu học phí, tổng 1.200.000/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Lập 2 phiếu học phí" }).click();
+    await expect(page.getByText(/Đã lập 2 phiếu học phí, tổng 1.200.000 \(đã ghi sổ\)/)).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "HV101" })).toContainText("Chưa đóng");
+
+    // Thu tiền mặt học viên HV101
+    await page.locator(".ag-row", { hasText: "HV101" }).getByRole("gridcell", { name: "HV101" }).click();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Thu tiền mặt" }).click();
+    await expect(page.getByText(/Đã thu 600.000: PT\d+/)).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "HV101" })).toContainText("Đã đóng");
+    await expect(page.locator(".ag-row", { hasText: "HV102" })).toContainText("Chưa đóng");
+    await shot(page, "32-hoc-phi");
+
+    // Thông báo học phí HV102 có mã VietQR
+    await page.locator(".ag-row", { hasText: "HV102" }).getByRole("gridcell", { name: "HV102" }).click();
+    await page.getByRole("button", { name: "Thông báo học phí" }).click();
+    const notice = page.getByRole("region", { name: "Thông báo học phí Học viên Mẫu Khang" });
+    await expect(notice.getByTestId("notice-total")).toHaveText("600.000");
+    await expect(notice.getByTestId("notice-note")).toHaveText(/^HP HV102 DV\d+$/);
+    await expect(notice.getByRole("img", { name: "Mã VietQR học phí HV102" })).toBeVisible();
+    await shot(page, "33-thong-bao-hoc-phi");
+    await page.getByRole("button", { name: "Đóng" }).click();
+
+    // Sổ công nợ: còn phải thu 600.000 của HV102
+    await page.goto(`/${slug}/sales/receivable-summary`);
+    await expect(page.locator(".ag-row", { hasText: "HV102" })).toContainText("600.000");
+  });
 });
