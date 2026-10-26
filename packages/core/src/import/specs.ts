@@ -1,6 +1,6 @@
 import type { FieldSpec } from "./table";
 
-export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items" | "opening-stock";
+export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items" | "opening-stock" | "students";
 
 export interface ImportSpec {
   kind: ImportKind;
@@ -170,6 +170,32 @@ export const IMPORT_SPECS: Record<ImportKind, ImportSpec> = {
       "Nhập sau khi đã có danh mục hàng hóa và danh mục kho. Mỗi đơn vị có sẵn kho mã KHO (Kho chính).",
       "TK kho bỏ trống thì lấy TK kho của mặt hàng, hoặc 1561 (TT99) / 156 (TT133). Tổng giá trị nên khớp số dư đầu kỳ TK 156.",
       "Từ FAO: Tồn kho › Báo cáo tồn kho (hoặc Tổng hợp nhập xuất tồn) tại ngày đầu kỳ › Kết xuất Excel.",
+    ],
+  },
+  students: {
+    kind: "students",
+    title: "Danh sách học viên",
+    fileName: "mau-danh-sach-hoc-vien",
+    fields: [
+      { key: "code", label: "Mã học viên", required: true, synonyms: ["Mã học viên", "Mã HV", "Mã học sinh", "Mã"], exclude: ["lớp", "phụ huynh"] },
+      { key: "name", label: "Họ tên học viên", required: true, synonyms: ["Họ tên học viên", "Tên học viên", "Họ và tên", "Họ tên", "Tên"], exclude: ["phụ huynh", "lớp", "trường", "bố", "mẹ"] },
+      { key: "birthDate", label: "Ngày sinh", synonyms: ["Ngày sinh", "Sinh ngày", "NS"] },
+      { key: "guardianName", label: "Phụ huynh", synonyms: ["Phụ huynh", "Tên phụ huynh", "Họ tên phụ huynh", "Bố/mẹ", "Người giám hộ"], exclude: ["điện thoại", "sđt", "số"] },
+      { key: "guardianPhone", label: "SĐT phụ huynh", synonyms: ["SĐT phụ huynh", "Điện thoại phụ huynh", "Điện thoại", "Số điện thoại", "SĐT"] },
+      { key: "school", label: "Trường", synonyms: ["Trường", "Trường học"] },
+      { key: "level", label: "Cấp (Tốt → Vua)", synonyms: ["Cấp", "Cấp độ", "Trình độ"] },
+      { key: "address", label: "Địa chỉ", synonyms: ["Địa chỉ"] },
+      { key: "classCode", label: "Mã lớp", synonyms: ["Mã lớp", "Lớp"], exclude: ["tên"] },
+      { key: "startDate", label: "Ngày vào lớp", synonyms: ["Ngày vào lớp", "Ngày nhập học", "Ngày bắt đầu"] },
+    ],
+    sample: [
+      ["HV0001", "Học viên Mẫu Một", "01/05/2016", "Phụ huynh Mẫu Một", "0900000001", "Tiểu học Mẫu", "Tốt", "Số 1 Phố Mẫu", "TOT-K12", "01/11/2026"],
+      ["HV0002", "Học viên Mẫu Hai", "15/09/2015", "Phụ huynh Mẫu Hai", "0900000002", "", "Mã", "", "", ""],
+    ],
+    notes: [
+      "Chỉ cột Mã học viên và Họ tên là bắt buộc. Mã tối đa 16 ký tự; học viên đã có (trùng mã) được cập nhật.",
+      "Cấp: Tốt, Mã, Tượng, Xe, Hậu, Vua. Ngày theo dạng ngày/tháng/năm.",
+      "Có Mã lớp thì AccEdu ghi danh học viên vào lớp đó (lớp phải có sẵn ở Đào tạo › Lớp học); Ngày vào lớp trống = hôm nay.",
     ],
   },
   "opening-partners": {

@@ -1,5 +1,7 @@
 import { inferAccount, type CoaKind, type NormalSide } from "../accounting/coa";
+import { parseLevel, type ChessLevel } from "../education/education";
 import { partnerSchema } from "../schemas/catalog";
+import { parseDateVN } from "../text/date";
 import { IMPORT_SPECS, type ImportKind } from "./specs";
 import { cellText, normalizeHeader, parseFlag, parseLooseAmount, type Cell, type ColumnMap, type HeaderGuess, type Table } from "./table";
 
@@ -9,6 +11,8 @@ export interface ImportContext {
   partners: ReadonlyArray<{ code: string }>;
   items?: ReadonlyArray<{ code: string; track_inventory?: boolean }>;
   warehouses?: ReadonlyArray<{ code: string }>;
+  /** Mã lớp học (nhập danh sách học viên) */
+  classes?: ReadonlyArray<{ code: string }>;
   /** Nhập từ trang Khách hàng hay Nhà cung cấp: loại mặc định của đối tượng mới */
   partnerDefault?: "customer" | "supplier";
 }
@@ -80,7 +84,22 @@ export interface StockOpeningImportRow {
   account?: string;
 }
 
-export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow | StockOpeningImportRow;
+/** Dòng gửi lên import_students */
+export interface StudentImportRow {
+  row: number;
+  code: string;
+  name: string;
+  birth_date?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  school?: string;
+  level?: ChessLevel;
+  address?: string;
+  class_code?: string;
+  start_date?: string;
+}
+
+export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow | StockOpeningImportRow | StudentImportRow;
 
 const ITEM_KIND_WORDS: Record<string, NonNullable<ItemImportRow["kind"]>> = {
   "hang hoa": "goods",
@@ -194,6 +213,19 @@ function accountCode(c: Cell): string {
 }
 
 /** Mã đối tượng: số nguyên trong ô Excel → chuỗi không có phần thập phân */
+/** Ô ngày: Date, số ngày kiểu Excel, "dd/mm/yyyy" hoặc "yyyy-mm-dd" → ISO; trống → ""; sai → null */
+function dateText(c: Cell): string | null {
+  if (c === null || c === undefined || c === "") return "";
+  if (c instanceof Date) return Number.isNaN(c.getTime()) ? null : c.toISOString().slice(0, 10);
+  if (typeof c === "number") {
+    if (c < 1 || c > 200_000) return null;
+    return new Date(Date.UTC(1899, 11, 30) + Math.round(c) * 86_400_000).toISOString().slice(0, 10);
+  }
+  const t = cellText(c);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  return parseDateVN(t);
+}
+
 function codeText(c: Cell): string {
   if (typeof c === "number" && Number.isInteger(c)) return String(c);
   return cellText(c);
@@ -662,6 +694,69 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
       seen.set(key, r.row);
       r.payload = { row: r.row, warehouse_code: wh, item_code: code, quantity: qty, amount: round2(amount ?? 0), ...(account ? { account } : {}) };
       r.status = "new";
+    }
+  }
+
+  if (kind === "students") {
+    const seen = new Map<string, number>();
+    const existing = new Set(ctx.partners.map((p) => p.code.toUpperCase()));
+    const classes = new Set((ctx.classes ?? []).map((c) => c.code.toUpperCase()));
+    const text = (cells: readonly Cell[], key: string) => (has(key) ? cellText(raw(cells, key)) : "");
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const code = codeText(raw(cells, "code")).toUpperCase();
+      const name = text(cells, "name");
+      r.values.code = code;
+      if (!code) {
+        if (looksLikeTotal(Object.values(r.values)) || !name) skip(r, "Không phải dòng học viên");
+        else fail(r, "Thiếu mã học viên");
+        continue;
+      }
+      if (code.length > 16) {
+        fail(r, "Mã học viên tối đa 16 ký tự");
+        continue;
+      }
+      if (!name) {
+        fail(r, "Thiếu họ tên học viên");
+        continue;
+      }
+      const dup = seen.get(code);
+      if (dup) {
+        fail(r, `Trùng mã ${code} với dòng ${dup}`);
+        continue;
+      }
+      const birth = dateText(raw(cells, "birthDate"));
+      const start = dateText(raw(cells, "startDate"));
+      if (birth === null || start === null) {
+        fail(r, "Ngày không hợp lệ (dạng ngày/tháng/năm)");
+        continue;
+      }
+      const level = parseLevel(text(cells, "level"));
+      if (level === undefined) {
+        fail(r, "Cấp phải là Tốt, Mã, Tượng, Xe, Hậu hoặc Vua");
+        continue;
+      }
+      const classCode = text(cells, "classCode").toUpperCase();
+      if (classCode && ctx.classes && !classes.has(classCode)) {
+        fail(r, `Chưa có lớp ${classCode} — thêm ở Đào tạo › Lớp học`);
+        continue;
+      }
+      seen.set(code, r.row);
+      const opt = (key: string, value: string | null | undefined) => (value ? { [key]: value } : {});
+      r.payload = {
+        row: r.row,
+        code,
+        name,
+        ...opt("birth_date", birth),
+        ...opt("guardian_name", text(cells, "guardianName")),
+        ...opt("guardian_phone", text(cells, "guardianPhone")),
+        ...opt("school", text(cells, "school")),
+        ...opt("level", level),
+        ...opt("address", text(cells, "address")),
+        ...opt("class_code", classCode),
+        ...opt("start_date", start),
+      } as StudentImportRow;
+      r.status = existing.has(code) ? "update" : "new";
     }
   }
 

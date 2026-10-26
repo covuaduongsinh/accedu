@@ -1,6 +1,10 @@
 import type {
   AccountImportRow,
   AccountInput,
+  ClassInput,
+  EnrollmentInput,
+  StudentImportRow,
+  StudentInput,
   ItemImportRow,
   ItemInput,
   OpeningImportRow,
@@ -15,6 +19,13 @@ import type {
   AccountRow,
   AgingRow,
   EInvoiceImportResult,
+  ClassRow,
+  EnrollmentRow,
+  PayTuitionResult,
+  StudentImportResult,
+  StudentRow,
+  TuitionGenerateResult,
+  TuitionStatusRow,
   GrossProfitRow,
   ImportResult,
   InvoicePaymentRow,
@@ -165,6 +176,109 @@ export const api = {
       ? unwrap(await db.from("warehouses").update(row).eq("id", id).select().single())
       : unwrap(await db.from("warehouses").insert(row).select().single());
   },
+  // ---------------------------------------------------------------- Đào tạo: học viên, lớp, học phí
+  async students(db: AccEduClient, tenantId: string): Promise<StudentRow[]> {
+    return unwrap(await db.from("partners").select("*, student_profiles(*)").eq("tenant_id", tenantId).eq("is_student", true).order("code")) as unknown as StudentRow[];
+  },
+  async saveStudent(db: AccEduClient, tenantId: string, s: StudentInput, id?: string): Promise<string> {
+    return unwrap(
+      await db.rpc("save_student", {
+        p_tenant: tenantId,
+        p_student: {
+          code: s.code.trim().toUpperCase(),
+          name: s.name.trim(),
+          birth_date: s.birthDate || null,
+          gender: s.gender || null,
+          guardian_name: s.guardianName || null,
+          guardian_phone: s.guardianPhone || null,
+          phone: s.phone || null,
+          school: s.school || null,
+          address: s.address || null,
+          level: s.level || null,
+          joined_on: s.joinedOn || null,
+          note: s.note || null,
+          is_active: s.isActive ?? true,
+        },
+        p_id: id ?? null,
+      }),
+    );
+  },
+  async importStudents(db: AccEduClient, tenantId: string, rows: StudentImportRow[]): Promise<StudentImportResult> {
+    return unwrap(await db.rpc("import_students", { p_tenant: tenantId, p_rows: checkBatch(rows) }));
+  },
+  async classes(db: AccEduClient, tenantId: string): Promise<ClassRow[]> {
+    return unwrap(await db.from("classes").select("*, jobs(*)").eq("tenant_id", tenantId)) as unknown as ClassRow[];
+  },
+  async saveClass(db: AccEduClient, tenantId: string, c: ClassInput, id?: string): Promise<string> {
+    return unwrap(
+      await db.rpc("save_class", {
+        p_tenant: tenantId,
+        p_class: {
+          code: c.code.trim().toUpperCase(),
+          name: c.name.trim(),
+          level: c.level || null,
+          billing: c.billing ?? "monthly",
+          fee: c.fee,
+          sessions_per_course: c.billing === "course" ? (c.sessionsPerCourse ?? null) : null,
+          schedule: c.schedule || null,
+          location: c.location || null,
+          coach_partner_id: c.coachPartnerId || null,
+          capacity: c.capacity ?? null,
+          start_date: c.startDate || null,
+          end_date: c.endDate || null,
+          is_active: c.isActive ?? true,
+        },
+        p_id: id ?? null,
+      }),
+    );
+  },
+  async enrollments(db: AccEduClient, tenantId: string): Promise<EnrollmentRow[]> {
+    return unwrap(await db.from("enrollments").select("*").eq("tenant_id", tenantId).order("start_date"));
+  },
+  async saveEnrollment(db: AccEduClient, tenantId: string, e: EnrollmentInput, id?: string): Promise<string> {
+    return unwrap(
+      await db.rpc("save_enrollment", {
+        p_tenant: tenantId,
+        p_row: {
+          class_id: e.classId,
+          student_id: e.studentId,
+          start_date: e.startDate,
+          end_date: e.endDate || null,
+          status: e.status ?? "active",
+          fee: e.fee ?? null,
+          note: e.note || null,
+        },
+        p_id: id ?? null,
+      }),
+    );
+  },
+  /** Lập học phí kỳ (tháng): chạy thử để xem trước, rồi lập (ghi sổ luôn nếu post) */
+  async generateTuition(
+    db: AccEduClient,
+    tenantId: string,
+    month: string,
+    opts: { classId?: string | null; date?: string | null; post?: boolean; dryRun?: boolean } = {},
+  ): Promise<TuitionGenerateResult> {
+    return unwrap(
+      await db.rpc("generate_tuition", {
+        p_tenant: tenantId,
+        p_month: month,
+        p_class: opts.classId ?? null,
+        p_date: opts.date ?? null,
+        p_post: opts.post ?? false,
+        p_dry_run: opts.dryRun ?? false,
+      }),
+    );
+  },
+  /** Thu học phí: mỗi học viên một phiếu thu (cash) / giấy báo có (bank) trừ đúng hóa đơn */
+  async payTuition(db: AccEduClient, tenantId: string, billIds: string[], method: "cash" | "bank", date?: string | null): Promise<PayTuitionResult> {
+    return unwrap(await db.rpc("pay_tuition", { p_tenant: tenantId, p_bills: billIds, p_method: method, p_date: date ?? null }));
+  },
+  async tuitionStatus(db: AccEduClient, tenantId: string, opts: { asOf?: string | null; classId?: string | null; month?: string | null } = {}): Promise<TuitionStatusRow[]> {
+    return unwrap(
+      await db.rpc("rpt_tuition_status", { p_tenant: tenantId, p_as_of: opts.asOf ?? null, p_class: opts.classId ?? null, p_month: opts.month ?? null }),
+    );
+  },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));
   },
@@ -244,7 +358,7 @@ export const api = {
   async updateTenant(
     db: AccEduClient,
     id: string,
-    patch: Partial<Pick<TenantRow, "name" | "tax_code" | "address" | "phone" | "email" | "start_date">>,
+    patch: Partial<Pick<TenantRow, "name" | "tax_code" | "address" | "phone" | "email" | "start_date" | "bank_bin" | "bank_account_no" | "bank_account_name">>,
   ): Promise<TenantRow> {
     return unwrap(await db.from("tenants").update(patch).eq("id", id).select().single());
   },
@@ -394,5 +508,8 @@ export const qk = {
   items: (tenantId: string) => ["items", tenantId] as const,
   warehouses: (tenantId: string) => ["warehouses", tenantId] as const,
   stockOpenings: (tenantId: string) => ["stock-openings", tenantId] as const,
+  students: (tenantId: string) => ["students", tenantId] as const,
+  classes: (tenantId: string) => ["classes", tenantId] as const,
+  enrollments: (tenantId: string) => ["enrollments", tenantId] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,
 };
