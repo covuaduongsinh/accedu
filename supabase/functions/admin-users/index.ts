@@ -3,7 +3,7 @@
 // service_role chỉ dùng ở đây (biến môi trường của container functions), không bao giờ tới client.
 import { createClient } from "npm:@supabase/supabase-js@2.118.0";
 
-const ROLES = ["admin", "chief_accountant", "accountant", "cashier", "viewer"];
+const ROLES = ["admin", "chief_accountant", "accountant", "cashier", "viewer", "coach"];
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-accedu-platform",
