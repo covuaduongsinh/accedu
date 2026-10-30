@@ -16,7 +16,10 @@ const slug = `ds-${stamp}`;
 const staffEmail = `ketoan-${stamp}@duongsinh.test`;
 const coachEmail = `hlv-${stamp}@duongsinh.test`;
 const parentEmail = `phuhuynh-${stamp}@duongsinh.test`;
-/** Hộp thư thử của Supabase local (Mailpit): API đọc thư; SMTP trong mạng docker cho Edge Function */
+/**
+ * Hộp thư thử của Supabase local (Mailpit): API đọc thư; SMTP trong mạng docker cho Edge Function.
+ * SMTP_HOST là IP container Mailpit (CI tự lấy): Deno không phân giải được tên container có dấu "_".
+ */
 const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
 const SMTP_HOST = process.env.E2E_SMTP_HOST ?? "supabase_inbucket_accedu";
 const SMTP_PORT = process.env.E2E_SMTP_PORT ?? "1025";

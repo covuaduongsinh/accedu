@@ -58,7 +58,8 @@ jobs:
             echo "E2E_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "E2E_DB_URL=$DB_URL"
             echo "E2E_MAILPIT_URL=http://127.0.0.1:54324"
-            echo "E2E_SMTP_HOST=supabase_inbucket_accedu"
+            # IP thay vì tên container: bộ phân giải DNS của Deno (Edge Function) không nhận tên có dấu "_"
+            echo "E2E_SMTP_HOST=$(docker inspect -f '{{(index .NetworkSettings.Networks "supabase_network_accedu").IPAddress}}' supabase_inbucket_accedu)"
             echo "E2E_SMTP_PORT=1025"
           } >> "$GITHUB_ENV"
       - run: pnpm --filter @accedu/web build
