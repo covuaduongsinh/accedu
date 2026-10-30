@@ -41,3 +41,7 @@ verify_jwt = false
 # Kế toán gửi tay (function tự kiểm tra JWT) hoặc lịch pg_cron (header x-cron-token)
 [functions.tuition-reminders]
 verify_jwt = false
+
+# Hỏi AccEdu (function tự kiểm tra JWT, gọi báo cáo bằng chính JWT người hỏi)
+[functions.ai-ask]
+verify_jwt = false
