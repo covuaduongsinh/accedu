@@ -4,10 +4,12 @@ import {
   autoMap,
   buildPreview,
   classSchema,
+  contractorPit,
   countsAsSession,
   crc16,
   detectHeader,
   parseLevel,
+  parseReminderDays,
   qrMatrix,
   recognizeCourse,
   remainingLabel,
@@ -131,5 +133,21 @@ describe("điểm danh, phân bổ doanh thu lớp theo khóa", () => {
     expect(recognizeCourse({ fee, sessions: 3, usedThrough: 2, recognizedBefore: 666_667 })).toBe(0);
     // chạy lại tháng trước khi tháng sau đã ghi nhận: không vượt phần còn lại
     expect(recognizeCourse({ fee, sessions: 3, usedThrough: 3, recognizedBefore: 0, recognizedOther: 500_000 })).toBe(500_000);
+  });
+});
+
+describe("lương HLV, ngày nhắc học phí", () => {
+  it("cộng tác viên từ 2.000.000 đ khấu trừ 10% TNCN; nhân viên không khấu trừ ở đây", () => {
+    expect(contractorPit(2_700_000)).toBe(270_000);
+    expect(contractorPit(2_000_000)).toBe(200_000);
+    expect(contractorPit(1_999_999)).toBe(0);
+    expect(contractorPit(5_000_000, "employee")).toBe(0);
+  });
+
+  it("ngày nhắc 1–28, bỏ trùng, sắp xếp, tối đa 4 ngày", () => {
+    expect(parseReminderDays("20, 5 5")).toEqual([5, 20]);
+    expect(parseReminderDays("")).toBe("Nhập ít nhất một ngày nhắc");
+    expect(parseReminderDays("30")).toBe("Ngày nhắc phải từ 1 đến 28");
+    expect(parseReminderDays("1,2,3,4,5")).toBe("Tối đa 4 ngày nhắc mỗi tháng");
   });
 });

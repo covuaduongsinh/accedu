@@ -34,6 +34,10 @@ export type TenantRow = {
   bank_bin?: string | null;
   bank_account_no?: string | null;
   bank_account_name?: string | null;
+  /** Nhắc học phí qua email: bật tự động, ngày nhắc trong tháng (1–28), email trả lời */
+  reminder_enabled?: boolean;
+  reminder_days?: number[];
+  reminder_reply_to?: string | null;
   created_at: Timestamp;
 };
 
@@ -514,6 +518,8 @@ export type ClassInfoRow = {
   coach_partner_id: string | null;
   /** Tài khoản HLV điểm danh lớp */
   coach_user_id: string | null;
+  /** Đơn giá một buổi dạy của lớp (ghi đè đơn giá HLV) */
+  coach_rate?: Numeric | null;
   capacity: number | null;
 };
 export type ClassRow = ClassInfoRow & { jobs: JobRow };
@@ -598,6 +604,8 @@ export type ClassSessionRow = {
   held_on: DateStr;
   topic: string | null;
   coach_user_id: string | null;
+  /** HLV nhận lương buổi này */
+  coach_partner_id?: string | null;
 };
 
 export type AttendanceRow = {
@@ -696,6 +704,86 @@ export type DeferredTuitionRow = {
   balance: Numeric;
 };
 
+/** Hồ sơ HLV: nhân viên / cộng tác viên, đơn giá buổi, tài khoản đăng nhập */
+export type CoachProfileRow = {
+  partner_id: string;
+  tenant_id: string;
+  kind: "employee" | "contractor";
+  session_rate: Numeric | null;
+  user_id: string | null;
+};
+
+/** Kết quả lập lương HLV tháng (generate_coach_pay) */
+export type CoachPayResult = {
+  ok: boolean;
+  dry_run: boolean;
+  month: DateStr;
+  gross: Numeric;
+  pit: Numeric;
+  net: Numeric;
+  voucher_id: string | null;
+  number: string | null;
+  posted: boolean;
+  replaced: string[];
+  coaches: Array<{
+    partner_id: string;
+    code: string;
+    name: string;
+    kind: "employee" | "contractor";
+    sessions: number;
+    gross: Numeric;
+    pit: Numeric;
+    net: Numeric;
+    classes: Array<{ class_id: string; class_code: string; class_name: string; sessions: number; rate: Numeric; amount: Numeric }>;
+  }>;
+  unassigned: Array<{ session_id: string; class_code: string; held_on: DateStr }>;
+};
+
+/** Lương HLV đã lập (coach_pay) */
+export type CoachPayRow = {
+  id: string;
+  tenant_id: string;
+  month: DateStr;
+  partner_id: string;
+  kind: "employee" | "contractor";
+  sessions: number;
+  gross: Numeric;
+  pit: Numeric;
+  voucher_id: string;
+};
+
+/** Nhật ký email nhắc học phí */
+export type TuitionReminderRow = {
+  id: string;
+  tenant_id: string;
+  student_id: string | null;
+  email: string | null;
+  amount: Numeric | null;
+  status: "sent" | "failed" | "skipped";
+  error: string | null;
+  trigger: "auto" | "manual" | "test";
+  created_by: string | null;
+  created_at: Timestamp;
+};
+
+/** Kết quả gọi Edge Function tuition-reminders */
+export type ReminderSendResult = {
+  dry_run?: boolean;
+  smtp_configured?: boolean;
+  sent?: number;
+  failed?: number;
+  skipped?: number;
+  results: Array<{
+    student_id: string;
+    student_code: string;
+    student_name: string;
+    email: string | null;
+    amount: number;
+    status: "sent" | "failed" | "skipped" | "preview";
+    error?: string;
+  }>;
+};
+
 /** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
 export type AllocationResult = {
   ok: boolean;
@@ -748,6 +836,9 @@ export type Database = {
       classes: Table<ClassInfoRow>;
       enrollments: Table<EnrollmentRow>;
       class_sessions: Table<ClassSessionRow>;
+      coach_profiles: Table<CoachProfileRow>;
+      coach_pay: Table<CoachPayRow>;
+      tuition_reminders: Table<TuitionReminderRow>;
       attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
@@ -809,6 +900,13 @@ export type Database = {
       rpt_course_balance: { Args: { p_tenant: string; p_class?: string | null }; Returns: CourseBalanceRow[] };
       rpt_attendance: { Args: { p_tenant: string; p_class: string; p_month: string }; Returns: AttendanceReportRow[] };
       rpt_deferred_tuition: { Args: { p_tenant: string; p_as_of?: string | null }; Returns: DeferredTuitionRow[] };
+      save_coach_profile: { Args: { p_tenant: string; p_partner: string; p_row: Record<string, unknown> }; Returns: string };
+      set_session_coach: { Args: { p_tenant: string; p_session: string; p_partner: string | null }; Returns: undefined };
+      generate_coach_pay: { Args: { p_tenant: string; p_month: string; p_post?: boolean; p_dry_run?: boolean }; Returns: CoachPayResult };
+      my_coach_sessions: {
+        Args: { p_tenant: string; p_month: string };
+        Returns: Array<{ class_id: string; class_code: string; class_name: string; sessions: number }>;
+      };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {
