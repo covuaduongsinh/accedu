@@ -807,10 +807,17 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     // Chờ kết nối thời gian thực ổn định rồi mới bấm nút trên thanh đầu trang
     // Lỗi JavaScript của trang in ra log CI (không tải được ảnh chụp thì vẫn có manh mối)
     page.on("pageerror", (e) => console.error(`[pageerror] ${e.message}`));
+    page.on("console", (m) => {
+      if (m.type() === "error") console.error(`[console] ${m.text().slice(0, 500)}`);
+    });
     const openAsk = async () => {
       await expect(page.getByTitle("Đồng bộ thời gian thực")).toBeVisible();
       await expect(async () => {
         if (!(await panel.isVisible())) await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+        if (!(await panel.isVisible())) {
+          const asides = await page.locator('aside[aria-label="Hỏi AccEdu"]').count();
+          console.error(`[hoi-accedu] ${page.url()} · aside trong DOM: ${asides}`);
+        }
         await expect(panel).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 15_000 });
     };
