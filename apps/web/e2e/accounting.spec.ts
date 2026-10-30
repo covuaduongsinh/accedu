@@ -804,9 +804,19 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await signIn(page);
     await page.goto(`/${slug}`);
     const panel = page.getByRole("dialog", { name: "Hỏi AccEdu" });
+    // Chờ kết nối thời gian thực ổn định rồi mới bấm nút trên thanh đầu trang
+    // Lỗi JavaScript của trang in ra log CI (không tải được ảnh chụp thì vẫn có manh mối)
+    page.on("pageerror", (e) => console.error(`[pageerror] ${e.message}`));
+    const openAsk = async () => {
+      await expect(page.getByTitle("Đồng bộ thời gian thực")).toBeVisible();
+      await expect(async () => {
+        if (!(await panel.isVisible())) await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+        await expect(panel).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 15_000 });
+    };
 
     // Chưa có khóa Anthropic: báo cấu hình, không trừ hạn mức
-    await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+    await openAsk();
     await expect(panel.getByTestId("ai-quota")).toHaveText("Còn 100/100 câu hỏi hôm nay");
     await panel.getByLabel("Câu hỏi cho AccEdu").fill("Doanh thu tháng này bao nhiêu?");
     await panel.getByLabel("Câu hỏi cho AccEdu").press("Enter");
@@ -818,7 +828,7 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     try {
       vault(`select app.vault_set('accedu_anthropic_api_key', 'e2e-khoa-gia'), app.vault_set('accedu_anthropic_base_url', '${AI_MOCK_URL}')`);
       await page.reload();
-      await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+      await openAsk();
       await panel.getByRole("button", { name: "Tháng này còn bao nhiêu học viên chưa đóng học phí?" }).click();
       const answer = panel.getByTestId("ai-answer");
       await expect(answer).toContainText("chưa đóng đủ học phí", { timeout: 30_000 });

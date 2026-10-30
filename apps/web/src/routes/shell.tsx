@@ -71,7 +71,8 @@ export function AppShell() {
               >
                 <Sparkles size={13} /> Hỏi AccEdu
               </button>
-              <span className="flex items-center gap-1" title={live ? "Đồng bộ thời gian thực" : "Ngoại tuyến — dữ liệu từ bộ nhớ đệm"}>
+              {/* Độ rộng cố định: đổi Ngoại tuyến ↔ Đã đồng bộ không làm xê dịch các nút bên cạnh */}
+              <span className="flex w-24 shrink-0 items-center gap-1" title={live ? "Đồng bộ thời gian thực" : "Ngoại tuyến — dữ liệu từ bộ nhớ đệm"}>
                 {live ? <Cloud size={14} className="text-gold-300" /> : <CloudOff size={14} className="text-red-200" />}
                 {live ? t.common.online : t.common.offline}
               </span>
