@@ -239,3 +239,24 @@ Workflow `supabase-deploy` đưa các giá trị này vào **Supabase Vault** tr
 - Ảnh QR là GIF tạo bằng `qrcode-generator` (cùng thư viện với web), đính kèm CID.
 
 Tổng số test: core 132, api 3, CSDL 113 (+8 lương HLV và nhắc học phí, +2 Edge Function dùng chung), E2E 15.
+
+---
+
+## Kết quả đợt P9c-2 (30/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Migration 0016: `ai_usage`, `tenants.ai_daily_limit`, `ai_quota` / `ai_begin` / `ai_finish` | Xong | `ai-usage.test.ts` (5 test): hạn mức, câu lỗi không tính, 0 = tắt, chỉ service role ghi kết quả, RLS người hỏi / quản trị |
+| Vòng lặp AI dùng chung `_shared/ai-agent.ts`: 14 tool chỉ đọc, bộ tool HLV hẹp, cắt 200 dòng, không gửi điện thoại / email | Xong | `ai-agent.test.ts` (10 test, client giả): gọi tool rồi trả lời, dừng ở 8 lượt, refusal, tool lỗi → `is_error`, HLV bị chặn tool kế toán, model dự phòng giữa chừng |
+| Edge Function `ai-ask`: JWT, Vault, chạy nền + client đọc `ai_usage` | Xong | Supabase local: Claude API giả (SSE) → tool tình hình học phí chạy bằng JWT người hỏi → câu trả lời đúng số liệu |
+| Web: nút **Hỏi AccEdu**, khung chat, lịch sử; thẻ hạn mức / chi phí ở *Thông tin đơn vị*. Mobile: màn hình Hỏi AccEdu | Xong | E2E 16/16 |
+| Triển khai: smoke test `ai-ask` 401 | Xong | workflow `supabase-deploy` |
+
+**Khác kế hoạch:**
+- **Chạy nền thay vì chờ đồng bộ:** `ai-ask` trả `{usage_id, pending}` ngay, xử lý bằng `EdgeRuntime.waitUntil`; client đọc kết quả từ `ai_usage`. Lý do: Kong của Supabase tự host ngắt sau 60 giây chờ; câu hỏi nhiều lượt tra cứu có thể lâu hơn. Cách này dùng chung cho web và mobile (React Native không đọc được stream).
+- **Prompt caching:** breakpoint trên system (tool + system dùng chung mọi câu hỏi) và cache tự động (`cache_control` cấp request) cho hội thoại trong vòng lặp tool; không đặt thêm breakpoint ở tool cuối.
+- **SDK** `@anthropic-ai/sdk@0.137.0` (bản 0.x cuối), gọi `beta.messages.stream(...).finalMessage()`.
+- **E2E** dùng Claude API giả (`apps/web/e2e/mock-anthropic.ts`) qua bí mật `accedu_anthropic_base_url` chỉ đặt trong test; CI không gọi API thật.
+- **Bổ sung tool:** sổ chi tiết tài khoản, buổi dạy của tôi (HLV).
+
+Tổng số test: core 132, api 3, CSDL 128 (+5 hạn mức AI, +10 vòng lặp AI), E2E 16.

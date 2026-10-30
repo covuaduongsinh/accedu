@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
 import readXlsxFile from "read-excel-file/node";
 import writeXlsxFile from "write-excel-file/node";
+import { startMockAnthropic } from "./mock-anthropic";
 
 const SHOTS = process.env.E2E_SHOTS;
 const stamp = Date.now().toString(36);
@@ -23,6 +24,9 @@ const parentEmail = `phuhuynh-${stamp}@duongsinh.test`;
 const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
 const SMTP_HOST = process.env.E2E_SMTP_HOST ?? "supabase_inbucket_accedu";
 const SMTP_PORT = process.env.E2E_SMTP_PORT ?? "1025";
+/** Claude API giả cho "Hỏi AccEdu": cổng trên máy chạy test, Edge Function gọi tới qua host.docker.internal */
+const AI_MOCK_PORT = Number(process.env.E2E_AI_MOCK_PORT ?? 54398);
+const AI_MOCK_URL = process.env.E2E_AI_MOCK_URL ?? `http://host.docker.internal:${AI_MOCK_PORT}`;
 
 /** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng GoTrue admin API (như workflow triển khai) + app.bootstrap_owner */
 test.beforeAll(async () => {
@@ -790,5 +794,53 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     expect(detail.Inline.map((i) => i.FileName)).toEqual(["vietqr.gif"]);
     await page.goto(`${MAILPIT}/view/${msg!.ID}.html`);
     await shot(page, "38-email-phu-huynh");
+  });
+
+  test("Hỏi AccEdu: chưa cấu hình khóa thì báo rõ; có khóa thì AI tra báo cáo học phí bằng quyền người hỏi", async ({ page }) => {
+    const dbUrl = process.env.E2E_DB_URL!;
+    const vault = (sql: string) => execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-qc", sql], { stdio: "inherit" });
+    const clearAi = () => vault("delete from vault.secrets where name in ('accedu_anthropic_api_key', 'accedu_anthropic_base_url')");
+    clearAi();
+    await signIn(page);
+    await page.goto(`/${slug}`);
+    const panel = page.getByRole("dialog", { name: "Hỏi AccEdu" });
+
+    // Chưa có khóa Anthropic: báo cấu hình, không trừ hạn mức
+    await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+    await expect(panel.getByTestId("ai-quota")).toHaveText("Còn 100/100 câu hỏi hôm nay");
+    await panel.getByLabel("Câu hỏi cho AccEdu").fill("Doanh thu tháng này bao nhiêu?");
+    await panel.getByLabel("Câu hỏi cho AccEdu").press("Enter");
+    await expect(panel.getByTestId("ai-error")).toContainText("Chưa cấu hình AI hỏi đáp");
+    await shot(page, "41-hoi-accedu-chua-cau-hinh");
+
+    // Có khóa (giả) → Edge Function gọi Claude API giả; tool tình hình học phí chạy trên dữ liệu thật
+    const mock = await startMockAnthropic(AI_MOCK_PORT);
+    try {
+      vault(`select app.vault_set('accedu_anthropic_api_key', 'e2e-khoa-gia'), app.vault_set('accedu_anthropic_base_url', '${AI_MOCK_URL}')`);
+      await page.reload();
+      await page.getByRole("button", { name: "Hỏi AccEdu", exact: true }).click();
+      await panel.getByRole("button", { name: "Tháng này còn bao nhiêu học viên chưa đóng học phí?" }).click();
+      const answer = panel.getByTestId("ai-answer");
+      await expect(answer).toContainText("chưa đóng đủ học phí", { timeout: 30_000 });
+      await expect(answer).toContainText("HV102 Học viên Mẫu Khang: 600.000 đ");
+      await expect(answer).toContainText("Đã tra: Tình hình học phí");
+      await expect(panel.getByTestId("ai-quota")).toHaveText("Còn 99/100 câu hỏi hôm nay");
+      await shot(page, "42-hoi-accedu");
+
+      // Yêu cầu gửi Claude: model, dự phòng khi bị từ chối, effort, bộ tool kế toán; không lộ số điện thoại phụ huynh
+      expect(mock.calls).toHaveLength(2);
+      const [first, second] = mock.calls;
+      expect(first!.headers["anthropic-beta"]).toContain("server-side-fallback-2026-07-01");
+      expect(first!.body).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", output_config: { effort: "medium" }, stream: true });
+      expect(first!.body.tools!.map((t) => t.name)).toContain("tuition_status");
+      expect(JSON.stringify(second!.body.messages)).not.toMatch(/guardian_phone/);
+
+      // Thông tin đơn vị: hạn mức và số câu hôm nay
+      await page.goto(`/${slug}/system/company`);
+      await expect(page.getByTestId("ai-today")).toHaveText("Đã hỏi 1 / 100 câu");
+    } finally {
+      await mock.close();
+      clearAi();
+    }
   });
 });
