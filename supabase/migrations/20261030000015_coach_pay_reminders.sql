@@ -490,7 +490,7 @@ begin
            (select max(r.created_at) from public.tuition_reminders r
             where r.tenant_id = p_tenant and r.student_id = p.id and r.trigger = 'auto' and r.status = 'sent'),
            (select max(r.created_at) from public.tuition_reminders r
-            where r.tenant_id = p_tenant and r.student_id = p.id and r.status = 'sent')
+            where r.tenant_id = p_tenant and r.student_id = p.id and r.status = 'sent' and r.trigger <> 'test')
     from open_bills b
     join public.partners p on p.id = b.student_id
     left join public.student_profiles sp on sp.partner_id = p.id
@@ -547,6 +547,22 @@ begin
   using p_names;
 end $$;
 
+-- Ghi / cập nhật bí mật trong Vault (chỉ dùng khi triển khai — chạy bằng psql trên VPS, không cấp cho API)
+create or replace function app.vault_set(p_name text, p_value text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_id uuid;
+begin
+  if p_name !~ '^accedu_[a-z0-9_]+$' then raise exception 'Tên bí mật không hợp lệ: %', p_name; end if;
+  if to_regclass('vault.secrets') is null then raise exception 'Chưa có Supabase Vault'; end if;
+  execute 'select id from vault.secrets where name = $1' into v_id using p_name;
+  if v_id is null then
+    execute 'select vault.create_secret($1, $2)' using p_value, p_name;
+  else
+    execute 'select vault.update_secret($1, $2)' using v_id, p_value;
+  end if;
+end $$;
+
 -- Lịch nhắc học phí (pg_cron): gọi Edge Function với token trong Vault; thiếu cấu hình thì bỏ qua
 create or replace function app.fire_tuition_reminders() returns void
 language plpgsql security definer set search_path = '' as $$
@@ -599,6 +615,7 @@ revoke execute on function public.log_tuition_reminders(uuid, jsonb, text) from 
 revoke execute on function public.reminder_due_tenants(date) from public, anon, authenticated;
 revoke execute on function public.system_secrets(text[]) from public, anon, authenticated;
 revoke execute on function app.fire_tuition_reminders() from public, anon, authenticated;
+revoke execute on function app.vault_set(text, text) from public, anon, authenticated, service_role;
 grant execute on function app.coach_month_sessions(uuid, date), app.first_postable(uuid, text[]), app.is_service()
   to authenticated, service_role;
 grant execute on function public.save_coach_profile(uuid, uuid, jsonb) to authenticated;
