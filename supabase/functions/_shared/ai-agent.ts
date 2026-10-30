@@ -341,6 +341,44 @@ export const AI_TOOLS: AiTool[] = [
     },
   },
   {
+    name: "bank_reconciliation",
+    label: "Sao kê ngân hàng & đối chiếu",
+    audience: "staff",
+    description:
+      "Đối chiếu tiền gửi ngân hàng (TK 112) với sao kê đã nhập: số dư sổ, số dư sao kê, chênh lệch, các giao dịch trên sao kê " +
+      "chưa khớp chứng từ (kèm gợi ý: học phí, hóa đơn, chứng từ có sẵn) và chứng từ đã ghi sổ chưa có trên sao kê.",
+    input_schema: {
+      type: "object",
+      properties: {
+        account: { type: "string", description: "TK ngân hàng chi tiết (mặc định 1121)" },
+        as_of: { type: "string", description: "Đối chiếu đến ngày YYYY-MM-DD (mặc định hôm nay); giao dịch chưa khớp lấy trong tháng của ngày này" },
+      },
+    },
+    async run(ctx, input) {
+      const account = textArg(input.account) || "1121";
+      if (!/^112\d*$/.test(account)) throw new Error("Tài khoản phải là TK tiền gửi ngân hàng (đầu 112)");
+      const asOf = dateArg(input.as_of, ctx.today);
+      const recon = (await ctx.db.rpc("rpt_bank_reconciliation", { p_tenant: ctx.tenantId, p_account: account, p_as_of: asOf })) as Record<string, unknown>;
+      const open = (await rows(ctx, "rpt_bank_lines", { p_account: account, p_from: monthStart(asOf), p_to: asOf })).filter(
+        (r) => r.status === "new" || r.status === "suggested",
+      );
+      return {
+        ...pick(recon, ["account", "as_of", "book_balance", "statement_balance", "statement_date", "difference", "unmatched_count", "unmatched_in", "unmatched_out"]),
+        book_only: ((recon.book_only as Array<Record<string, unknown>> | undefined) ?? []).map((b) => pick(b, ["number", "posting_date", "amount", "description"])),
+        unmatched_lines: limitRows(
+          open.map((r) => {
+            const sg = r.suggestion as Record<string, unknown> | null;
+            return {
+              ...pick(r, ["txn_date", "ref", "description", "amount_in", "amount_out", "status"]),
+              ...(sg ? { suggestion: pick(sg, ["kind", "sure", "partner_code", "partner_name", "invoice_number", "number", "advance"]) } : {}),
+            };
+          }),
+          50,
+        ),
+      };
+    },
+  },
+  {
     name: "gross_profit",
     label: "Lãi gộp",
     audience: "staff",

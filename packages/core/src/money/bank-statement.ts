@@ -124,7 +124,7 @@ export function parseBankStatement(rows: Table): BankStatementParse {
   const header = detectHeader(rows, BANK_FIELDS);
   const map = autoMap(header.headers, BANK_FIELDS);
   const columns: Partial<Record<BankField, string>> = {};
-  for (const f of BANK_FIELDS) if (map[f.key] !== null) columns[f.key] = header.headers[map[f.key]!];
+  for (const f of BANK_FIELDS) if (map[f.key] !== null) columns[f.key] = header.headers[map[f.key]!] ?? "";
 
   const result: BankStatementParse = {
     ok: false,
@@ -208,7 +208,7 @@ export function parseBankStatement(rows: Table): BankStatementParse {
     result.lines.push(line);
   }
 
-  const dates = result.lines.map((l) => l.date).sort();
+  const dates = result.lines.map((l) => l.date).toSorted();
   result.from = dates[0] ?? null;
   result.to = dates.at(-1) ?? null;
   result.totalIn = round2(result.lines.reduce((s, l) => s + l.amountIn, 0));

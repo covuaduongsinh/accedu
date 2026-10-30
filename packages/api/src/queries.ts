@@ -15,6 +15,7 @@ import type {
   WarehouseInput,
 } from "@accedu/core";
 import type { AccEduClient } from "./client";
+import type { BankStatementParse } from "@accedu/core";
 import type {
   AccountRow,
   AgingRow,
@@ -30,6 +31,11 @@ import type {
   AiAnswer,
   AiQuota,
   AiUsageRow,
+  BankConfirmResult,
+  BankImportResult,
+  BankLineRow,
+  BankReconciliation,
+  BankStatementRow,
   CourseBalanceRow,
   DeferredTuitionRow,
   EnrollmentRow,
@@ -441,6 +447,70 @@ export const api = {
       }
     }
     throw new Error("AI trả lời quá lâu. Thầy/Cô xem lại câu trả lời trong lịch sử hỏi sau ít phút.");
+  },
+  // ---------------------------------------------------------------- Sao kê ngân hàng
+  /** Nhập sao kê đã đọc ở client; thứ tự giao dịch (seq) theo thời gian kể cả khi tệp xếp ngày giảm dần */
+  async importBankStatement(db: AccEduClient, tenantId: string, account: string, parsed: BankStatementParse, fileName: string): Promise<BankImportResult> {
+    const lines = parsed.lines;
+    const descending = lines.length > 1 && lines[0]!.date > lines.at(-1)!.date;
+    return unwrap(
+      await db.rpc("import_bank_statement", {
+        p_tenant: tenantId,
+        p_account: account,
+        p_meta: { file_name: fileName, period_from: parsed.from, period_to: parsed.to, closing_balance: parsed.closingBalance },
+        p_lines: lines.map((l, i) => ({
+          seq: descending ? lines.length - i : i + 1,
+          txn_date: l.date,
+          ref: l.ref || null,
+          description: l.description,
+          amount_in: l.amountIn,
+          amount_out: l.amountOut,
+          balance: l.balance,
+          fingerprint: l.fingerprint,
+        })),
+      }),
+    );
+  },
+  async bankStatements(db: AccEduClient, tenantId: string, account: string): Promise<BankStatementRow[]> {
+    return unwrap(
+      await db.from("bank_statements").select("*").eq("tenant_id", tenantId).eq("account", account).order("created_at", { ascending: false }).limit(50),
+    );
+  },
+  async deleteBankStatement(db: AccEduClient, tenantId: string, statementId: string): Promise<number> {
+    return unwrap(await db.rpc("delete_bank_statement", { p_tenant: tenantId, p_statement: statementId }));
+  },
+  async bankLines(db: AccEduClient, tenantId: string, account: string, from: string, to: string): Promise<BankLineRow[]> {
+    return unwrap(await db.rpc("rpt_bank_lines", { p_tenant: tenantId, p_account: account, p_from: from, p_to: to }));
+  },
+  async bankConfirm(db: AccEduClient, tenantId: string, lineIds: string[]): Promise<BankConfirmResult> {
+    return unwrap(await db.rpc("bank_confirm", { p_tenant: tenantId, p_lines: lineIds }));
+  },
+  /** Lập BC / BN cho dòng chưa khớp với TK đối ứng tự chọn */
+  async bankCreateVoucher(
+    db: AccEduClient,
+    tenantId: string,
+    lineId: string,
+    row: { account: string; partnerId?: string | null; description?: string | null },
+  ): Promise<{ voucher_id: string; number: string }> {
+    return unwrap(
+      await db.rpc("bank_create_voucher", {
+        p_tenant: tenantId,
+        p_line: lineId,
+        p_row: { account: row.account, partner_id: row.partnerId ?? null, description: row.description ?? null },
+      }),
+    );
+  },
+  async bankLink(db: AccEduClient, tenantId: string, lineId: string, voucherId: string) {
+    unwrap(await db.rpc("bank_link", { p_tenant: tenantId, p_line: lineId, p_voucher: voucherId }));
+  },
+  async bankUnlink(db: AccEduClient, tenantId: string, lineId: string) {
+    unwrap(await db.rpc("bank_unlink", { p_tenant: tenantId, p_line: lineId }));
+  },
+  async bankIgnore(db: AccEduClient, tenantId: string, lineId: string, ignored = true) {
+    unwrap(await db.rpc("bank_ignore", { p_tenant: tenantId, p_line: lineId, p_ignored: ignored }));
+  },
+  async bankReconciliation(db: AccEduClient, tenantId: string, account: string, asOf: string): Promise<BankReconciliation> {
+    return unwrap(await db.rpc("rpt_bank_reconciliation", { p_tenant: tenantId, p_account: account, p_as_of: asOf }));
   },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));

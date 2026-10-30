@@ -227,6 +227,34 @@ describe("Hỏi AccEdu: vòng lặp tool use", () => {
     expect(out.rows).toEqual([{ code: "HV2", name: "Bình", is_active: true, level: "ma", school: "TH Mẫu", joined_on: "2026-09-01" }]);
   });
 
+  it("đối chiếu sao kê: số dư sổ / sao kê, giao dịch chưa khớp trong tháng kèm gợi ý; chỉ TK 112", async () => {
+    const { client, calls } = fakeClient([
+      reply([toolUse("t", "bank_reconciliation", { as_of: "2026-10-31" }), toolUse("u", "bank_reconciliation", { account: "1111" })], "tool_use"),
+      reply([text("ok")], "end_turn"),
+    ]);
+    const { db, calls: dbCalls } = fakeDb({
+      rpt_bank_reconciliation: () => ({ account: "1121", as_of: "2026-10-31", book_balance: 7414000, statement_balance: 8664000, difference: 1250000, unmatched_count: 1, unmatched_in: 900000, unmatched_out: 0, book_only: [{ voucher_id: "v", number: "BN0001", posting_date: "2026-10-20", amount: -300000, description: "VPP" }] }),
+      rpt_bank_lines: () => [
+        { id: "a", txn_date: "2026-10-05", ref: "FT1", description: "HP HV101", amount_in: 1200000, amount_out: 0, status: "matched", suggestion: null },
+        { id: "b", txn_date: "2026-10-06", ref: "FT3", description: "HPHV103", amount_in: 900000, amount_out: 0, status: "suggested", suggestion: { kind: "tuition", sure: false, partner_code: "HV103", partner_id: "x", allocations: [] } },
+        { id: "c", txn_date: "2026-10-31", ref: "X9", description: "CHUYEN NHAM", amount_in: 50000, amount_out: 0, status: "ignored", suggestion: null },
+      ],
+    });
+    await askAccEdu({ client, db, tenantId: TENANT, role: "accountant", question: "Sao kê tháng 10 còn gì chưa khớp?", today: TODAY });
+    expect(dbCalls).toEqual([
+      { fn: "rpt_bank_reconciliation", args: { p_tenant: TENANT, p_account: "1121", p_as_of: "2026-10-31" } },
+      { fn: "rpt_bank_lines", args: { p_tenant: TENANT, p_account: "1121", p_from: "2026-10-01", p_to: "2026-10-31" } },
+    ]);
+    const results = (calls[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<Record<string, unknown>>;
+    const out = JSON.parse(String(results[0]!.content));
+    expect(out).toMatchObject({ book_balance: 7414000, statement_balance: 8664000, difference: 1250000, unmatched_count: 1, book_only: [{ number: "BN0001", amount: -300000 }] });
+    expect(out.unmatched_lines.rows).toEqual([
+      { txn_date: "2026-10-06", ref: "FT3", description: "HPHV103", amount_in: 900000, amount_out: 0, status: "suggested", suggestion: { kind: "tuition", sure: false, partner_code: "HV103" } },
+    ]);
+    expect(results[1]).toMatchObject({ is_error: true, content: "Tài khoản phải là TK tiền gửi ngân hàng (đầu 112)" });
+    expect(toolsFor("coach").map((t) => t.name)).not.toContain("bank_reconciliation");
+  });
+
   it("max_tokens: báo câu trả lời bị cắt", async () => {
     const { client } = fakeClient([reply([text("Danh sách rất dài…")], "max_tokens")]);
     const r = await askAccEdu({ client, db: fakeDb({}).db, tenantId: TENANT, role: "owner", question: "?", today: TODAY });

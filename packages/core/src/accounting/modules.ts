@@ -66,7 +66,7 @@ export const MODULES: ModuleDef[] = [
       { path: "cash/bank-debits", title: "Giấy báo nợ", kind: "voucher", phase: "P3", ready: true },
       { path: "cash/cash-book", title: "Sổ quỹ tiền mặt", kind: "report", phase: "P3", ready: true, mobile: true },
       { path: "cash/bank-book", title: "Sổ tiền gửi ngân hàng", kind: "report", phase: "P3", ready: true },
-      { path: "cash/bank-accounts", title: "Tài khoản ngân hàng", kind: "catalog", phase: "P3" },
+      { path: "cash/bank-statements", title: "Sao kê ngân hàng & đối chiếu", kind: "report", phase: "P3", ready: true },
     ],
   },
   {

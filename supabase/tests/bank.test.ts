@@ -103,18 +103,19 @@ afterAll(async () => {
   await pool.end();
 });
 
+const statement = () => [
+  line("2026-10-05", "MBVCB.111.HP HV101.CT tu 0011 PHU HUYNH A", 1_200_000, 0, 1_200_000, "FT1"),
+  line("2026-10-05", `IBFT HP HV102 ${bill["HV102-10"]} chuyen tien`, 600_000, 0, 1_800_000, "FT2"),
+  line("2026-10-06", "HPHV103", 900_000, 0, 2_700_000, "FT3"),
+  line("2026-10-07", "HP HV104 HOC PHI", 700_000, 0, 3_400_000, "FT4"),
+  line("2026-10-08", "THANH TOAN HD0001 NHA SACH MAU", 220_000, 0, 3_620_000, "FT5"),
+  line("2026-10-11", "NOP VON GOP", 5_000_000, 0, 8_620_000, "FT6"),
+  line("2026-10-31", "PHI QUAN LY TAI KHOAN", 0, 11_000, 8_609_000, "FEE"),
+  line("2026-10-31", "TRA LAI TIEN GUI", 5_000, 0, 8_614_000, "INT"),
+  line("2026-10-31", "CHUYEN TIEN NHAM 999", 50_000, 0, 8_664_000, "X9"),
+];
+
 describe("sao kê ngân hàng: nhập, gợi ý khớp, xác nhận, đối chiếu", () => {
-  const statement = () => [
-    line("2026-10-05", "MBVCB.111.HP HV101.CT tu 0011 PHU HUYNH A", 1_200_000, 0, 1_200_000, "FT1"),
-    line("2026-10-05", `IBFT HP HV102 ${bill["HV102-10"]} chuyen tien`, 600_000, 0, 1_800_000, "FT2"),
-    line("2026-10-06", "HPHV103", 900_000, 0, 2_700_000, "FT3"),
-    line("2026-10-07", "HP HV104 HOC PHI", 700_000, 0, 3_400_000, "FT4"),
-    line("2026-10-08", "THANH TOAN HD0001 NHA SACH MAU", 220_000, 0, 3_620_000, "FT5"),
-    line("2026-10-11", "NOP VON GOP", 5_000_000, 0, 8_620_000, "FT6"),
-    line("2026-10-31", "PHI QUAN LY TAI KHOAN", 0, 11_000, 8_609_000, "FEE"),
-    line("2026-10-31", "TRA LAI TIEN GUI", 5_000, 0, 8_614_000, "INT"),
-    line("2026-10-31", "CHUYEN TIEN NHAM 999", 50_000, 0, 8_664_000, "X9"),
-  ];
 
   it("nhập sao kê: chỉ TK 112 chi tiết, chỉ người ghi sổ; nhập lại không sinh dòng trùng", async () => {
     await expect(importStatement(statement(), owner, "1111")).rejects.toThrow(/không phải TK tiền gửi ngân hàng/);
