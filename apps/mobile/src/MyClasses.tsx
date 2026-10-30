@@ -1,5 +1,5 @@
-import { useMyClasses } from "@accedu/api/react";
-import { formatDateVN } from "@accedu/core";
+import { useMyClasses, useMyCoachSessions } from "@accedu/api/react";
+import { formatDateVN, todayVN } from "@accedu/core";
 import { router } from "expo-router";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { colors, s } from "./theme";
@@ -7,6 +7,9 @@ import { colors, s } from "./theme";
 /** Lớp của tôi: HLV chạm vào lớp để điểm danh buổi hôm nay */
 export function MyClasses({ slug, tenantId }: { slug: string; tenantId: string | undefined }) {
   const classes = useMyClasses(tenantId);
+  const month = todayVN().slice(0, 7);
+  const mine = useMyCoachSessions(tenantId, `${month}-01`);
+  const taught = (mine.data ?? []).reduce((sum, r) => sum + r.sessions, 0);
   return (
     <FlatList
       style={s.screen}
@@ -18,6 +21,11 @@ export function MyClasses({ slug, tenantId }: { slug: string; tenantId: string |
         <View style={{ gap: 4 }}>
           <Text style={s.title}>Lớp của tôi</Text>
           <Text style={s.subtitle}>Chạm vào lớp để điểm danh buổi hôm nay</Text>
+          {mine.data?.length ? (
+            <Text style={{ color: colors.navy[600], fontWeight: "600" }}>
+              Tháng {month.slice(5)}/{month.slice(0, 4)}: {taught} buổi dạy ({mine.data.map((r) => `${r.class_code} ${r.sessions}`).join(", ")})
+            </Text>
+          ) : null}
         </View>
       }
       ListEmptyComponent={

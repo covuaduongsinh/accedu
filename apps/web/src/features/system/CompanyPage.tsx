@@ -1,13 +1,14 @@
 import { api, friendlyError, qk } from "@accedu/api";
 import { useDb, usePeriodLocks } from "@accedu/api/react";
-import { ACCOUNTING_REGIMES, VIETQR_BANKS, formatDateVN, todayVN, vietQrPayload } from "@accedu/core";
+import { ACCOUNTING_REGIMES, VIETQR_BANKS, formatDateVN, parseReminderDays, todayVN, vietQrPayload } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { Lock, Save } from "lucide-react";
+import { Lock, MailCheck, Save } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { QrCode } from "../../components/QrCode";
 import { Button, Card, Field, Input, PageHeader, Select } from "../../components/ui";
-import { useTenantCtx } from "../../lib/tenant";
+import { useSession } from "../../lib/session";
+import { canPost, useTenantCtx } from "../../lib/tenant";
 
 export function CompanyPage() {
   const { tenant, role } = useTenantCtx();
@@ -69,6 +70,7 @@ export function CompanyPage() {
         </div>
       </Card>
       <BankCard />
+      <ReminderCard />
       <PeriodLockCard />
     </div>
   );
@@ -141,6 +143,88 @@ function BankCard() {
             <QrCode value={vietQrPayload({ bin: form.bin, accountNo: form.accountNo })} size={132} label="Mã VietQR tài khoản nhận học phí" />
             Quét thử bằng ứng dụng ngân hàng
           </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** Nhắc học phí qua email: bật tự động, ngày nhắc trong tháng, email trả lời; gửi thư thử */
+function ReminderCard() {
+  const { tenant, role } = useTenantCtx();
+  const db = useDb();
+  const qc = useQueryClient();
+  const session = useSession();
+  const canManage = role === "owner" || role === "admin";
+  const [form, setForm] = useState({
+    enabled: tenant.reminder_enabled ?? false,
+    days: (tenant.reminder_days ?? [5, 20]).join(", "),
+    replyTo: tenant.reminder_reply_to ?? tenant.email ?? "",
+  });
+  const [testTo, setTestTo] = useState(session?.user.email ?? "");
+  const [busy, setBusy] = useState(false);
+  const days = parseReminderDays(form.days);
+
+  async function save() {
+    if (typeof days === "string") return toast.error(days);
+    try {
+      await api.updateTenant(db, tenant.id, {
+        reminder_enabled: form.enabled,
+        reminder_days: days,
+        reminder_reply_to: form.replyTo.trim() || null,
+      });
+      await qc.invalidateQueries({ queryKey: qk.tenant(tenant.slug) });
+      toast.success("Đã lưu cài đặt nhắc học phí");
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  async function sendTest() {
+    setBusy(true);
+    try {
+      const r = await api.sendTuitionReminders(db, tenant.id, { testTo: testTo.trim() });
+      const first = r.results[0];
+      if (first?.status === "sent") toast.success(`Đã gửi thư thử tới ${testTo} (mẫu theo học viên ${first.student_code})`);
+      else toast.error(first?.error ?? "Không gửi được thư thử");
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card
+      title="Nhắc học phí qua email"
+      actions={
+        canManage ? (
+          <Button icon={<Save size={14} />} aria-label="Lưu cài đặt nhắc học phí" onClick={() => void save()}>
+            Lưu
+          </Button>
+        ) : null
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm md:col-span-3">
+          <input type="checkbox" checked={form.enabled} disabled={!canManage} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+          Tự động gửi email thông báo học phí (có mã VietQR) cho phụ huynh còn nợ, 8:00 sáng các ngày nhắc
+        </label>
+        <Field label="Ngày nhắc trong tháng" hint={typeof days === "string" ? days : "Từ 1 đến 28, ví dụ: 5, 20"}>
+          <Input aria-label="Ngày nhắc trong tháng" value={form.days} disabled={!canManage} onChange={(e) => setForm({ ...form, days: e.target.value })} />
+        </Field>
+        <Field label="Email nhận phản hồi của phụ huynh" hint="Phụ huynh bấm Trả lời sẽ gửi về đây">
+          <Input type="email" aria-label="Email nhận phản hồi" value={form.replyTo} disabled={!canManage} onChange={(e) => setForm({ ...form, replyTo: e.target.value })} />
+        </Field>
+        {canPost(role) ? (
+          <Field label="Gửi thư thử tới" hint="Thư mẫu theo một học viên còn nợ — kiểm tra trước khi bật tự động">
+            <div className="flex gap-2">
+              <Input type="email" aria-label="Email nhận thư thử" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
+              <Button variant="secondary" icon={<MailCheck size={14} />} disabled={busy || !testTo} onClick={() => void sendTest()}>
+                Gửi thử
+              </Button>
+            </div>
+          </Field>
         ) : null}
       </div>
     </Card>

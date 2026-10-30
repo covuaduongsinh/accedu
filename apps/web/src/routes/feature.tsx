@@ -15,6 +15,7 @@ import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { ClassesPage } from "../features/education/ClassesPage";
 import { StudentsPage } from "../features/education/StudentsPage";
 import { AttendancePage } from "../features/education/AttendancePage";
+import { CoachPayPage } from "../features/education/CoachPayPage";
 import { RevenueAllocationPage } from "../features/education/RevenueAllocationPage";
 import { TuitionPage } from "../features/education/TuitionPage";
 import { COACH_HOME, isCoach, useTenantCtx } from "../lib/tenant";
@@ -68,6 +69,7 @@ const PAGES: Record<string, ComponentType> = {
   "education/tuition": TuitionPage,
   "education/attendance": AttendancePage,
   "education/revenue": RevenueAllocationPage,
+  "education/coach-pay": CoachPayPage,
   "purchase/aging": () => <AgingPage side="payable" />,
   "general/vat-out": () => <VatListingPage direction="out" />,
   "general/vat-in": () => <VatListingPage direction="in" />,

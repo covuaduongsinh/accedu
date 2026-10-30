@@ -1,11 +1,12 @@
-import { friendlyError, type AttendanceReportRow, type AttendanceStatus, type RosterRow } from "@accedu/api";
-import { useAttendanceReport, useMyClasses, useRecordAttendance, useRoster } from "@accedu/api/react";
+import { api, friendlyError, type AttendanceReportRow, type AttendanceStatus, type RosterRow } from "@accedu/api";
+import { useAttendanceReport, useClassSessions, useCoachProfiles, useDb, useMyClasses, usePartners, useRecordAttendance, useRoster } from "@accedu/api/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ATTENDANCE_STATUS, COURSE_ENDING_SESSIONS, formatDateVN, remainingLabel, todayVN } from "@accedu/core";
 import { CheckCheck, Save } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select } from "../../components/ui";
-import { useTenantCtx } from "../../lib/tenant";
+import { canPost, useTenantCtx } from "../../lib/tenant";
 
 const STATUSES = Object.keys(ATTENDANCE_STATUS) as AttendanceStatus[];
 const MARK: Record<AttendanceStatus, { short: string; tone: string }> = {
@@ -110,6 +111,7 @@ function SessionCard({ classId, course, date, onDate }: { classId: string; cours
         >
           Lưu điểm danh
         </Button>
+        <SessionCoach classId={classId} date={date} />
       </div>
       {roster.isLoading ? <p className="text-sm text-muted">Đang tải…</p> : null}
       {!roster.isLoading && rows.length === 0 ? <p className="text-sm text-muted">Lớp chưa có học viên đang học vào ngày này.</p> : null}
@@ -253,4 +255,42 @@ function pivot(rows: AttendanceReportRow[]) {
     }
   }
   return { sessions: [...sessions.values()].toSorted((a, b) => a.held_on.localeCompare(b.held_on)), students: [...students.values()], cell };
+}
+
+/** Kế toán đổi HLV nhận lương của buổi học (dạy thay) — chỉ hiện khi buổi đã có điểm danh */
+function SessionCoach({ classId, date }: { classId: string; date: string }) {
+  const { tenant, role } = useTenantCtx();
+  const allowed = canPost(role);
+  const db = useDb();
+  const qc = useQueryClient();
+  const sessions = useClassSessions(allowed ? tenant.id : undefined, classId, date, date);
+  const profiles = useCoachProfiles(allowed ? tenant.id : undefined);
+  const partners = usePartners(allowed ? tenant.id : undefined);
+  const session = sessions.data?.[0];
+  if (!allowed || !session) return null;
+  const coaches = (partners.data ?? []).filter((p) => p.is_employee && (profiles.data ?? []).some((c) => c.partner_id === p.id));
+
+  async function change(partnerId: string) {
+    try {
+      await api.setSessionCoach(db, tenant.id, session!.id, partnerId || null);
+      await qc.invalidateQueries({ queryKey: ["attendance", tenant.id] });
+      toast.success("Đã đổi HLV nhận lương của buổi học");
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  return (
+    <label className="ml-auto flex items-center gap-2 text-sm">
+      HLV dạy
+      <Select aria-label="HLV dạy buổi này" className="w-56" value={session.coach_partner_id ?? ""} onChange={(e) => void change(e.target.value)}>
+        <option value="">— chưa gán —</option>
+        {coaches.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.code} — {c.name}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
 }
