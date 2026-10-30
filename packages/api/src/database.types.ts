@@ -38,6 +38,8 @@ export type TenantRow = {
   reminder_enabled?: boolean;
   reminder_days?: number[];
   reminder_reply_to?: string | null;
+  /** Số câu hỏi AI tối đa mỗi ngày (0 = tắt AI hỏi đáp) */
+  ai_daily_limit?: number;
   created_at: Timestamp;
 };
 
@@ -784,6 +786,42 @@ export type ReminderSendResult = {
   }>;
 };
 
+/** Nhật ký "Hỏi AccEdu": câu hỏi, câu trả lời, báo cáo AI đã tra, token, chi phí ước tính (USD) */
+export type AiUsageRow = {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  role: MyTenantRow["role"];
+  question: string;
+  answer: string | null;
+  tools: string[];
+  status: "pending" | "ok" | "refused" | "error";
+  error: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cost_usd: Numeric;
+  asked_on: DateStr;
+  created_at: Timestamp;
+  finished_at: Timestamp | null;
+};
+
+/** Hạn mức câu hỏi AI hôm nay của đơn vị */
+export type AiQuota = { limit: number; used: number; remaining: number };
+
+/** Kết quả gọi Edge Function ai-ask (chờ xong) */
+export type AiAnswer = {
+  usage_id: string | null;
+  status: "ok" | "refused" | "error";
+  answer: string;
+  tools: string[];
+  error?: string | undefined;
+  limit?: number | undefined;
+  remaining?: number | undefined;
+};
+
 /** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
 export type AllocationResult = {
   ok: boolean;
@@ -839,6 +877,7 @@ export type Database = {
       coach_profiles: Table<CoachProfileRow>;
       coach_pay: Table<CoachPayRow>;
       tuition_reminders: Table<TuitionReminderRow>;
+      ai_usage: Table<AiUsageRow>;
       attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
@@ -907,6 +946,7 @@ export type Database = {
         Args: { p_tenant: string; p_month: string };
         Returns: Array<{ class_id: string; class_code: string; class_name: string; sessions: number }>;
       };
+      ai_quota: { Args: { p_tenant: string }; Returns: AiQuota };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

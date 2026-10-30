@@ -71,6 +71,10 @@ jobs:
         run: |
           docker ps -a
           docker logs supabase_edge_runtime_accedu --tail 100 || true
+          # Ảnh chụp cây giao diện lúc test lỗi (đọc được ngay trong log, không cần tải artifact)
+          for f in apps/web/test-results/*/error-context.md; do
+            if [ -f "$f" ]; then echo "::group::$f"; cat "$f"; echo "::endgroup::"; fi
+          done
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

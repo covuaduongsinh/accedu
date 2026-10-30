@@ -217,6 +217,6 @@ Phụ huynh mở thư trên điện thoại là quét chuyển khoản được 
 - 8:00 sáng các ngày nhắc, AccEdu gửi cho mọi phụ huynh còn nợ học phí đã ghi sổ.
 - Mỗi học viên nhận tối đa một email tự động mỗi ngày.
 
-## Sắp có (đợt P9c-2)
+## 14. Hỏi AccEdu bằng AI
 
-- Hỏi đáp số liệu học viên, học phí, điểm danh bằng AI (hướng dẫn riêng `hoi-dap-ai.md`).
+Bấm nút vàng **Hỏi AccEdu** để hỏi số liệu học phí, lớp học, điểm danh, lương HLV bằng tiếng Việt, ví dụ *"Lớp nào có học viên sắp hết khóa?"*. Cách bật, hạn mức và chi phí: xem [Hướng dẫn Hỏi AccEdu](hoi-dap-ai.md).

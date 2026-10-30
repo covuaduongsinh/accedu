@@ -27,6 +27,9 @@ import type {
   CoachProfileRow,
   ReminderSendResult,
   TuitionReminderRow,
+  AiAnswer,
+  AiQuota,
+  AiUsageRow,
   CourseBalanceRow,
   DeferredTuitionRow,
   EnrollmentRow,
@@ -79,6 +82,15 @@ function unwrapMaybe<D>(res: { data: D; error: { message: string } | null }): D 
   if (res.error) throw new Error(res.error.message);
   return res.data;
 }
+
+/** Lỗi HTTP từ Edge Function: lấy thông điệp tiếng Việt trong body */
+async function functionError(error: Error): Promise<Error> {
+  const ctx = (error as { context?: Response }).context;
+  const body = ctx ? ((await ctx.json().catch(() => null)) as { message?: string } | null) : null;
+  return new Error(body?.message ?? error.message);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Giới hạn một lần nhập (máy chủ cũng chặn) */
 export const IMPORT_MAX_ROWS = 5000;
@@ -395,6 +407,41 @@ export const api = {
     if (!data) throw new Error("Máy chủ không trả kết quả");
     return data;
   },
+  // ---------------------------------------------------------------- Hỏi AccEdu (AI hỏi đáp số liệu)
+  async aiQuota(db: AccEduClient, tenantId: string): Promise<AiQuota> {
+    return unwrap(await db.rpc("ai_quota", { p_tenant: tenantId }));
+  },
+  /** Lịch sử hỏi: người hỏi thấy câu của mình, quản trị thấy cả đơn vị (RLS); userId để lọc riêng một người */
+  async aiHistory(db: AccEduClient, tenantId: string, opts: { userId?: string | null; limit?: number; since?: string } = {}): Promise<AiUsageRow[]> {
+    let query = db.from("ai_usage").select("*").eq("tenant_id", tenantId);
+    if (opts.userId) query = query.eq("user_id", opts.userId);
+    if (opts.since) query = query.gte("asked_on", opts.since);
+    return unwrap(await query.order("created_at", { ascending: false }).limit(opts.limit ?? 50));
+  },
+  /**
+   * Hỏi AccEdu: gửi câu hỏi tới Edge Function ai-ask. Function trả lời ngay rồi chạy nền (tránh giới hạn thời gian chờ của
+   * proxy) → đọc kết quả từ ai_usage đến khi xong.
+   */
+  async askAi(db: AccEduClient, tenantId: string, question: string, opts: { pollMs?: number; timeoutMs?: number } = {}): Promise<AiAnswer> {
+    const { data, error } = await db.functions.invoke<Partial<AiAnswer> & { usage_id: string; pending: boolean }>("ai-ask", {
+      body: { tenant_id: tenantId, question },
+    });
+    if (error) throw await functionError(error);
+    if (!data) throw new Error("Máy chủ không trả kết quả");
+    const quota = { limit: data.limit, remaining: data.remaining };
+    if (!data.pending) {
+      return { usage_id: data.usage_id, status: data.status ?? "error", answer: data.answer ?? "", tools: data.tools ?? [], error: data.error, ...quota };
+    }
+    const deadline = Date.now() + (opts.timeoutMs ?? 300_000);
+    while (Date.now() < deadline) {
+      await sleep(opts.pollMs ?? 1500);
+      const row = unwrapMaybe(await db.from("ai_usage").select("*").eq("id", data.usage_id).maybeSingle());
+      if (row && row.status !== "pending") {
+        return { usage_id: row.id, status: row.status, answer: row.answer ?? "", tools: row.tools ?? [], error: row.error ?? undefined, ...quota };
+      }
+    }
+    throw new Error("AI trả lời quá lâu. Thầy/Cô xem lại câu trả lời trong lịch sử hỏi sau ít phút.");
+  },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));
   },
@@ -489,6 +536,7 @@ export const api = {
         | "reminder_enabled"
         | "reminder_days"
         | "reminder_reply_to"
+        | "ai_daily_limit"
       >
     >,
   ): Promise<TenantRow> {
@@ -646,6 +694,7 @@ export const qk = {
   myClasses: (tenantId: string) => ["my-classes", tenantId] as const,
   coachProfiles: (tenantId: string) => ["coach-profiles", tenantId] as const,
   reminders: (tenantId: string) => ["tuition-reminders", tenantId] as const,
+  ai: (tenantId: string) => ["ai", tenantId] as const,
   roster: (tenantId: string, classId: string, date: string) => ["roster", tenantId, classId, date] as const,
   attendance: (tenantId: string, classId: string, month: string) => ["attendance", tenantId, classId, month] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,

@@ -206,7 +206,10 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/tuition-reminders" \
             -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
           [ "$code" = 401 ] || { echo "::error::Edge Function tuition-reminders trả $code (mong đợi 401)"; exit 1; }
-          echo "✓ $base: REST (bảng tiền tệ), auth (tắt đăng ký), Edge Function admin-users, tuition-reminders"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/ai-ask" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
+          [ "$code" = 401 ] || { echo "::error::Edge Function ai-ask trả $code (mong đợi 401)"; exit 1; }
+          echo "✓ $base: REST (bảng tiền tệ), auth (tắt đăng ký), Edge Function admin-users, tuition-reminders, ai-ask"
 
       - name: Dọn
         if: always()

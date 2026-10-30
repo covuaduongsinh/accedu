@@ -326,6 +326,22 @@ export function useTuitionReminders(tenantId: string | undefined) {
   return useQuery({ queryKey: qk.reminders(tenantId ?? ""), queryFn: () => api.tuitionReminders(db, tenantId as string), enabled: !!tenantId });
 }
 
+/** Hỏi AccEdu: số câu còn lại hôm nay */
+export function useAiQuota(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: [...qk.ai(tenantId ?? ""), "quota"], queryFn: () => api.aiQuota(db, tenantId as string), enabled: !!tenantId });
+}
+
+/** Lịch sử hỏi AI (userId: chỉ của một người; bỏ trống: mọi câu người gọi được xem) */
+export function useAiHistory(tenantId: string | undefined, opts: { userId?: string | null; limit?: number; since?: string } = {}) {
+  const db = useDb();
+  return useQuery({
+    queryKey: [...qk.ai(tenantId ?? ""), "history", opts.userId ?? "", opts.since ?? "", String(opts.limit ?? 50)],
+    queryFn: () => api.aiHistory(db, tenantId as string, opts),
+    enabled: !!tenantId,
+  });
+}
+
 export function useStockBalances(tenantId: string | undefined, asOf?: string | null) {
   const db = useDb();
   return useQuery({

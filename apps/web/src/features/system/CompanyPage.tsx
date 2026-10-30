@@ -1,8 +1,8 @@
 import { api, friendlyError, qk } from "@accedu/api";
-import { useDb, usePeriodLocks } from "@accedu/api/react";
+import { useAiHistory, useAiQuota, useDb, usePeriodLocks } from "@accedu/api/react";
 import { ACCOUNTING_REGIMES, VIETQR_BANKS, formatDateVN, parseReminderDays, todayVN, vietQrPayload } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { Lock, MailCheck, Save } from "lucide-react";
+import { Lock, MailCheck, Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { QrCode } from "../../components/QrCode";
@@ -71,6 +71,7 @@ export function CompanyPage() {
       </Card>
       <BankCard />
       <ReminderCard />
+      <AiCard />
       <PeriodLockCard />
     </div>
   );
@@ -227,6 +228,73 @@ function ReminderCard() {
           </Field>
         ) : null}
       </div>
+    </Card>
+  );
+}
+
+/** Hỏi AccEdu: hạn mức câu hỏi mỗi ngày, số câu và chi phí ước tính tháng này */
+function AiCard() {
+  const { tenant, role } = useTenantCtx();
+  const db = useDb();
+  const qc = useQueryClient();
+  const canManage = role === "owner" || role === "admin";
+  const [limit, setLimit] = useState(String(tenant.ai_daily_limit ?? 100));
+  const quota = useAiQuota(tenant.id);
+  const monthStart = `${todayVN().slice(0, 8)}01`;
+  // Quản trị thấy mọi câu hỏi của đơn vị (RLS); người khác chỉ thấy của mình
+  const month = useAiHistory(tenant.id, { since: monthStart, limit: 1000 });
+  const rows = month.data ?? [];
+  const cost = rows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
+
+  async function save() {
+    const n = Number(limit);
+    if (!Number.isInteger(n) || n < 0 || n > 10000) return toast.error("Hạn mức từ 0 đến 10.000 câu / ngày");
+    try {
+      await api.updateTenant(db, tenant.id, { ai_daily_limit: n });
+      await qc.invalidateQueries({ queryKey: qk.tenant(tenant.slug) });
+      await qc.invalidateQueries({ queryKey: qk.ai(tenant.id) });
+      toast.success("Đã lưu hạn mức AI hỏi đáp");
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-1.5">
+          <Sparkles size={14} className="text-gold-500" /> AI hỏi đáp (Hỏi AccEdu)
+        </span>
+      }
+      actions={
+        canManage ? (
+          <Button icon={<Save size={14} />} aria-label="Lưu hạn mức AI" onClick={() => void save()}>
+            Lưu
+          </Button>
+        ) : null
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Field label="Số câu hỏi tối đa mỗi ngày" hint="Cả đơn vị; 0 = tắt AI hỏi đáp">
+          <Input aria-label="Số câu hỏi AI mỗi ngày" type="number" min={0} max={10000} value={limit} disabled={!canManage} onChange={(e) => setLimit(e.target.value)} />
+        </Field>
+        <div className="text-sm">
+          <p className="text-xs font-medium text-muted">Hôm nay</p>
+          <p className="mt-1" data-testid="ai-today">
+            {quota.data ? `Đã hỏi ${quota.data.used} / ${quota.data.limit} câu` : "—"}
+          </p>
+        </div>
+        <div className="text-sm">
+          <p className="text-xs font-medium text-muted">Tháng này{canManage ? " (cả đơn vị)" : " (của bạn)"}</p>
+          <p className="mt-1">
+            {rows.length} câu · chi phí ước tính {cost.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} USD
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted">
+        AI chỉ đọc các báo cáo mà người hỏi được xem; không gửi số điện thoại, email, địa chỉ học viên. Khóa Anthropic API do quản trị hệ thống
+        cấu hình (bí mật ANTHROPIC_API_KEY).
+      </p>
     </Card>
   );
 }
