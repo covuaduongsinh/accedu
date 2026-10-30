@@ -1,5 +1,5 @@
 import { api, friendlyError, qk, type ClassRow, type EnrollmentRow } from "@accedu/api";
-import { useClasses, useDb, useEnrollments, usePartners, useStudents } from "@accedu/api/react";
+import { useClasses, useCourseBalance, useDb, useEnrollments, useMembers, usePartners, useStudents } from "@accedu/api/react";
 import {
   BILLING_MODES,
   CHESS_LEVELS,
@@ -8,6 +8,7 @@ import {
   enrollmentSchema,
   formatAmount,
   parseAmount,
+  remainingLabel,
   todayVN,
   type BillingMode,
   type ChessLevel,
@@ -15,15 +16,15 @@ import {
 } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
-import { Pencil, Plus, UserPlus } from "lucide-react";
+import { Pencil, Plus, RefreshCw, UserPlus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataGrid, amountCol, dateCol } from "../../components/DataGrid";
 import { Badge, Button, Card, Field, Input, Modal, PageHeader, Select } from "../../components/ui";
-import { canPost, useTenantCtx } from "../../lib/tenant";
+import { ROLE_LABEL, canPost, useTenantCtx } from "../../lib/tenant";
 
-type ClassGridRow = ClassRow & { students: number };
-type EnrollmentGridRow = EnrollmentRow & { student_code: string; student_name: string };
+type ClassGridRow = ClassRow & { students: number; coach_name: string };
+type EnrollmentGridRow = EnrollmentRow & { student_code: string; student_name: string; remaining: number | null };
 
 const STATUS_TONE: Record<EnrollmentStatus, "green" | "gold" | "gray" | "red"> = { active: "green", paused: "gold", finished: "gray", dropped: "red" };
 
@@ -33,6 +34,7 @@ export function ClassesPage() {
   const classes = useClasses(tenant.id);
   const enrollments = useEnrollments(tenant.id);
   const students = useStudents(tenant.id);
+  const members = useMembers(tenant.id);
   const [editing, setEditing] = useState<ClassRow | "new" | null>(null);
   const [selected, setSelected] = useState<ClassRow | null>(null);
   const [enrolling, setEnrolling] = useState(false);
@@ -41,8 +43,11 @@ export function ClassesPage() {
   const rows = useMemo<ClassGridRow[]>(() => {
     const count = new Map<string, number>();
     for (const e of enrollments.data ?? []) if (e.status === "active") count.set(e.class_id, (count.get(e.class_id) ?? 0) + 1);
-    return (classes.data ?? []).map((c) => ({ ...c, students: count.get(c.job_id) ?? 0 })).toSorted((a, b) => a.jobs.code.localeCompare(b.jobs.code));
-  }, [classes.data, enrollments.data]);
+    const coach = new Map((members.data ?? []).map((m) => [m.user_id, m.full_name ?? m.email ?? ""]));
+    return (classes.data ?? [])
+      .map((c) => ({ ...c, students: count.get(c.job_id) ?? 0, coach_name: c.coach_user_id ? (coach.get(c.coach_user_id) ?? "") : "" }))
+      .toSorted((a, b) => a.jobs.code.localeCompare(b.jobs.code));
+  }, [classes.data, enrollments.data, members.data]);
   const current = rows.find((r) => r.job_id === selected?.job_id) ?? null;
 
   const cols = useMemo<ColDef<ClassGridRow>[]>(
@@ -54,6 +59,7 @@ export function ClassesPage() {
       amountCol("fee", "Học phí", { width: 120 }),
       { field: "sessions_per_course", headerName: "Buổi/khóa", width: 100, type: "rightAligned" },
       { field: "schedule", headerName: "Lịch học", flex: 1, minWidth: 150 },
+      { field: "coach_name", headerName: "HLV điểm danh", width: 150 },
       { field: "students", headerName: "Đang học", width: 100, type: "rightAligned" },
       { field: "jobs.is_active", headerName: "Mở", width: 70, valueFormatter: (p) => (p.value ? "✓" : "") },
     ],
@@ -126,9 +132,29 @@ function ClassStudents({
   const db = useDb();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<EnrollmentGridRow | null>(null);
+  const course = cls.billing === "course";
+  const balance = useCourseBalance(course ? tenant.id : undefined, cls.job_id);
+  const remainingOf = new Map((balance.data ?? []).map((b) => [b.enrollment_id, b.remaining]));
   const rows = enrollments
-    .map((e) => ({ ...e, student_code: studentById.get(e.student_id)?.code ?? "", student_name: studentById.get(e.student_id)?.name ?? "" }))
-    .toSorted((a, b) => a.student_code.localeCompare(b.student_code));
+    .map((e) => ({
+      ...e,
+      student_code: studentById.get(e.student_id)?.code ?? "",
+      student_name: studentById.get(e.student_id)?.name ?? "",
+      remaining: remainingOf.get(e.id) ?? null,
+    }))
+    .toSorted((a, b) => a.student_code.localeCompare(b.student_code) || a.start_date.localeCompare(b.start_date));
+
+  async function renew() {
+    if (!picked) return;
+    if (!window.confirm(`Gia hạn khóa mới cho ${picked.student_name}? Khóa cũ sẽ kết thúc; lập học phí khóa mới ở trang Học phí.`)) return;
+    try {
+      await api.renewCourse(db, tenant.id, picked.id);
+      await Promise.all([qc.invalidateQueries({ queryKey: qk.enrollments(tenant.id) }), qc.invalidateQueries({ queryKey: ["report", tenant.id] })]);
+      toast.success(`${picked.student_name}: đã gia hạn khóa mới — vào Học phí › Lập học phí để lập hóa đơn khóa mới`);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
 
   async function setStatus(status: EnrollmentStatus) {
     if (!picked) return;
@@ -171,6 +197,19 @@ function ClassStudents({
       width: 120,
       cellRenderer: (p: { value: EnrollmentStatus }) => <Badge tone={STATUS_TONE[p.value]}>{ENROLLMENT_STATUS[p.value]}</Badge>,
     },
+    ...(course
+      ? [
+          {
+            field: "remaining",
+            headerName: "Số buổi",
+            width: 130,
+            cellRenderer: (p: { value: number | null; data?: EnrollmentGridRow }) =>
+              p.value === null || p.value === undefined ? null : (
+                <Badge tone={p.value <= 2 && p.data?.status === "active" ? (p.value < 0 ? "red" : "gold") : "gray"}>{remainingLabel(p.value)}</Badge>
+              ),
+          } satisfies ColDef<EnrollmentGridRow>,
+        ]
+      : []),
   ];
 
   return (
@@ -191,6 +230,16 @@ function ClassStudents({
             <Button variant="secondary" disabled={!picked || picked.status === "finished"} onClick={() => void setStatus("finished")}>
               Kết thúc
             </Button>
+            {course ? (
+              <Button
+                variant="gold"
+                icon={<RefreshCw size={14} />}
+                disabled={!picked || (picked.status !== "active" && picked.status !== "paused")}
+                onClick={() => void renew()}
+              >
+                Gia hạn khóa
+              </Button>
+            ) : null}
           </div>
         ) : null
       }
@@ -212,6 +261,7 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
   const db = useDb();
   const qc = useQueryClient();
   const partners = usePartners(tenant.id);
+  const members = useMembers(tenant.id);
   const listId = useId();
   const coaches = (partners.data ?? []).filter((p) => p.is_employee && p.is_active);
   const [form, setForm] = useState({
@@ -224,6 +274,7 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
     schedule: cls?.schedule ?? "",
     location: cls?.location ?? "",
     coachCode: coaches.find((c) => c.id === cls?.coach_partner_id)?.code ?? "",
+    coachUserId: cls?.coach_user_id ?? "",
     startDate: cls?.jobs.start_date ?? "",
     endDate: cls?.jobs.end_date ?? "",
     isActive: cls?.jobs.is_active ?? true,
@@ -243,6 +294,7 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
       schedule: form.schedule,
       location: form.location,
       coachPartnerId: coach?.id ?? null,
+      coachUserId: form.coachUserId || null,
       startDate: form.startDate,
       endDate: form.endDate,
       isActive: form.isActive,
@@ -312,8 +364,20 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
       <Field label="Địa điểm">
         <Input value={form.location} onChange={(e) => set({ location: e.target.value })} />
       </Field>
-      <Field label="HLV (mã nhân viên)" hint="Đối tượng là nhân viên">
+      <Field label="HLV (mã nhân viên)" hint="Đối tượng là nhân viên — tính lương sau này">
         <Input list={listId} value={form.coachCode} onChange={(e) => set({ coachCode: e.target.value })} />
+      </Field>
+      <Field label="HLV điểm danh (tài khoản)" hint="Tài khoản vai trò Huấn luyện viên — tạo ở Hệ thống › Người dùng">
+        <Select aria-label="HLV điểm danh" value={form.coachUserId} onChange={(e) => set({ coachUserId: e.target.value })}>
+          <option value="">—</option>
+          {(members.data ?? [])
+            .toSorted((a, b) => Number(b.role === "coach") - Number(a.role === "coach"))
+            .map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.full_name ?? m.email ?? "(chưa có tên)"} · {ROLE_LABEL[m.role]}
+              </option>
+            ))}
+        </Select>
       </Field>
       <Field label="Khai giảng">
         <Input type="date" value={form.startDate} onChange={(e) => set({ startDate: e.target.value })} />

@@ -142,6 +142,8 @@ export const MODULES: ModuleDef[] = [
       { path: "education/students", title: "Học viên", kind: "catalog", phase: "P9", ready: true, mobile: true },
       { path: "education/classes", title: "Lớp học (Tốt → Vua)", kind: "catalog", phase: "P9", ready: true, mobile: true },
       { path: "education/tuition", title: "Học phí & VietQR", kind: "process", phase: "P9", ready: true, mobile: true },
+      { path: "education/attendance", title: "Điểm danh", kind: "process", phase: "P9", ready: true, mobile: true },
+      { path: "education/revenue", title: "Phân bổ doanh thu học phí", kind: "process", phase: "P9", ready: true },
     ],
   },
 ];

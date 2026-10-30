@@ -1,15 +1,22 @@
 import { useTrialBalance, useVouchers } from "@accedu/api/react";
 import { formatAmount, formatDateVN, todayVN, voucherType } from "@accedu/core";
-import { Link } from "@tanstack/react-router";
+import { Link, Navigate } from "@tanstack/react-router";
 import { Banknote, Building, HandCoins, Receipt, TrendingDown, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, Card, Empty, PageHeader } from "../components/ui";
-import { useTenantCtx } from "../lib/tenant";
+import { COACH_HOME, isCoach, useTenantCtx } from "../lib/tenant";
 import { STATUS_BADGE } from "../features/vouchers/config";
 
 const ALL_TYPES = ["PT", "PC", "BC", "BN", "PK", "HDB", "HDV", "HDM", "HMV"] as const;
 
 export function Dashboard() {
+  const { role, slug } = useTenantCtx();
+  // HLV không xem số liệu kế toán: vào thẳng Điểm danh
+  if (isCoach(role)) return <Navigate to="/$tenant/$" params={{ tenant: slug, _splat: COACH_HOME }} replace />;
+  return <AccountingDashboard />;
+}
+
+function AccountingDashboard() {
   const { tenant, slug } = useTenantCtx();
   const today = todayVN();
   const from = `${today.slice(0, 4)}-01-01`;

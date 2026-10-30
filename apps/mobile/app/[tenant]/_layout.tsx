@@ -21,6 +21,8 @@ export default function TenantLayout() {
       <Stack.Screen name="receivables" options={{ title: "Công nợ phải thu" }} />
       <Stack.Screen name="stock" options={{ title: "Tồn kho" }} />
       <Stack.Screen name="tuition" options={{ title: "Học phí" }} />
+      <Stack.Screen name="classes" options={{ title: "Lớp của tôi" }} />
+      <Stack.Screen name="attendance" options={{ title: "Điểm danh" }} />
     </Stack>
   );
 }

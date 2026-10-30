@@ -1,5 +1,5 @@
 import { findFeature } from "@accedu/core";
-import { useParams } from "@tanstack/react-router";
+import { Navigate, useParams } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 import type { ComponentType } from "react";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
@@ -14,7 +14,10 @@ import { UsersPage } from "../features/system/UsersPage";
 import { PartnersPage } from "../features/catalogs/PartnersPage";
 import { ClassesPage } from "../features/education/ClassesPage";
 import { StudentsPage } from "../features/education/StudentsPage";
+import { AttendancePage } from "../features/education/AttendancePage";
+import { RevenueAllocationPage } from "../features/education/RevenueAllocationPage";
 import { TuitionPage } from "../features/education/TuitionPage";
+import { COACH_HOME, isCoach, useTenantCtx } from "../lib/tenant";
 import { GeneralJournalPage } from "../features/reports/GeneralJournalPage";
 import { GrossProfitPage } from "../features/reports/GrossProfitPage";
 import { LedgerPage } from "../features/reports/LedgerPage";
@@ -63,6 +66,8 @@ const PAGES: Record<string, ComponentType> = {
   "education/students": StudentsPage,
   "education/classes": ClassesPage,
   "education/tuition": TuitionPage,
+  "education/attendance": AttendancePage,
+  "education/revenue": RevenueAllocationPage,
   "purchase/aging": () => <AgingPage side="payable" />,
   "general/vat-out": () => <VatListingPage direction="out" />,
   "general/vat-in": () => <VatListingPage direction="in" />,
@@ -79,6 +84,8 @@ const PAGES: Record<string, ComponentType> = {
 
 export function FeaturePage() {
   const { _splat: path = "" } = useParams({ strict: false }) as { _splat?: string };
+  const { role, slug } = useTenantCtx();
+  if (isCoach(role) && path !== COACH_HOME) return <Navigate to="/$tenant/$" params={{ tenant: slug, _splat: COACH_HOME }} replace />;
   const Page = PAGES[path];
   if (Page) return <Page />;
   const f = findFeature(path);

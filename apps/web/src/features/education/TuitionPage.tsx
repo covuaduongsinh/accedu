@@ -182,7 +182,7 @@ export function TuitionPage() {
         rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
         onSelectionChanged={(e) => setSelected(e.api.getSelectedRows())}
         pinnedBottomRowData={[
-          { class_code: "", student_name: "Tổng cộng", amount: sum("amount"), paid: sum("paid"), remaining: sum("remaining") } as unknown as TuitionStatusRow,
+          { bill_id: "tong-cong", class_code: "", student_name: "Tổng cộng", amount: sum("amount"), paid: sum("paid"), remaining: sum("remaining") } as unknown as TuitionStatusRow,
         ]}
       />
       <Modal open={preview !== null} extraWide title={`Lập học phí tháng ${month.slice(5)}/${month.slice(0, 4)}`} onClose={() => setPreview(null)}>

@@ -13,6 +13,41 @@ export type BillingMode = keyof typeof BILLING_MODES;
 export const ENROLLMENT_STATUS = { active: "Đang học", paused: "Bảo lưu", finished: "Kết thúc", dropped: "Nghỉ học" } as const;
 export type EnrollmentStatus = keyof typeof ENROLLMENT_STATUS;
 
+/** Điểm danh: có mặt và vắng không phép trừ buổi; vắng có phép không trừ (học bù) */
+export const ATTENDANCE_STATUS = { present: "Có mặt", absent: "Vắng", excused: "Có phép" } as const;
+export type AttendanceStatus = keyof typeof ATTENDANCE_STATUS;
+export const countsAsSession = (status: AttendanceStatus | null | undefined): boolean => status === "present" || status === "absent";
+
+/** Còn ≤ 2 buổi thì báo sắp hết khóa */
+export const COURSE_ENDING_SESSIONS = 2;
+
+/** Nhãn số buổi còn lại của học viên lớp theo khóa */
+export function remainingLabel(remaining: number | null | undefined): string {
+  if (remaining == null) return "";
+  if (remaining < 0) return `Vượt ${-remaining} buổi`;
+  if (remaining === 0) return "Hết khóa";
+  return `Còn ${remaining} buổi`;
+}
+
+/**
+ * Doanh thu lớp theo khóa ghi nhận trong tháng (cùng công thức với allocate_tuition_revenue):
+ * lũy kế = học phí × số buổi đã học đến hết tháng / số buổi của khóa (đủ buổi thì trọn học phí),
+ * trừ phần đã ghi nhận các tháng trước; không vượt phần học phí chưa phân bổ.
+ */
+export function recognizeCourse(input: {
+  fee: number;
+  sessions: number;
+  usedThrough: number;
+  recognizedBefore: number;
+  recognizedOther?: number;
+}): number {
+  const { fee, sessions, usedThrough, recognizedBefore } = input;
+  if (sessions <= 0 || fee <= 0) return 0;
+  const target = usedThrough >= sessions ? fee : Math.round((fee * usedThrough) / sessions);
+  const cap = fee - (input.recognizedOther ?? recognizedBefore);
+  return Math.max(0, Math.min(cap, target - recognizedBefore));
+}
+
 /** "Tốt", "tot", "TỐT", "Cấp Mã" → mã cấp; trống → null; không nhận ra → undefined */
 export function parseLevel(text: string | null | undefined): ChessLevel | null | undefined {
   const t = stripDiacritics(String(text ?? ""))
@@ -60,6 +95,7 @@ export const classSchema = z
     schedule: optionalText(128, "Lịch học"),
     location: optionalText(128, "Địa điểm"),
     coachPartnerId: z.uuid().nullish(),
+    coachUserId: z.uuid().nullish(),
     capacity: z.number().int().positive().nullish(),
     startDate: z.iso.date().optional().or(z.literal("")),
     endDate: z.iso.date().optional().or(z.literal("")),

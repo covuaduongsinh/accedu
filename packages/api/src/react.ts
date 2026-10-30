@@ -239,6 +239,65 @@ export function useTuitionStatus(tenantId: string | undefined, opts: { classId?:
   });
 }
 
+export function useMyClasses(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.myClasses(tenantId ?? ""), queryFn: () => api.myClasses(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useRoster(tenantId: string | undefined, classId: string | null | undefined, date: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.roster(tenantId ?? "", classId ?? "", date),
+    queryFn: () => api.classRoster(db, tenantId as string, classId as string, date),
+    enabled: !!tenantId && !!classId,
+  });
+}
+
+export function useAttendanceReport(tenantId: string | undefined, classId: string | null | undefined, month: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.attendance(tenantId ?? "", classId ?? "", month),
+    queryFn: () => api.attendanceReport(db, tenantId as string, classId as string, month),
+    enabled: !!tenantId && !!classId,
+  });
+}
+
+/** Ghi điểm danh: thử lại khi mạng chập chờn, xong thì làm mới danh sách lớp / điểm danh / số buổi */
+export function useRecordAttendance(tenantId: string | undefined) {
+  const db = useDb();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { classId: string; date: string; rows: Parameters<typeof api.recordAttendance>[4]; topic?: string | null }) =>
+      api.recordAttendance(db, tenantId as string, v.classId, v.date, v.rows, v.topic),
+    retry: 3,
+    onSuccess: () => invalidateAttendance(qc, tenantId ?? ""),
+  });
+}
+
+export function useCourseBalance(tenantId: string | undefined, classId?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "course-balance", classId ?? ""),
+    queryFn: () => api.courseBalance(db, tenantId as string, classId),
+    enabled: !!tenantId,
+  });
+}
+
+export function useDeferredTuition(tenantId: string | undefined, asOf?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "deferred-tuition", asOf ?? ""),
+    queryFn: () => api.deferredTuition(db, tenantId as string, asOf),
+    enabled: !!tenantId,
+  });
+}
+
+function invalidateAttendance(qc: QueryClient, tenantId: string) {
+  for (const key of [["roster", tenantId], ["attendance", tenantId], qk.myClasses(tenantId), ["report", tenantId]]) {
+    void qc.invalidateQueries({ queryKey: key });
+  }
+}
+
 export function useStockBalances(tenantId: string | undefined, asOf?: string | null) {
   const db = useDb();
   return useQuery({
@@ -317,6 +376,9 @@ const SYNC_TABLES = [
   "classes",
   "enrollments",
   "tuition_bills",
+  "class_sessions",
+  "attendance",
+  "tuition_recognitions",
 ] as const;
 
 /**
@@ -403,7 +465,11 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "enrollments":
       return inv(qk.enrollments(tenantId));
     case "tuition_bills":
+    case "tuition_recognitions":
       return inv(["report", tenantId]);
+    case "class_sessions":
+    case "attendance":
+      return invalidateAttendance(qc, tenantId);
     case "items":
       return inv(qk.items(tenantId));
     case "warehouses":

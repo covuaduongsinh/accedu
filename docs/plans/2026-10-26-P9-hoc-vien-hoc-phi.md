@@ -201,3 +201,35 @@ Có sẵn để dùng lại:
 - Lớp theo khóa lập học phí một lần cho mỗi ghi danh; gia hạn khóa mới bằng một ghi danh mới (tự động gia hạn sẽ làm ở P9b cùng số buổi còn lại).
 
 Tổng số test: core 128, api 3, CSDL 97, E2E 13.
+
+---
+
+## Kết quả đợt P9b (26/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Migration 0014: vai trò HLV, điểm danh, số buổi còn lại, gia hạn khóa, phân bổ doanh thu 3387 → 5113 | Xong | Test CSDL `attendance.test.ts` (6 test); 97 test cũ giữ xanh |
+| Core: trạng thái điểm danh, `recognizeCourse` (chia học phí theo buổi, buổi cuối nhận phần dư), nhãn số buổi | Xong | `education.test.ts` (+2 test) |
+| Web: vai trò HLV (chỉ thấy Điểm danh), Điểm danh (buổi + bảng tháng), Phân bổ doanh thu học phí, Lớp học (HLV điểm danh, số buổi, gia hạn khóa) | Xong | E2E 14/14 trên Supabase local |
+| Mobile: HLV đăng nhập vào thẳng *Lớp của tôi* → điểm danh buổi hôm nay | Xong | Typecheck, bundle Expo trong CI |
+| Edge Function `admin-users` nhận vai trò `coach` | Xong | E2E tạo tài khoản HLV |
+
+**Test CSDL `attendance.test.ts` kiểm:**
+- HLV thấy đơn vị (`my_tenants`) và lớp mình phụ trách; không đọc được `vouchers`, `voucher_lines`, `gl_entries`, `partners`, `accounts`, `tuition_bills`, `enrollments`, `classes`, `student_profiles`, `rpt_tuition_status`; không lập chứng từ, không xem danh sách người dùng; HLV khác không thấy lớp;
+- điểm danh: ghi / sửa một buổi, HLV đọc được buổi học lớp mình; chặn ngày tương lai, học viên ngoài lớp, lớp không phụ trách, người chỉ xem; bỏ hết điểm danh thì xóa buổi;
+- lớp khóa 3 buổi: vắng có phép không trừ; học vượt → *Vượt 1 buổi*; gia hạn khóa (ngày bắt đầu = buổi vượt đầu tiên) → khóa cũ còn 0, khóa mới đã học 1; lập học phí khóa mới;
+- phân bổ: chạy thử không ghi; tháng 1: lớp tháng 2 × 600.000 + lớp khóa 666.667 (2/3 buổi); chạy lại thay phiếu, không nhân đôi; tháng 2: khóa cũ nhận nốt 333.333, khóa mới 333.333 (1/3 buổi); số dư 3387 = 666.667 khớp `rpt_deferred_tuition`;
+- hóa đơn học phí đã phân bổ không bỏ ghi sổ được; tháng khóa sổ chặn phân bổ và sửa điểm danh; ma trận điểm danh tháng cho HLV.
+
+**E2E** (nối tiếp kịch bản học phí P9a):
+1. quản trị tạo tài khoản HLV, gán HLV điểm danh cho lớp TOT-K15;
+2. HLV đăng nhập lần đầu, đổi mật khẩu → vào thẳng Điểm danh, menu chỉ có Đào tạo;
+3. HLV điểm danh HV101 có mặt, HV102 có phép → bảng tháng ✓ / P; mở sổ cái bị chuyển về Điểm danh;
+4. kế toán xem trước và lập phiếu phân bổ tháng: PK 1.200.000 vào 5113; học phí chờ phân bổ 0, khớp sổ cái 3387.
+
+**Khác kế hoạch:**
+- Không lưu `enrollment_id` trên dòng điểm danh: buổi đã trừ được gán lần lượt vào các khóa theo thứ tự vào lớp khi tính (`app.course_sessions`), nên sửa ngày ghi danh hay gia hạn sớm không làm lệch số buổi.
+- Thêm `tuition_recognitions` (phân bổ theo phiếu học phí × tháng) để lập lại tháng không nhân đôi và đối chiếu 3387 theo học viên.
+- Ngày "hôm nay" khi điểm danh tính theo giờ Việt Nam (`app.today_vn()`), máy chủ chạy UTC.
+
+Tổng số test: core 130, api 3, CSDL 103, E2E 14.

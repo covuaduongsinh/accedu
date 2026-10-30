@@ -19,9 +19,17 @@ import type {
   AccountRow,
   AgingRow,
   EInvoiceImportResult,
+  AllocationResult,
+  AttendanceReportRow,
+  AttendanceStatus,
   ClassRow,
+  CourseBalanceRow,
+  DeferredTuitionRow,
   EnrollmentRow,
+  MyClassRow,
   PayTuitionResult,
+  RecordAttendanceResult,
+  RosterRow,
   StudentImportResult,
   StudentRow,
   TuitionGenerateResult,
@@ -223,6 +231,7 @@ export const api = {
           schedule: c.schedule || null,
           location: c.location || null,
           coach_partner_id: c.coachPartnerId || null,
+          coach_user_id: c.coachUserId || null,
           capacity: c.capacity ?? null,
           start_date: c.startDate || null,
           end_date: c.endDate || null,
@@ -278,6 +287,52 @@ export const api = {
     return unwrap(
       await db.rpc("rpt_tuition_status", { p_tenant: tenantId, p_as_of: opts.asOf ?? null, p_class: opts.classId ?? null, p_month: opts.month ?? null }),
     );
+  },
+  /** Lớp của tôi: HLV thấy lớp mình phụ trách; kế toán / quản trị thấy mọi lớp đang mở */
+  async myClasses(db: AccEduClient, tenantId: string): Promise<MyClassRow[]> {
+    return unwrap(await db.rpc("my_classes", { p_tenant: tenantId }));
+  },
+  /** Học viên của lớp tại ngày học kèm điểm danh hôm đó và số buổi còn lại (không có số tiền) */
+  async classRoster(db: AccEduClient, tenantId: string, classId: string, date: string): Promise<RosterRow[]> {
+    return unwrap(await db.rpc("class_roster", { p_tenant: tenantId, p_class: classId, p_date: date }));
+  },
+  /** Ghi điểm danh một buổi; status null = bỏ điểm danh học viên đó */
+  async recordAttendance(
+    db: AccEduClient,
+    tenantId: string,
+    classId: string,
+    date: string,
+    rows: Array<{ studentId: string; status: AttendanceStatus | null; note?: string | null }>,
+    topic?: string | null,
+  ): Promise<RecordAttendanceResult> {
+    return unwrap(
+      await db.rpc("record_attendance", {
+        p_tenant: tenantId,
+        p_class: classId,
+        p_date: date,
+        p_rows: rows.map((r) => ({ student_id: r.studentId, status: r.status, note: r.note ?? null })),
+        p_topic: topic || null,
+      }),
+    );
+  },
+  async attendanceReport(db: AccEduClient, tenantId: string, classId: string, month: string): Promise<AttendanceReportRow[]> {
+    return unwrap(await db.rpc("rpt_attendance", { p_tenant: tenantId, p_class: classId, p_month: month }));
+  },
+  async courseBalance(db: AccEduClient, tenantId: string, classId?: string | null): Promise<CourseBalanceRow[]> {
+    return unwrap(await db.rpc("rpt_course_balance", { p_tenant: tenantId, p_class: classId ?? null }));
+  },
+  /** Gia hạn khóa: kết thúc ghi danh cũ, ghi danh mới cùng học phí (lập học phí khóa mới ở trang Học phí) */
+  async renewCourse(db: AccEduClient, tenantId: string, enrollmentId: string, start?: string | null): Promise<string> {
+    return unwrap(await db.rpc("renew_course", { p_tenant: tenantId, p_enrollment: enrollmentId, p_start: start ?? null }));
+  },
+  /** Phân bổ doanh thu học phí tháng: PK Nợ 3387 / Có 5113; dryRun để xem trước */
+  async allocateTuitionRevenue(db: AccEduClient, tenantId: string, month: string, opts: { post?: boolean; dryRun?: boolean } = {}): Promise<AllocationResult> {
+    return unwrap(
+      await db.rpc("allocate_tuition_revenue", { p_tenant: tenantId, p_month: month, p_post: opts.post ?? true, p_dry_run: opts.dryRun ?? false }),
+    );
+  },
+  async deferredTuition(db: AccEduClient, tenantId: string, asOf?: string | null): Promise<DeferredTuitionRow[]> {
+    return unwrap(await db.rpc("rpt_deferred_tuition", { p_tenant: tenantId, p_as_of: asOf ?? null }));
   },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));
@@ -511,5 +566,8 @@ export const qk = {
   students: (tenantId: string) => ["students", tenantId] as const,
   classes: (tenantId: string) => ["classes", tenantId] as const,
   enrollments: (tenantId: string) => ["enrollments", tenantId] as const,
+  myClasses: (tenantId: string) => ["my-classes", tenantId] as const,
+  roster: (tenantId: string, classId: string, date: string) => ["roster", tenantId, classId, date] as const,
+  attendance: (tenantId: string, classId: string, month: string) => ["attendance", tenantId, classId, month] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,
 };
