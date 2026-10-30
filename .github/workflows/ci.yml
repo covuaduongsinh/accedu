@@ -47,8 +47,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.121.0
-      - name: Khởi động Supabase local (có edge-runtime cho function admin-users)
-        run: supabase start -x studio,imgproxy,logflare,vector,supavisor,mailpit,storage-api,postgres-meta
+      - name: Khởi động Supabase local (edge-runtime cho các Edge Function, Mailpit nhận email nhắc học phí)
+        run: supabase start -x studio,imgproxy,logflare,vector,supavisor,storage-api,postgres-meta
       - name: Cấu hình web + E2E
         run: |
           eval "$(supabase status -o env)"
@@ -57,6 +57,9 @@ jobs:
             echo "E2E_SUPABASE_URL=$API_URL"
             echo "E2E_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "E2E_DB_URL=$DB_URL"
+            echo "E2E_MAILPIT_URL=http://127.0.0.1:54324"
+            echo "E2E_SMTP_HOST=supabase_inbucket_accedu"
+            echo "E2E_SMTP_PORT=1025"
           } >> "$GITHUB_ENV"
       - run: pnpm --filter @accedu/web build
       - run: pnpm --filter @accedu/web exec playwright install --with-deps chromium

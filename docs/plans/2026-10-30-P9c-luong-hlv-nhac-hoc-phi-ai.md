@@ -220,3 +220,22 @@ Workflow `supabase-deploy` đưa các giá trị này vào **Supabase Vault** tr
   - `docs/huong-dan/hoi-dap-ai.md` (mới);
   - ghi kết quả vào kế hoạch này và file tiến độ.
 - **Tương thích:** chỉ thêm bảng, cột, hàm. Migration không lỗi khi thiếu pg_cron, pg_net hoặc Vault.
+
+---
+
+## Kết quả đợt P9c-1 (30/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Migration 0015: hồ sơ HLV, lương tháng (PK 632 / 334 \| 331, TNCN 3335), nhắc học phí, Vault, pg_cron | Xong | `coach-pay.test.ts` (8 test); 103 test cũ giữ xanh. Trên Supabase local: tạo được lịch `accedu-tuition-reminders`, đọc Vault bằng service role |
+| Edge Function `tuition-reminders` (SMTP, VietQR đính kèm, lịch / gửi tay / thư thử) | Xong | Gửi thật tới Mailpit local; `functions-shared.test.ts` (2 test); sai token cron → 401 |
+| Triển khai: secret SMTP / AI → Vault (`app.vault_set`), token cron tự sinh, smoke test | Xong | shellcheck; thử `vault_set` với ký tự đặc biệt |
+| Core / API: email phụ huynh (form + Excel), `contractorPit`, `parseReminderDays`, hook | Xong | Core 132 test |
+| Web: Lương HLV, Gửi email nhắc, cài đặt nhắc, đơn giá lớp, HLV dạy thay; mobile số buổi dạy | Xong | E2E 15/15 |
+
+**Khác kế hoạch:**
+- Không cần `rpt_coach_sessions`: chạy thử `generate_coach_pay` đã trả đủ bảng xem trước.
+- Tên hàm nhật ký là `log_tuition_reminders` (ghi nhiều dòng một lần).
+- Ảnh QR là GIF tạo bằng `qrcode-generator` (cùng thư viện với web), đính kèm CID.
+
+Tổng số test: core 132, api 3, CSDL 113 (+8 lương HLV và nhắc học phí, +2 Edge Function dùng chung), E2E 15.

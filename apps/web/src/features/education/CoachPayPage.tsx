@@ -207,10 +207,9 @@ function PayCard() {
   }
 
   return (
-    <Card
-      title="Lương tháng"
-      actions={
-        <div className="flex items-end gap-2">
+    <Card title="Lương tháng">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="w-48">
           <Input
             type="month"
             aria-label="Tháng lương"
@@ -221,17 +220,21 @@ function PayCard() {
               setResult(null);
             }}
           />
-          <Button variant="secondary" icon={<Eye size={14} />} disabled={busy || !allowed} onClick={() => void run(true)}>
-            Xem trước
-          </Button>
-          {allowed ? (
-            <Button icon={<CalendarCheck size={14} />} disabled={busy || !result?.dry_run || result.coaches.length === 0} onClick={() => void run(false)}>
-              {result?.replaced.length ? "Lập lại phiếu lương" : "Lập phiếu lương"}
-            </Button>
-          ) : null}
         </div>
-      }
-    >
+        <Button variant="secondary" className="whitespace-nowrap" icon={<Eye size={14} />} disabled={busy || !allowed} onClick={() => void run(true)}>
+          Xem trước
+        </Button>
+        {allowed ? (
+          <Button
+            className="whitespace-nowrap"
+            icon={<CalendarCheck size={14} />}
+            disabled={busy || !result?.dry_run || result.coaches.length === 0}
+            onClick={() => void run(false)}
+          >
+            {result?.replaced.length ? "Lập lại phiếu lương" : "Lập phiếu lương"}
+          </Button>
+        ) : null}
+      </div>
       {!result ? (
         <p className="text-sm text-muted">Chọn tháng rồi bấm Xem trước. Phiếu kế toán ngày cuối tháng: Nợ 632 (theo lớp) / Có 334 hoặc 331; cộng tác viên Nợ 331 / Có 3335.</p>
       ) : (
