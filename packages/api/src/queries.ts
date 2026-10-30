@@ -23,6 +23,10 @@ import type {
   AttendanceReportRow,
   AttendanceStatus,
   ClassRow,
+  CoachPayResult,
+  CoachProfileRow,
+  ReminderSendResult,
+  TuitionReminderRow,
   CourseBalanceRow,
   DeferredTuitionRow,
   EnrollmentRow,
@@ -200,6 +204,7 @@ export const api = {
           guardian_name: s.guardianName || null,
           guardian_phone: s.guardianPhone || null,
           phone: s.phone || null,
+          email: s.email || null,
           school: s.school || null,
           address: s.address || null,
           level: s.level || null,
@@ -232,6 +237,7 @@ export const api = {
           location: c.location || null,
           coach_partner_id: c.coachPartnerId || null,
           coach_user_id: c.coachUserId || null,
+          coach_rate: c.coachRate ?? null,
           capacity: c.capacity ?? null,
           start_date: c.startDate || null,
           end_date: c.endDate || null,
@@ -334,6 +340,61 @@ export const api = {
   async deferredTuition(db: AccEduClient, tenantId: string, asOf?: string | null): Promise<DeferredTuitionRow[]> {
     return unwrap(await db.rpc("rpt_deferred_tuition", { p_tenant: tenantId, p_as_of: asOf ?? null }));
   },
+  async coachProfiles(db: AccEduClient, tenantId: string): Promise<CoachProfileRow[]> {
+    return unwrap(await db.from("coach_profiles").select("*").eq("tenant_id", tenantId));
+  },
+  async saveCoachProfile(
+    db: AccEduClient,
+    tenantId: string,
+    partnerId: string,
+    p: { kind: CoachProfileRow["kind"]; sessionRate: number | null; userId: string | null },
+  ): Promise<string> {
+    return unwrap(
+      await db.rpc("save_coach_profile", {
+        p_tenant: tenantId,
+        p_partner: partnerId,
+        p_row: { kind: p.kind, session_rate: p.sessionRate, user_id: p.userId },
+      }),
+    );
+  },
+  /** Dạy thay: đổi HLV nhận lương của buổi học */
+  async setSessionCoach(db: AccEduClient, tenantId: string, sessionId: string, partnerId: string | null) {
+    unwrap(await db.rpc("set_session_coach", { p_tenant: tenantId, p_session: sessionId, p_partner: partnerId }));
+  },
+  /** Lương HLV tháng: PK Nợ 632 / Có 334|331, khấu trừ TNCN cộng tác viên; dryRun để xem trước */
+  async generateCoachPay(db: AccEduClient, tenantId: string, month: string, opts: { dryRun?: boolean } = {}): Promise<CoachPayResult> {
+    return unwrap(await db.rpc("generate_coach_pay", { p_tenant: tenantId, p_month: month, p_post: true, p_dry_run: opts.dryRun ?? false }));
+  },
+  async myCoachSessions(db: AccEduClient, tenantId: string, month: string) {
+    return unwrap(await db.rpc("my_coach_sessions", { p_tenant: tenantId, p_month: month }));
+  },
+  async classSessions(db: AccEduClient, tenantId: string, classId: string, from: string, to: string) {
+    return unwrap(
+      await db.from("class_sessions").select("*").eq("tenant_id", tenantId).eq("class_id", classId).gte("held_on", from).lte("held_on", to),
+    );
+  },
+  async tuitionReminders(db: AccEduClient, tenantId: string, limit = 100): Promise<TuitionReminderRow[]> {
+    return unwrap(
+      await db.from("tuition_reminders").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(limit),
+    );
+  },
+  /** Email thông báo học phí có mã VietQR: xem trước (dryRun), gửi các học viên chọn (hoặc mọi học viên còn nợ), hoặc thư thử */
+  async sendTuitionReminders(
+    db: AccEduClient,
+    tenantId: string,
+    opts: { studentIds?: string[] | null; dryRun?: boolean; testTo?: string | null } = {},
+  ): Promise<ReminderSendResult> {
+    const { data, error } = await db.functions.invoke<ReminderSendResult>("tuition-reminders", {
+      body: { tenant_id: tenantId, student_ids: opts.studentIds ?? null, dry_run: opts.dryRun ?? false, test_to: opts.testTo ?? null },
+    });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      const body = ctx ? ((await ctx.json().catch(() => null)) as { message?: string } | null) : null;
+      throw new Error(body?.message ?? error.message);
+    }
+    if (!data) throw new Error("Máy chủ không trả kết quả");
+    return data;
+  },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));
   },
@@ -413,7 +474,23 @@ export const api = {
   async updateTenant(
     db: AccEduClient,
     id: string,
-    patch: Partial<Pick<TenantRow, "name" | "tax_code" | "address" | "phone" | "email" | "start_date" | "bank_bin" | "bank_account_no" | "bank_account_name">>,
+    patch: Partial<
+      Pick<
+        TenantRow,
+        | "name"
+        | "tax_code"
+        | "address"
+        | "phone"
+        | "email"
+        | "start_date"
+        | "bank_bin"
+        | "bank_account_no"
+        | "bank_account_name"
+        | "reminder_enabled"
+        | "reminder_days"
+        | "reminder_reply_to"
+      >
+    >,
   ): Promise<TenantRow> {
     return unwrap(await db.from("tenants").update(patch).eq("id", id).select().single());
   },
@@ -567,6 +644,8 @@ export const qk = {
   classes: (tenantId: string) => ["classes", tenantId] as const,
   enrollments: (tenantId: string) => ["enrollments", tenantId] as const,
   myClasses: (tenantId: string) => ["my-classes", tenantId] as const,
+  coachProfiles: (tenantId: string) => ["coach-profiles", tenantId] as const,
+  reminders: (tenantId: string) => ["tuition-reminders", tenantId] as const,
   roster: (tenantId: string, classId: string, date: string) => ["roster", tenantId, classId, date] as const,
   attendance: (tenantId: string, classId: string, month: string) => ["attendance", tenantId, classId, month] as const,
   report: (tenantId: string, name: string, ...args: string[]) => ["report", tenantId, name, ...args] as const,

@@ -92,6 +92,7 @@ export interface StudentImportRow {
   birth_date?: string;
   guardian_name?: string;
   guardian_phone?: string;
+  email?: string;
   school?: string;
   level?: ChessLevel;
   address?: string;
@@ -739,6 +740,11 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
         fail(r, "Cấp phải là Tốt, Mã, Tượng, Xe, Hậu hoặc Vua");
         continue;
       }
+      const email = text(cells, "email");
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        fail(r, `Email phụ huynh không hợp lệ: ${email}`);
+        continue;
+      }
       const classCode = text(cells, "classCode").toUpperCase();
       if (classCode && ctx.classes && !classes.has(classCode)) {
         fail(r, `Chưa có lớp ${classCode} — thêm ở Đào tạo › Lớp học`);
@@ -752,6 +758,7 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
         ...optField("birth_date", birth),
         ...optField("guardian_name", text(cells, "guardianName")),
         ...optField("guardian_phone", text(cells, "guardianPhone")),
+        ...optField("email", email),
         ...optField("school", text(cells, "school")),
         ...optField("level", level),
         ...optField("address", text(cells, "address")),

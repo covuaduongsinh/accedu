@@ -298,6 +298,34 @@ function invalidateAttendance(qc: QueryClient, tenantId: string) {
   }
 }
 
+export function useCoachProfiles(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.coachProfiles(tenantId ?? ""), queryFn: () => api.coachProfiles(db, tenantId as string), enabled: !!tenantId });
+}
+
+export function useMyCoachSessions(tenantId: string | undefined, month: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: ["my-coach-sessions", tenantId ?? "", month],
+    queryFn: () => api.myCoachSessions(db, tenantId as string, month),
+    enabled: !!tenantId,
+  });
+}
+
+export function useClassSessions(tenantId: string | undefined, classId: string | null | undefined, from: string, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: ["attendance", tenantId ?? "", classId ?? "", "sessions", from, to],
+    queryFn: () => api.classSessions(db, tenantId as string, classId as string, from, to),
+    enabled: !!tenantId && !!classId,
+  });
+}
+
+export function useTuitionReminders(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({ queryKey: qk.reminders(tenantId ?? ""), queryFn: () => api.tuitionReminders(db, tenantId as string), enabled: !!tenantId });
+}
+
 export function useStockBalances(tenantId: string | undefined, asOf?: string | null) {
   const db = useDb();
   return useQuery({
@@ -379,6 +407,9 @@ const SYNC_TABLES = [
   "class_sessions",
   "attendance",
   "tuition_recognitions",
+  "coach_profiles",
+  "coach_pay",
+  "tuition_reminders",
 ] as const;
 
 /**
@@ -470,6 +501,12 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "class_sessions":
     case "attendance":
       return invalidateAttendance(qc, tenantId);
+    case "coach_profiles":
+      return inv(qk.coachProfiles(tenantId));
+    case "coach_pay":
+      return inv(["report", tenantId]);
+    case "tuition_reminders":
+      return inv(qk.reminders(tenantId));
     case "items":
       return inv(qk.items(tenantId));
     case "warehouses":

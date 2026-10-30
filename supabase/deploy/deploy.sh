@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Triển khai CSDL + Edge Function của AccEdu lên Supabase tự host (chạy trên VPS qua SSH, sau inspect.sh).
 # Đầu vào trong thư mục chứa script ($STAGE): deploy.conf, migrations/*.sql, seed.sql, functions/,
-# owner.env (tùy chọn — email/mật khẩu tạm của chủ sở hữu, xóa ngay khi script kết thúc).
+# owner.env (tùy chọn — email/mật khẩu tạm của chủ sở hữu), secrets.env (tùy chọn — SMTP, khóa AI → Supabase Vault);
+# cả hai xóa ngay khi đọc xong.
 # Mật khẩu CSDL và service_role đọc ngay trong container, không rời máy chủ.
 set -euo pipefail
 STAGE=$(cd "$(dirname "$0")" && pwd)
@@ -89,6 +90,37 @@ if [ -f "$STAGE/owner.env" ]; then
   [ -n "$uid" ] || { echo "✗ Không tìm thấy tài khoản $OWNER_EMAIL"; exit 7; }
   printf "select app.bootstrap_owner(:'uid', :'slug', :'name', :'regime', :'start'::date);" |
     psql_db -At -v uid="$uid" -v slug="$TENANT_SLUG" -v name="$TENANT_NAME" -v regime="$TENANT_REGIME" -v start="$TENANT_START" -f -
+fi
+
+log "Cấu hình bí mật (Supabase Vault)"
+if [ "$(psql_db -At -c "select count(*) from pg_extension where extname = 'supabase_vault'")" = 1 ]; then
+  vault_set() { # tên, giá trị — giá trị đi qua stdin của psql, không xuất hiện trên dòng lệnh hay log
+    case "$2" in *'$v$'*) echo "✗ Giá trị bí mật $1 chứa ký tự không hỗ trợ"; return 1 ;; esac
+    printf "select app.vault_set('%s', \$v\$%s\$v\$);" "$1" "$2" | psql_db -At -f - >/dev/null
+    echo "  ✓ $1"
+  }
+  vault_set accedu_functions_url "$SUPABASE_URL"
+  if [ "$(psql_db -At -c "select count(*) from vault.secrets where name = 'accedu_cron_token'")" = 0 ]; then
+    vault_set accedu_cron_token "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  else
+    echo "  · accedu_cron_token (đã có)"
+  fi
+  if [ -f "$STAGE/secrets.env" ]; then
+    # shellcheck source=/dev/null
+    . "$STAGE/secrets.env"
+    rm -f "$STAGE/secrets.env"
+    [ -n "${SMTP_HOST:-}" ] && vault_set accedu_smtp_host "$SMTP_HOST"
+    [ -n "${SMTP_PORT:-}" ] && vault_set accedu_smtp_port "$SMTP_PORT"
+    [ -n "${SMTP_USER:-}" ] && vault_set accedu_smtp_user "$SMTP_USER"
+    [ -n "${SMTP_PASSWORD:-}" ] && vault_set accedu_smtp_password "$SMTP_PASSWORD"
+    [ -n "${SMTP_FROM:-}" ] && vault_set accedu_smtp_from "$SMTP_FROM"
+    [ -n "${ANTHROPIC_API_KEY:-}" ] && vault_set accedu_anthropic_api_key "$ANTHROPIC_API_KEY"
+    unset SMTP_PASSWORD ANTHROPIC_API_KEY
+  fi
+  have=$(psql_db -At -c "select string_agg(name, ', ' order by name) from vault.secrets where name like 'accedu\_%'")
+  echo "  Đang có: ${have:-—}"
+else
+  echo "⚠ Chưa có Supabase Vault — bỏ qua (email nhắc học phí, AI hỏi đáp sẽ báo chưa cấu hình)"
 fi
 
 log "Xong"

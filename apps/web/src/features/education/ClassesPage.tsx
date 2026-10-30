@@ -275,6 +275,7 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
     location: cls?.location ?? "",
     coachCode: coaches.find((c) => c.id === cls?.coach_partner_id)?.code ?? "",
     coachUserId: cls?.coach_user_id ?? "",
+    coachRate: cls?.coach_rate != null ? formatAmount(Number(cls.coach_rate)) : "",
     startDate: cls?.jobs.start_date ?? "",
     endDate: cls?.jobs.end_date ?? "",
     isActive: cls?.jobs.is_active ?? true,
@@ -295,6 +296,7 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
       location: form.location,
       coachPartnerId: coach?.id ?? null,
       coachUserId: form.coachUserId || null,
+      coachRate: form.coachRate.trim() ? (parseAmount(form.coachRate) ?? -1) : null,
       startDate: form.startDate,
       endDate: form.endDate,
       isActive: form.isActive,
@@ -366,6 +368,9 @@ function ClassForm({ cls, onDone }: { cls: ClassRow | null; onDone: () => void }
       </Field>
       <Field label="HLV (mã nhân viên)" hint="Đối tượng là nhân viên — tính lương sau này">
         <Input list={listId} value={form.coachCode} onChange={(e) => set({ coachCode: e.target.value })} />
+      </Field>
+      <Field label="Đơn giá buổi dạy của lớp" hint="Trống = theo đơn giá của HLV (Lương HLV)">
+        <Input aria-label="Đơn giá buổi dạy của lớp" className="num text-right" value={form.coachRate} onChange={(e) => set({ coachRate: e.target.value })} />
       </Field>
       <Field label="HLV điểm danh (tài khoản)" hint="Tài khoản vai trò Huấn luyện viên — tạo ở Hệ thống › Người dùng">
         <Select aria-label="HLV điểm danh" value={form.coachUserId} onChange={(e) => set({ coachUserId: e.target.value })}>

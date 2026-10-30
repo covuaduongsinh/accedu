@@ -15,6 +15,14 @@ const password = "VuiTriTue@2026";
 const slug = `ds-${stamp}`;
 const staffEmail = `ketoan-${stamp}@duongsinh.test`;
 const coachEmail = `hlv-${stamp}@duongsinh.test`;
+const parentEmail = `phuhuynh-${stamp}@duongsinh.test`;
+/**
+ * Hộp thư thử của Supabase local (Mailpit): API đọc thư; SMTP trong mạng docker cho Edge Function.
+ * SMTP_HOST là IP container Mailpit (CI tự lấy): Deno không phân giải được tên container có dấu "_".
+ */
+const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
+const SMTP_HOST = process.env.E2E_SMTP_HOST ?? "supabase_inbucket_accedu";
+const SMTP_PORT = process.env.E2E_SMTP_PORT ?? "1025";
 
 /** Tài khoản do quản trị cấp: chủ sở hữu tạo bằng GoTrue admin API (như workflow triển khai) + app.bootstrap_owner */
 test.beforeAll(async () => {
@@ -37,6 +45,19 @@ test.beforeAll(async () => {
   execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-qc", `select app.bootstrap_owner('${user.id}', 'goc-${stamp}', 'Đơn vị gốc E2E')`], {
     stdio: "inherit",
   });
+  // Hộp thư gửi email nhắc học phí → Mailpit local (như deploy ghi Vault trên VPS)
+  execFileSync(
+    "psql",
+    [
+      dbUrl,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-qc",
+      `select app.vault_set('accedu_smtp_host', '${SMTP_HOST}'), app.vault_set('accedu_smtp_port', '${SMTP_PORT}'),
+              app.vault_set('accedu_smtp_from', 'no-reply@duongsinh.test')`,
+    ],
+    { stdio: "inherit" },
+  );
 });
 
 async function changeTempPassword(page: Page, newPassword: string) {
@@ -693,5 +714,81 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByTestId("deferred-ledger")).toHaveText("0");
     await expect(page.getByText("Khớp sổ cái")).toBeVisible();
     await shot(page, "35-phan-bo-doanh-thu");
+  });
+
+  test("lương HLV theo buổi dạy (cộng tác viên khấu trừ TNCN), email nhắc học phí có mã VietQR", async ({ page }) => {
+    await signIn(page);
+    const dialog = page.getByRole("dialog");
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+
+    // HLV là đối tượng nhân viên
+    await page.goto(`/${slug}/sales/customers`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await page.getByLabel("Mã", { exact: true }).fill("GV01");
+    await page.getByLabel("Tên", { exact: true }).fill("HLV Cộng tác Mẫu");
+    await page.getByLabel("Nhân viên").check();
+    await page.getByRole("button", { name: "Lưu" }).click();
+    await expect(page.getByRole("gridcell", { name: "HLV Cộng tác Mẫu" })).toBeVisible();
+
+    // Khai báo HLV: cộng tác viên 2.500.000 đ/buổi, gắn tài khoản điểm danh của HLV
+    await page.goto(`/${slug}/education/coach-pay`);
+    await page.getByRole("button", { name: "Khai báo HLV" }).click();
+    await dialog.getByLabel("Mã nhân viên HLV").fill("GV01");
+    await dialog.getByLabel("Loại HLV").selectOption("contractor");
+    await dialog.getByLabel("Đơn giá buổi").fill("2500000");
+    await dialog.getByLabel("Tài khoản điểm danh của HLV").selectOption({ label: "HLV Mẫu E2E · Huấn luyện viên" });
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByText("Đã lưu HLV GV01")).toBeVisible();
+
+    // Buổi hôm nay HLV điểm danh trước khi khai báo → kế toán gán HLV dạy
+    await page.goto(`/${slug}/education/attendance`);
+    await page.getByLabel("Lớp điểm danh").selectOption({ label: "TOT-K15 — Lớp Tốt K15 — chiều chủ nhật" });
+    await page.getByLabel("HLV dạy buổi này").selectOption({ label: "GV01 — HLV Cộng tác Mẫu" });
+    await expect(page.getByText("Đã đổi HLV nhận lương của buổi học")).toBeVisible();
+
+    // Lương tháng này: 1 buổi × 2.500.000, khấu trừ 10% TNCN
+    await page.goto(`/${slug}/education/coach-pay`);
+    await page.getByLabel("Tháng lương").fill(today.slice(0, 7));
+    await page.getByRole("button", { name: "Xem trước" }).click();
+    await expect(page.getByTestId("pay-gross")).toHaveText("2.500.000");
+    await expect(page.getByTestId("pay-pit")).toHaveText("250.000");
+    await expect(page.getByTestId("pay-GV01")).toContainText("TOT-K15: 1 buổi × 2.500.000");
+    await page.getByRole("button", { name: "Lập phiếu lương" }).click();
+    await expect(page.getByText(/Đã lập phiếu lương PK\d+: 2.500.000/)).toBeVisible();
+    await shot(page, "36-luong-hlv");
+
+    // Email phụ huynh của HV102
+    await page.goto(`/${slug}/education/students`);
+    await page.locator(".ag-row", { hasText: "HV102" }).getByRole("gridcell", { name: "HV102" }).dblclick();
+    await dialog.getByLabel("Email phụ huynh").fill(parentEmail);
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByText("Đã lưu học viên")).toBeVisible();
+
+    // Gửi email nhắc học phí: xem trước rồi gửi
+    await page.goto(`/${slug}/education/tuition`);
+    await page.locator(".ag-row", { hasText: "HV102" }).getByRole("gridcell", { name: "HV102" }).click();
+    await page.getByRole("button", { name: "Gửi email nhắc" }).click();
+    await expect(dialog.getByTestId("mail-HV102")).toContainText(parentEmail);
+    await expect(dialog.getByTestId("mail-HV102")).toContainText("Sẽ gửi");
+    await dialog.getByRole("button", { name: "Gửi 1 email" }).click();
+    await expect(page.getByText(/Đã gửi 1 email/)).toBeVisible();
+    await expect(dialog.getByTestId("mail-HV102")).toContainText("Đã gửi");
+    await shot(page, "37-gui-email-nhac");
+
+    // Thư đến hộp thư phụ huynh: tiêu đề, số tiền, mã VietQR đính kèm
+    let msg: { ID: string; Subject: string } | undefined;
+    await expect
+      .poll(async () => {
+        const list = (await (await fetch(`${MAILPIT}/api/v1/messages?limit=50`)).json()) as { messages: Array<{ ID: string; Subject: string; To: Array<{ Address: string }> }> };
+        msg = list.messages.find((m) => m.To.some((t) => t.Address === parentEmail));
+        return msg?.Subject ?? "";
+      })
+      .toContain("Thông báo học phí Học viên Mẫu Khang");
+    const detail = (await (await fetch(`${MAILPIT}/api/v1/message/${msg!.ID}`)).json()) as { Text: string; Inline: Array<{ FileName: string }> };
+    expect(detail.Text).toContain("600.000 đ");
+    expect(detail.Text).toMatch(/Nội dung: HP HV102 DV\d+/);
+    expect(detail.Inline.map((i) => i.FileName)).toEqual(["vietqr.gif"]);
+    await page.goto(`${MAILPIT}/view/${msg!.ID}.html`);
+    await shot(page, "38-email-phu-huynh");
   });
 });

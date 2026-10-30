@@ -154,8 +154,69 @@ Cách tính:
 
 > Hóa đơn học phí đã được phân bổ doanh thu thì không bỏ ghi sổ / xóa được. Cần sửa thì xóa phiếu phân bổ tháng đó trước (*Tổng hợp › Phiếu kế toán*), sửa hóa đơn, rồi lập lại phân bổ.
 
-## Sắp có (đợt P9c)
+## 12. Lương HLV theo buổi dạy
 
-- Lương HLV theo số buổi dạy (từ điểm danh).
-- Nhắc học phí qua Zalo / SMS cho phụ huynh chưa đóng.
-- Hỏi đáp số liệu học viên, học phí bằng AI.
+Cuối tháng, cô Lan tính lương cho thầy Hùng (nhân viên, 150.000 đ/buổi) và cô Mai (cộng tác viên, 200.000 đ/buổi). Số buổi lấy từ điểm danh, cô không phải đếm tay.
+
+**Khai báo HLV (làm một lần).** Vào *Đào tạo › Lương HLV*, bấm **Khai báo HLV**:
+- **Mã nhân viên:** đối tượng trong danh mục. Chưa có thì thêm ở *Bán hàng › Khách hàng › Mới*, tích **Nhân viên**.
+- **Loại:**
+  - *Nhân viên*: lương ghi Có 334 (TT99: 3341).
+  - *Cộng tác viên*: lương ghi Có 331; tổng tháng từ **2.000.000 đ** thì khấu trừ **10% thuế TNCN** (Có 3335).
+- **Đơn giá mỗi buổi.** Lớp có đơn giá riêng thì khai ở *Lớp học › Sửa › Đơn giá buổi dạy của lớp*; đơn giá của lớp được ưu tiên.
+- **Tài khoản điểm danh:** tài khoản đăng nhập của HLV (mục 8). Buổi do tài khoản này điểm danh được tính lương cho HLV đó.
+
+**Buổi được tính lương** là buổi có điểm danh. Lương của buổi được tính cho HLV đã điểm danh; nếu kế toán điểm danh thay thì tính cho HLV phụ trách lớp.
+
+Khi có người **dạy thay**: vào *Điểm danh*, chọn lớp và ngày, đổi ô **HLV dạy**.
+
+**Lập lương tháng:**
+1. Chọn **Tháng**, bấm **Xem trước**. Mỗi HLV một dòng: số buổi × đơn giá theo từng lớp, tổng lương, thuế TNCN, thực nhận.
+2. Nếu còn buổi **chưa có HLV nhận lương**, AccEdu liệt kê để gán trước.
+3. Bấm **Lập phiếu lương**. AccEdu lập và ghi sổ một phiếu kế toán ngày cuối tháng:
+
+| Nợ | Có | Ghi chú |
+|---|---|---|
+| 632 (vụ việc = lớp) | 334 / 3341 | HLV nhân viên |
+| 632 (vụ việc = lớp) | 331 | HLV cộng tác viên |
+| 331 | 3335 | Khấu trừ 10% TNCN (cộng tác viên ≥ 2.000.000 đ) |
+
+Ví dụ cô Mai dạy 13 buổi = 2.700.000 đ: khấu trừ 270.000 đ, thực nhận 2.430.000 đ.
+
+- Vì Nợ 632 mang mã lớp, báo cáo theo vụ việc cho thấy doanh thu học phí (5113) trừ lương HLV (632) của từng lớp.
+- Điểm danh sửa sau đó thì bấm **Lập lại phiếu lương**: phiếu cũ được thay, không nhân đôi. Tháng đã khóa sổ thì không lập lại được.
+- Trả lương bằng *Phiếu chi* / *Giấy báo nợ* như bình thường (Nợ 334 hoặc 331, đối tượng là HLV).
+- HLV xem được **số buổi mình dạy trong tháng** trên điện thoại, không xem số tiền.
+
+## 13. Email nhắc học phí
+
+AccEdu gửi email **Thông báo học phí** cho phụ huynh còn nợ. Mỗi email gồm:
+- các khoản còn phải đóng, tổng tiền;
+- tài khoản nhận và **mã VietQR đúng số tiền**, kèm nội dung chuyển khoản.
+
+Phụ huynh mở thư trên điện thoại là quét chuyển khoản được ngay.
+
+**Chuẩn bị:**
+1. **Email phụ huynh:** *Đào tạo › Học viên › Sửa › Email phụ huynh*, hoặc cột *Email phụ huynh* khi nhập từ Excel.
+2. **Hộp thư gửi (làm một lần):** Thầy thêm vào GitHub (*Settings › Environments › SUPABASE_URL › Secrets*) các secret sau, rồi chạy lại workflow **Supabase deploy (VPS)**:
+   - `ACCEDU_SMTP_HOST`, `ACCEDU_SMTP_PORT`, `ACCEDU_SMTP_USER`, `ACCEDU_SMTP_PASSWORD`, `ACCEDU_SMTP_FROM`.
+   - Với Gmail: host `smtp.gmail.com`, cổng `465`, tài khoản là địa chỉ Gmail.
+   - Mật khẩu là **mật khẩu ứng dụng** 16 ký tự: Tài khoản Google › Bảo mật › Xác minh 2 bước › Mật khẩu ứng dụng.
+   - Mật khẩu chỉ nằm trong GitHub và kho bí mật (Vault) trên máy chủ, không ghi vào file nào.
+3. **Cài đặt nhắc:** *Hệ thống › Thông tin đơn vị › Nhắc học phí qua email*:
+   - **Ngày nhắc trong tháng** (mặc định 5 và 20);
+   - **Email nhận phản hồi:** phụ huynh bấm Trả lời sẽ gửi về đây;
+   - **Gửi thử** tới email của mình để xem mẫu thư.
+
+**Gửi tay.** Vào *Đào tạo › Học phí*, tích chọn các học viên, bấm **Gửi email nhắc**:
+- AccEdu cho xem trước ai có email, ai *thiếu email* (bỏ qua);
+- bấm **Gửi N email**;
+- kết quả từng phụ huynh hiện ngay, nhật ký ở cuối trang (*Email nhắc học phí gần đây*).
+
+**Gửi tự động.** Tích **Tự động gửi** ở thẻ cài đặt.
+- 8:00 sáng các ngày nhắc, AccEdu gửi cho mọi phụ huynh còn nợ học phí đã ghi sổ.
+- Mỗi học viên nhận tối đa một email tự động mỗi ngày.
+
+## Sắp có (đợt P9c-2)
+
+- Hỏi đáp số liệu học viên, học phí, điểm danh bằng AI (hướng dẫn riêng `hoi-dap-ai.md`).

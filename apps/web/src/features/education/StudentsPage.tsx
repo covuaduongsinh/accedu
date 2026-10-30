@@ -48,6 +48,7 @@ export function StudentsPage() {
       { field: "classes", headerName: "Lớp đang học", width: 160 },
       { field: "student_profiles.guardian_name", headerName: "Phụ huynh", flex: 1, minWidth: 160 },
       { headerName: "Điện thoại", width: 130, valueGetter: (p) => p.data?.student_profiles?.guardian_phone ?? p.data?.phone ?? "" },
+      { field: "email", headerName: "Email phụ huynh", width: 190 },
       { field: "student_profiles.school", headerName: "Trường", width: 160 },
       { field: "is_active", headerName: "Đang học", width: 100, valueFormatter: (p) => (p.value ? "✓" : "") },
     ],
@@ -104,6 +105,7 @@ function StudentForm({ student, onDone }: { student: StudentRow | null; onDone: 
     gender: p?.gender ?? "",
     guardianName: p?.guardian_name ?? student?.contact_name ?? "",
     guardianPhone: p?.guardian_phone ?? student?.phone ?? "",
+    email: student?.email ?? "",
     school: p?.school ?? "",
     level: p?.level ?? "",
     address: student?.address ?? "",
@@ -166,6 +168,9 @@ function StudentForm({ student, onDone }: { student: StudentRow | null; onDone: 
       </Field>
       <Field label="SĐT phụ huynh">
         <Input value={form.guardianPhone} onChange={(e) => set({ guardianPhone: e.target.value })} />
+      </Field>
+      <Field label="Email phụ huynh" hint="Nhận email thông báo học phí có mã VietQR">
+        <Input type="email" aria-label="Email phụ huynh" value={form.email} onChange={(e) => set({ email: e.target.value })} />
       </Field>
       <Field label="Trường">
         <Input value={form.school} onChange={(e) => set({ school: e.target.value })} />

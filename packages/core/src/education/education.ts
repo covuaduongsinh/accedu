@@ -18,6 +18,26 @@ export const ATTENDANCE_STATUS = { present: "Có mặt", absent: "Vắng", excus
 export type AttendanceStatus = keyof typeof ATTENDANCE_STATUS;
 export const countsAsSession = (status: AttendanceStatus | null | undefined): boolean => status === "present" || status === "absent";
 
+/** Loại HLV: nhân viên (lương Có 334) / cộng tác viên (Có 331, khấu trừ thuế TNCN) */
+export const COACH_KINDS = { employee: "Nhân viên", contractor: "Cộng tác viên" } as const;
+export type CoachKind = keyof typeof COACH_KINDS;
+
+/** Cộng tác viên: tổng chi trả một lần (tháng) từ 2.000.000 đ thì khấu trừ 10% thuế TNCN (cùng công thức với generate_coach_pay) */
+export const PIT_THRESHOLD = 2_000_000;
+export function contractorPit(gross: number, kind: CoachKind = "contractor"): number {
+  return kind === "contractor" && gross >= PIT_THRESHOLD ? Math.round(gross * 0.1) : 0;
+}
+
+/** "5, 20" → [5, 20]; ngày nhắc học phí trong tháng 1–28, tối đa 4 ngày */
+export function parseReminderDays(text: string): number[] | string {
+  const parts = text.split(/[\s,;]+/).filter(Boolean);
+  if (!parts.length) return "Nhập ít nhất một ngày nhắc";
+  const days = [...new Set(parts.map(Number))].toSorted((a, b) => a - b);
+  if (days.some((d) => !Number.isInteger(d) || d < 1 || d > 28)) return "Ngày nhắc phải từ 1 đến 28";
+  if (days.length > 4) return "Tối đa 4 ngày nhắc mỗi tháng";
+  return days;
+}
+
 /** Còn ≤ 2 buổi thì báo sắp hết khóa */
 export const COURSE_ENDING_SESSIONS = 2;
 
@@ -76,6 +96,7 @@ export const studentSchema = z.object({
   guardianName: optionalText(128, "Tên phụ huynh"),
   guardianPhone: optionalText(32, "SĐT phụ huynh"),
   phone: optionalText(32, "Điện thoại"),
+  email: z.email("Email phụ huynh không hợp lệ").optional().or(z.literal("")),
   school: optionalText(128, "Trường"),
   address: optionalText(256, "Địa chỉ"),
   level: z.enum(LEVEL_ORDER as [ChessLevel, ...ChessLevel[]]).optional().or(z.literal("")),
@@ -96,6 +117,7 @@ export const classSchema = z
     location: optionalText(128, "Địa điểm"),
     coachPartnerId: z.uuid().nullish(),
     coachUserId: z.uuid().nullish(),
+    coachRate: z.number().min(0, "Đơn giá buổi không được âm").nullish(),
     capacity: z.number().int().positive().nullish(),
     startDate: z.iso.date().optional().or(z.literal("")),
     endDate: z.iso.date().optional().or(z.literal("")),

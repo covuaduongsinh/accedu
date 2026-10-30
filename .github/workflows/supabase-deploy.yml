@@ -9,6 +9,9 @@ name: Supabase deploy (VPS)
 #              SUPABASE_COMPOSE_DIR (thư mục docker compose của stack AccEdu trên VPS; chưa biết thì chạy một lần,
 #              bước kiểm tra sẽ liệt kê), VPS_HOST (mặc định 217.15.160.118), VPS_USER (mặc định root), VPS_PORT (22)
 #   Tùy chọn:  SUPABASE_DB_CONTAINER / SUPABASE_FUNCTIONS_CONTAINER nếu stack không chạy bằng docker compose
+#   Secrets tùy chọn → Supabase Vault trên VPS (Edge Function đọc bằng service role):
+#              ACCEDU_SMTP_HOST, ACCEDU_SMTP_PORT, ACCEDU_SMTP_USER, ACCEDU_SMTP_PASSWORD, ACCEDU_SMTP_FROM (email nhắc học phí),
+#              ANTHROPIC_API_KEY (AI hỏi đáp)
 # Chưa có VPS_SSH_KEY thì workflow bỏ qua (cảnh báo), không lỗi.
 on:
   push:
@@ -69,6 +72,8 @@ jobs:
           HAS_OWNER_PASSWORD: ${{ secrets.ACCEDU_OWNER_PASSWORD != '' }}
           HAS_URL_VAR: ${{ vars.SUPABASE_URL != '' }}
           HAS_COMPOSE_DIR: ${{ vars.SUPABASE_COMPOSE_DIR != '' }}
+          HAS_SMTP: ${{ secrets.ACCEDU_SMTP_HOST != '' && secrets.ACCEDU_SMTP_FROM != '' }}
+          HAS_AI_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
           # Chỉ in có/không — không bao giờ in giá trị
           mark() { [ "$1" = true ] && echo "✓ có" || echo "✗ chưa thấy"; }
@@ -78,6 +83,8 @@ jobs:
           echo "Biến    SUPABASE_URL           $(mark "$HAS_URL_VAR")"
           echo "Biến    SUPABASE_ANON_KEY      $(mark "$([ -n "$SUPABASE_ANON_KEY_RAW" ] && echo true)")"
           echo "Biến    SUPABASE_COMPOSE_DIR   $(mark "$HAS_COMPOSE_DIR")"
+          echo "Secret  ACCEDU_SMTP_* (email)  $(mark "$HAS_SMTP")"
+          echo "Secret  ANTHROPIC_API_KEY      $(mark "$HAS_AI_KEY")"
           echo "(Đặt ở Settings → Environments → SUPABASE_URL, hoặc Settings → Secrets and variables → Actions → mục Repository;"
           echo " không phải Codespaces hay Dependabot.)"
           # Anon key là JWT — không bao giờ có khoảng trắng; dán từ tin nhắn hay bị xuống dòng giữa chừng
@@ -162,12 +169,24 @@ jobs:
         env:
           OWNER_EMAIL: ${{ secrets.ACCEDU_OWNER_EMAIL }}
           OWNER_PASSWORD: ${{ secrets.ACCEDU_OWNER_PASSWORD }}
+          SMTP_HOST: ${{ secrets.ACCEDU_SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.ACCEDU_SMTP_PORT }}
+          SMTP_USER: ${{ secrets.ACCEDU_SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.ACCEDU_SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.ACCEDU_SMTP_FROM }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           if [ -n "$OWNER_EMAIL" ] && [ -n "$OWNER_PASSWORD" ]; then
             printf 'OWNER_EMAIL=%q\nOWNER_PASSWORD=%q\n' "$OWNER_EMAIL" "$OWNER_PASSWORD" |
               ssh vps 'umask 077; cat > /tmp/accedu-deploy/owner.env'
           else
             echo "::notice::Chưa có ACCEDU_OWNER_EMAIL/ACCEDU_OWNER_PASSWORD — bỏ qua tạo chủ sở hữu"
+          fi
+          # Bí mật → Supabase Vault: chỉ đi qua stdin của ssh, file tạm umask 077, deploy.sh xóa ngay khi đọc
+          if [ -n "$SMTP_HOST$SMTP_PORT$SMTP_USER$SMTP_PASSWORD$SMTP_FROM$ANTHROPIC_API_KEY" ]; then
+            printf 'SMTP_HOST=%q\nSMTP_PORT=%q\nSMTP_USER=%q\nSMTP_PASSWORD=%q\nSMTP_FROM=%q\nANTHROPIC_API_KEY=%q\n' \
+              "$SMTP_HOST" "$SMTP_PORT" "$SMTP_USER" "$SMTP_PASSWORD" "$SMTP_FROM" "$ANTHROPIC_API_KEY" |
+              ssh vps 'umask 077; cat > /tmp/accedu-deploy/secrets.env'
           fi
           ssh vps 'bash /tmp/accedu-deploy/deploy.sh'
 
@@ -184,7 +203,10 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/admin-users" \
             -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
           [ "$code" = 401 ] || { echo "::error::Edge Function admin-users trả $code (mong đợi 401)"; exit 1; }
-          echo "✓ $base: REST (bảng tiền tệ), auth (tắt đăng ký), Edge Function admin-users"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/functions/v1/tuition-reminders" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H 'content-type: application/json' -d '{}')
+          [ "$code" = 401 ] || { echo "::error::Edge Function tuition-reminders trả $code (mong đợi 401)"; exit 1; }
+          echo "✓ $base: REST (bảng tiền tệ), auth (tắt đăng ký), Edge Function admin-users, tuition-reminders"
 
       - name: Dọn
         if: always()

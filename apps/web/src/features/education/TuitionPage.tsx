@@ -1,9 +1,9 @@
-import { api, friendlyError, type TuitionGenerateResult, type TuitionStatusRow } from "@accedu/api";
-import { useClasses, useDb, useTuitionStatus } from "@accedu/api/react";
+import { api, friendlyError, type ReminderSendResult, type TuitionGenerateResult, type TuitionStatusRow } from "@accedu/api";
+import { useClasses, useDb, useTuitionReminders, useTuitionStatus } from "@accedu/api/react";
 import { formatAmount, formatDateVN, todayVN } from "@accedu/core";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
-import { Banknote, FileDown, Landmark, QrCode as QrIcon, Receipt } from "lucide-react";
+import { Banknote, FileDown, Landmark, Mail, QrCode as QrIcon, Receipt } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataGrid, amountCol } from "../../components/DataGrid";
@@ -32,6 +32,7 @@ export function TuitionPage() {
   const [postNow, setPostNow] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<TuitionStatusRow[] | null>(null);
+  const [mailing, setMailing] = useState<string[] | null>(null);
   const allowed = canPost(role);
 
   const rows = useMemo(() => (status.data ?? []).filter((r) => !onlyUnpaid || Number(r.remaining) > 0), [status.data, onlyUnpaid]);
@@ -171,6 +172,16 @@ export function TuitionPage() {
           <Button variant="gold" icon={<QrIcon size={14} />} disabled={!selected.length} onClick={() => setNotice(selected)}>
             Thông báo học phí
           </Button>
+          {allowed ? (
+            <Button
+              variant="secondary"
+              icon={<Mail size={14} />}
+              disabled={!selected.length}
+              onClick={() => setMailing([...new Set(selected.filter((r) => Number(r.remaining) > 0).map((r) => r.student_id))])}
+            >
+              Gửi email nhắc
+            </Button>
+          ) : null}
         </div>
       </div>
       <DataGrid<TuitionStatusRow>
@@ -233,6 +244,135 @@ export function TuitionPage() {
         ) : null}
       </Modal>
       {notice ? <TuitionNotice rows={notice} onClose={() => setNotice(null)} /> : null}
+      <Modal open={mailing !== null} wide title="Gửi email thông báo học phí" onClose={() => setMailing(null)}>
+        {mailing ? <ReminderDialog studentIds={mailing} onClose={() => setMailing(null)} /> : null}
+      </Modal>
+      {allowed ? <ReminderLog /> : null}
     </div>
+  );
+}
+
+const REMINDER_STATUS: Record<ReminderSendResult["results"][number]["status"], { label: string; tone: "green" | "red" | "gray" | "gold" }> = {
+  sent: { label: "Đã gửi", tone: "green" },
+  failed: { label: "Lỗi", tone: "red" },
+  skipped: { label: "Bỏ qua", tone: "gray" },
+  preview: { label: "Sẽ gửi", tone: "gold" },
+};
+
+/** Xem trước (ai có / thiếu email) rồi gửi email thông báo học phí có mã VietQR */
+function ReminderDialog({ studentIds, onClose }: { studentIds: string[]; onClose: () => void }) {
+  const { tenant } = useTenantCtx();
+  const db = useDb();
+  const qc = useQueryClient();
+  const preview = useQuery({
+    queryKey: ["reminder-preview", tenant.id, ...studentIds],
+    queryFn: () => api.sendTuitionReminders(db, tenant.id, { studentIds, dryRun: true }),
+    retry: false,
+    gcTime: 0,
+  });
+  const [sent, setSent] = useState<ReminderSendResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const result = sent ?? preview.data ?? null;
+  const loaded = !preview.isLoading;
+
+  async function send() {
+    setBusy(true);
+    try {
+      const r = await api.sendTuitionReminders(db, tenant.id, { studentIds });
+      setSent(r);
+      toast.success(`Đã gửi ${r.sent ?? 0} email${r.failed ? `, lỗi ${r.failed}` : ""}${r.skipped ? `, bỏ qua ${r.skipped} (thiếu email)` : ""}`);
+      await qc.invalidateQueries({ queryKey: ["tuition-reminders", tenant.id] });
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rows = result?.results ?? [];
+  const withEmail = rows.filter((r) => r.email).length;
+  return (
+    <div className="space-y-3 text-sm">
+      {preview.isLoading ? <p className="text-muted">Đang kiểm tra…</p> : null}
+      {preview.error && !sent ? <p className="text-danger">{friendlyError(preview.error)}</p> : null}
+      {result?.dry_run && result.smtp_configured === false ? (
+        <p className="rounded border border-gold-300 bg-gold-50 p-2">
+          Chưa cấu hình hộp thư gửi email (SMTP) trên máy chủ — nhờ quản trị khai báo theo hướng dẫn <b>Nhắc học phí qua email</b>.
+        </p>
+      ) : null}
+      {rows.length ? (
+        <div className="max-h-80 overflow-auto rounded-md border border-line">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-navy-50 text-navy-700">
+              <tr>
+                <th className="px-2 py-1 text-left">Học viên</th>
+                <th className="px-2 text-left">Email phụ huynh</th>
+                <th className="px-2 text-right">Còn nợ</th>
+                <th className="px-2 text-left">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.student_id} className="border-t border-line" data-testid={`mail-${r.student_code}`}>
+                  <td className="px-2 py-1">
+                    {r.student_code} — {r.student_name}
+                  </td>
+                  <td className="px-2">{r.email ?? <span className="text-danger">thiếu email</span>}</td>
+                  <td className="num px-2 text-right">{formatAmount(r.amount)}</td>
+                  <td className="px-2">
+                    <Badge tone={REMINDER_STATUS[r.status].tone}>{r.email || r.status !== "preview" ? REMINDER_STATUS[r.status].label : "Bỏ qua"}</Badge>
+                    {r.error && r.status !== "preview" ? <span className="ml-1 text-muted">{r.error}</span> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : loaded ? (
+        <p className="text-muted">Các học viên đã chọn không còn học phí phải đóng.</p>
+      ) : null}
+      <p className="text-xs text-muted">
+        Mỗi phụ huynh nhận một email: các khoản còn nợ, tổng tiền, tài khoản nhận và mã VietQR đúng số tiền. Thêm email phụ huynh ở Đào tạo › Học viên.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Đóng
+        </Button>
+        {result?.dry_run ? (
+          <Button icon={<Mail size={14} />} disabled={busy || withEmail === 0 || result.smtp_configured === false} onClick={() => void send()}>
+            Gửi {withEmail} email
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Nhật ký email nhắc học phí gần đây */
+function ReminderLog() {
+  const { tenant } = useTenantCtx();
+  const log = useTuitionReminders(tenant.id);
+  const rows = (log.data ?? []).slice(0, 20);
+  if (!rows.length) return null;
+  return (
+    <details className="rounded-md border border-line bg-white p-3 text-sm">
+      <summary className="cursor-pointer font-medium text-navy-700">Email nhắc học phí gần đây ({log.data?.length ?? 0})</summary>
+      <table className="mt-2 w-full text-xs">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-t border-line">
+              <td className="py-1 pr-2">{new Date(r.created_at).toLocaleString("vi-VN")}</td>
+              <td className="pr-2">{r.email ?? "—"}</td>
+              <td className="num pr-2 text-right">{r.amount ? formatAmount(Number(r.amount)) : ""}</td>
+              <td className="pr-2">{r.trigger === "auto" ? "Tự động" : r.trigger === "test" ? "Thư thử" : "Gửi tay"}</td>
+              <td>
+                <Badge tone={REMINDER_STATUS[r.status].tone}>{REMINDER_STATUS[r.status].label}</Badge>
+                {r.error ? <span className="ml-1 text-muted">{r.error}</span> : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }
