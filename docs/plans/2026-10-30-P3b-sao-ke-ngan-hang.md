@@ -154,3 +154,25 @@ Mỗi đợt một PR, Thầy duyệt "merge" như các đợt trước.
 - Chỉ thêm bảng, cột, hàm; migration tương thích ngược.
 - Dữ liệu test giả hoàn toàn. Không commit sao kê thật.
 - Trước khi push: `pnpm check`, `pnpm db:test`, E2E trên Supabase local.
+
+---
+
+## Kết quả đợt P3b (31/10/2026)
+
+| Hạng mục | Trạng thái | Kiểm chứng |
+|---|---|---|
+| Core: đọc sao kê Excel / CSV (tiêu đề Việt / Anh, ghi nợ / ghi có hoặc số tiền có dấu, ngày kèm giờ, ô ngày Excel, dòng thông tin phía trên tiêu đề), khóa chống trùng | Xong | `bank-statement.test.ts` (7 test) |
+| Migration 0017: `bank_statements`, `bank_lines`, gợi ý khớp, xác nhận lập BC, lập BC / BN TK đối ứng tự chọn, gắn / bỏ khớp / bỏ qua, xóa lần nhập, đối chiếu số dư | Xong | `bank.test.ts` (9 test) |
+| Web: *Tiền › Sao kê ngân hàng & đối chiếu* | Xong | E2E 17/17 (kịch bản mới: nhập CSV, xác nhận học phí HV102, BN phí 6422, BC lãi 515, bỏ qua khoản lạ, đối chiếu) |
+| Hỏi AccEdu: tool `bank_reconciliation` | Xong | `ai-agent.test.ts` (+1 test) |
+
+**Lỗi tìm ra khi chạy E2E (đã sửa ở core, dùng chung mọi chức năng nhập CSV):**
+- Đoán dấu phân cách sai khi tệp có dòng tên báo cáo / số tài khoản phía trên tiêu đề (dòng đó không có dấu phân cách). Nay chọn dấu xuất hiện cùng số lần trên nhiều dòng nhất.
+- Dò tiêu đề 2 tầng ghép nhầm dòng ghi chú phía trên. Nay chỉ ghép khi nhận thêm được cột so với dòng dưới đứng một mình.
+
+**Khác kế hoạch:**
+- Gợi ý khớp tính lúc đọc (không lưu), nên luôn theo số liệu mới nhất.
+- Thêm *Xóa lần nhập sao kê* để gỡ tệp nhập nhầm.
+- Chứng từ lập từ sao kê có `source = import`, chứng từ gốc "Sao kê <TK> · <số tham chiếu>".
+
+Tổng số test: core 139, api 3, CSDL 138 (+9 sao kê, +1 tool AI), E2E 17.

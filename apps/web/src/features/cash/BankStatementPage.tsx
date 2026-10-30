@@ -97,8 +97,8 @@ export function BankStatementPage() {
   };
 
   const cols: ColDef<BankLineRow>[] = [
-      dateCol("txn_date", "Ngày", { width: 100 }),
-      { field: "ref", headerName: "Số tham chiếu", width: 120 },
+      dateCol("txn_date", "Ngày", { width: 112 }),
+      { field: "ref", headerName: "Số tham chiếu", width: 135 },
       { field: "description", headerName: "Nội dung", flex: 1, minWidth: 220, tooltipField: "description" },
       amountCol("amount_in", "Tiền vào", { width: 120 }),
       amountCol("amount_out", "Tiền ra", { width: 110 }),

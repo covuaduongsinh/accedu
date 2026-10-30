@@ -55,6 +55,23 @@ describe("đọc sao kê ngân hàng", () => {
     ]);
   });
 
+  it("CSV có dòng thông tin tài khoản phía trên tiêu đề, nội dung có dấu phẩy: vẫn nhận đúng dấu chấm phẩy", () => {
+    const csv = [
+      "SAO KÊ TÀI KHOẢN",
+      "Số tài khoản: 0123456789",
+      "Ngày giao dịch;Số tham chiếu;Nội dung;Ghi nợ;Ghi có;Số dư",
+      "05/10/2026 09:15:00;FT001;MBVCB.1.HP HV102 DV0003, CT tu PHU HUYNH;;600.000;10.600.000",
+      "05/10/2026;FEE01;PHI QUAN LY TAI KHOAN;11.000;;10.589.000",
+    ].join("\r\n");
+    const r = parseBankStatement(parseDelimited(csv));
+    expect(r.ok).toBe(true);
+    expect(r.headerRow).toBe(3);
+    expect(r.lines.map((l) => [l.ref, l.amountIn, l.amountOut, l.description])).toEqual([
+      ["FT001", 600000, 0, "MBVCB.1.HP HV102 DV0003, CT tu PHU HUYNH"],
+      ["FEE01", 0, 11000, "PHI QUAN LY TAI KHOAN"],
+    ]);
+  });
+
   it("báo lỗi theo dòng: ngày sai, số tiền sai; thiếu cột bắt buộc", () => {
     const r = parseBankStatement([
       ["Ngày giao dịch", "Nội dung", "Ghi nợ", "Ghi có"],
