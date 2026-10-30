@@ -19,3 +19,4 @@ export * from "./auth/password";
 export * from "./import/table";
 export * from "./import/specs";
 export * from "./import/validate";
+export * from "./money/bank-statement";
