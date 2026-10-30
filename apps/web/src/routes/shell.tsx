@@ -2,10 +2,11 @@ import { useRealtimeSync, useTenant, useTenants } from "@accedu/api/react";
 import { MODULES, searchFeatures } from "@accedu/core";
 import { getDictionary } from "@accedu/i18n";
 import { Link, Navigate, Outlet, useNavigate, useParams } from "@tanstack/react-router";
-import { Cloud, CloudOff, Home, KeyRound, LogOut, Search } from "lucide-react";
+import { Cloud, CloudOff, Home, KeyRound, LogOut, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDb } from "@accedu/api/react";
 import { Empty } from "../components/ui";
+import { AskPanel } from "../features/ai/AskPanel";
 import { useSession } from "../lib/session";
 import { platform } from "../lib/supabase";
 import { COACH_HOME, ROLE_LABEL, TenantContext, isCoach } from "../lib/tenant";
@@ -21,6 +22,7 @@ export function AppShell() {
   const sync = useRealtimeSync(tenant.data?.id);
   const db = useDb();
   const [online, setOnline] = useState(navigator.onLine);
+  const [askOpen, setAskOpen] = useState(false);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -62,6 +64,13 @@ export function AppShell() {
             <span className="rounded bg-navy-700 px-1.5 py-0.5">/{ctx.slug.toUpperCase()}</span>
             <div className="ml-auto flex items-center gap-3">
               {coach ? null : <FeatureSearch slug={ctx.slug} />}
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded bg-gold-500 px-2 py-0.5 font-semibold text-navy-900 hover:bg-gold-400"
+                onClick={() => setAskOpen((v) => !v)}
+              >
+                <Sparkles size={13} /> Hỏi AccEdu
+              </button>
               <span className="flex items-center gap-1" title={live ? "Đồng bộ thời gian thực" : "Ngoại tuyến — dữ liệu từ bộ nhớ đệm"}>
                 {live ? <Cloud size={14} className="text-gold-300" /> : <CloudOff size={14} className="text-red-200" />}
                 {live ? t.common.online : t.common.offline}
@@ -85,6 +94,7 @@ export function AppShell() {
         <main className="flex-1 p-4">
           <Outlet />
         </main>
+        {askOpen ? <AskPanel onClose={() => setAskOpen(false)} /> : null}
       </div>
     </TenantContext.Provider>
   );

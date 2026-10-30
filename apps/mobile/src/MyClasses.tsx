@@ -26,6 +26,9 @@ export function MyClasses({ slug, tenantId }: { slug: string; tenantId: string |
               Tháng {month.slice(5)}/{month.slice(0, 4)}: {taught} buổi dạy ({mine.data.map((r) => `${r.class_code} ${r.sessions}`).join(", ")})
             </Text>
           ) : null}
+          <Pressable onPress={() => router.push({ pathname: "/[tenant]/ask", params: { tenant: slug } })}>
+            <Text style={{ color: colors.gold[700], fontWeight: "600" }}>✦ Hỏi AccEdu về lớp và buổi dạy của tôi ›</Text>
+          </Pressable>
         </View>
       }
       ListEmptyComponent={

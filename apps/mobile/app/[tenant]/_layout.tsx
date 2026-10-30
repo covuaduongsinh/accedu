@@ -23,6 +23,7 @@ export default function TenantLayout() {
       <Stack.Screen name="tuition" options={{ title: "Học phí" }} />
       <Stack.Screen name="classes" options={{ title: "Lớp của tôi" }} />
       <Stack.Screen name="attendance" options={{ title: "Điểm danh" }} />
+      <Stack.Screen name="ask" options={{ title: "Hỏi AccEdu" }} />
     </Stack>
   );
 }

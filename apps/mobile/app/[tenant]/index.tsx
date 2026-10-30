@@ -45,6 +45,7 @@ function Dashboard({ slug, tenantId }: { slug: string; tenantId: string | undefi
           </View>
         ))}
       </View>
+      <Button gold title="✦ Hỏi AccEdu" onPress={() => router.push({ pathname: "/[tenant]/ask", params: { tenant: slug } })} />
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Button title="+ Phiếu thu" onPress={() => router.push({ pathname: "/[tenant]/quick", params: { tenant: slug, type: "PT" } })} />
