@@ -105,7 +105,10 @@ export function AskPanel({ onClose }: { onClose: () => void }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [turns]);
+  // Thân hàm có ngoặc: scrollIntoView trên Chromium mới trả về Promise, React sẽ coi đó là hàm dọn dẹp và báo lỗi
+  useEffect(() => {
+    if (turns.length > 0) bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [turns]);
 
   function submit(q = question) {
     const text = q.trim();
