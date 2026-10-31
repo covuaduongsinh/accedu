@@ -13,6 +13,8 @@ export interface ImportContext {
   warehouses?: ReadonlyArray<{ code: string }>;
   /** Mã lớp học (nhập danh sách học viên) */
   classes?: ReadonlyArray<{ code: string }>;
+  /** Mã TSCĐ / CCDC đã có (nhập danh sách tài sản) */
+  assets?: ReadonlyArray<{ code: string }>;
   /** Nhập từ trang Khách hàng hay Nhà cung cấp: loại mặc định của đối tượng mới */
   partnerDefault?: "customer" | "supplier";
 }
@@ -100,7 +102,35 @@ export interface StudentImportRow {
   start_date?: string;
 }
 
-export type ImportPayload = AccountImportRow | PartnerImportRow | OpeningImportRow | ItemImportRow | StockOpeningImportRow | StudentImportRow;
+/** Dòng gửi lên import_assets (TSCĐ / CCDC) */
+export interface AssetImportRow {
+  row: number;
+  code: string;
+  name: string;
+  category?: string;
+  department?: string;
+  quantity?: number;
+  uom?: string;
+  acquired_on?: string;
+  start_on: string;
+  cost: number;
+  months: number;
+  opening_accumulated?: number;
+  opening_months?: number;
+  asset_account?: string;
+  accum_account?: string;
+  expense_account?: string;
+  note?: string;
+}
+
+export type ImportPayload =
+  | AccountImportRow
+  | PartnerImportRow
+  | OpeningImportRow
+  | ItemImportRow
+  | StockOpeningImportRow
+  | StudentImportRow
+  | AssetImportRow;
 
 const ITEM_KIND_WORDS: Record<string, NonNullable<ItemImportRow["kind"]>> = {
   "hang hoa": "goods",
@@ -765,6 +795,114 @@ export function buildPreview(kind: ImportKind, table: Table, header: HeaderGuess
         ...optField("class_code", classCode),
         ...optField("start_date", start),
       } as StudentImportRow;
+      r.status = existing.has(code) ? "update" : "new";
+    }
+  }
+
+  if (kind === "fixed-assets" || kind === "tools") {
+    const seen = new Map<string, number>();
+    const existing = new Set((ctx.assets ?? []).map((a) => a.code.toUpperCase()));
+    const text = (cells: readonly Cell[], key: string) => (has(key) ? cellText(raw(cells, key)) : "");
+    const num = (cells: readonly Cell[], key: string) => (text(cells, key) === "" ? undefined : parseLooseAmount(raw(cells, key) ?? null));
+    const verb = kind === "fixed-assets" ? "khấu hao" : "phân bổ";
+    for (const r of rows) {
+      const cells = tableRow(r);
+      const code = codeText(raw(cells, "code")).toUpperCase();
+      const name = text(cells, "name");
+      r.values.code = code;
+      if (!code) {
+        if (looksLikeTotal(Object.values(r.values)) || !name) skip(r, "Không phải dòng tài sản");
+        else fail(r, "Thiếu mã");
+        continue;
+      }
+      if (code.length > 32) {
+        fail(r, "Mã tối đa 32 ký tự");
+        continue;
+      }
+      if (!name) {
+        fail(r, "Thiếu tên");
+        continue;
+      }
+      const dup = seen.get(code);
+      if (dup) {
+        fail(r, `Trùng mã ${code} với dòng ${dup}`);
+        continue;
+      }
+      const start = dateText(raw(cells, "startOn"));
+      const acquired = dateText(raw(cells, "acquiredOn"));
+      if (start === null || acquired === null) {
+        fail(r, "Ngày không hợp lệ (dạng ngày/tháng/năm)");
+        continue;
+      }
+      if (!start) {
+        fail(r, `Thiếu ngày tính ${verb}`);
+        continue;
+      }
+      if (acquired && acquired > start) {
+        fail(r, `Ngày tính ${verb} không được trước ngày ghi tăng`);
+        continue;
+      }
+      const cost = num(cells, "cost");
+      const months = num(cells, "months");
+      const acc = num(cells, "accumulated");
+      const used = num(cells, "monthsUsed");
+      const qty = num(cells, "quantity");
+      if (cost === null || months === null || acc === null || used === null || qty === null) {
+        fail(r, "Số tiền / số tháng / số lượng không hợp lệ");
+        continue;
+      }
+      if (!cost || cost <= 0) {
+        fail(r, kind === "fixed-assets" ? "Nguyên giá phải lớn hơn 0" : "Giá trị phải lớn hơn 0");
+        continue;
+      }
+      if (months === undefined || !Number.isInteger(months) || months < 1 || months > 600) {
+        fail(r, `Số tháng ${verb} là số nguyên từ 1 đến 600`);
+        continue;
+      }
+      if ((acc ?? 0) < 0 || (acc ?? 0) > cost) {
+        fail(r, `Số đã ${verb} đầu kỳ phải từ 0 đến ${kind === "fixed-assets" ? "nguyên giá" : "giá trị"}`);
+        continue;
+      }
+      if ((used ?? 0) < 0 || (used ?? 0) > months) {
+        fail(r, `Số tháng đã ${verb} phải từ 0 đến số tháng ${verb}`);
+        continue;
+      }
+      if (qty !== undefined && qty <= 0) {
+        fail(r, "Số lượng phải lớn hơn 0");
+        continue;
+      }
+      const accounts = { asset_account: "assetAccount", accum_account: "accumAccount", expense_account: "expenseAccount" } as const;
+      const picked: Record<string, string> = {};
+      let badAccount = "";
+      for (const [k, f] of Object.entries(accounts)) {
+        const a = has(f) ? accountCode(raw(cells, f)) : "";
+        if (!a) continue;
+        const known = accountByCode.get(a);
+        if (!known || !known.is_postable) badAccount ||= `TK ${a} không có hoặc không phải TK chi tiết`;
+        picked[k] = a;
+      }
+      if (badAccount) {
+        fail(r, badAccount);
+        continue;
+      }
+      seen.set(code, r.row);
+      r.payload = {
+        row: r.row,
+        code,
+        name,
+        start_on: start,
+        cost: Math.round(cost),
+        months,
+        ...optField("category", text(cells, "category")),
+        ...optField("department", text(cells, "department")),
+        ...optField("uom", text(cells, "uom")),
+        ...optField("acquired_on", acquired),
+        ...optField("note", text(cells, "note")),
+        ...(qty === undefined ? {} : { quantity: qty }),
+        ...(acc ? { opening_accumulated: Math.round(acc) } : {}),
+        ...(used ? { opening_months: used } : {}),
+        ...picked,
+      } as AssetImportRow;
       r.status = existing.has(code) ? "update" : "new";
     }
   }

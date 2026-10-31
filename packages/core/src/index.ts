@@ -8,6 +8,7 @@ export * from "./accounting/vat";
 export * from "./accounting/invoice";
 export * from "./accounting/settlement";
 export * from "./accounting/stock";
+export * from "./accounting/assets";
 export * from "./accounting/ledger";
 export * from "./accounting/modules";
 export * from "./education/education";

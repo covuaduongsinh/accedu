@@ -14,6 +14,7 @@ import {
   parseDelimited,
   payloadOf,
   type AccountImportRow,
+  type AssetImportRow,
   type ColumnMap,
   type HeaderGuess,
   type ImportKind,
@@ -163,6 +164,14 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
       ]);
       const warehouses =
         kind === "opening-stock" ? await qc.fetchQuery({ queryKey: qk.warehouses(tenant.id), queryFn: () => api.warehouses(db, tenant.id), staleTime: 0 }) : undefined;
+      const assets =
+        kind === "fixed-assets" || kind === "tools"
+          ? await qc.fetchQuery({
+              queryKey: qk.report(tenant.id, "assets", kind === "tools" ? "tool" : "fixed", ""),
+              queryFn: () => api.assets(db, tenant.id, kind === "tools" ? "tool" : "fixed"),
+              staleTime: 0,
+            })
+          : undefined;
       const classes =
         kind === "students"
           ? (await qc.fetchQuery({ queryKey: qk.classes(tenant.id), queryFn: () => api.classes(db, tenant.id), staleTime: 0 })).map((c) => ({ code: c.jobs.code }))
@@ -174,6 +183,7 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
           items,
           ...(warehouses ? { warehouses } : {}),
           ...(classes ? { classes } : {}),
+          ...(assets ? { assets } : {}),
           ...(partnerDefault ? { partnerDefault } : {}),
         }),
       );
@@ -217,6 +227,19 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
           qc.invalidateQueries({ queryKey: qk.enrollments(tenant.id) }),
         ]);
         toast.success(`Đã nhập học viên: thêm ${r.inserted}, cập nhật ${r.updated}, ghi danh ${r.enrolled}`);
+        close();
+        return;
+      }
+      if (kind === "fixed-assets" || kind === "tools") {
+        const r = await api.importAssets(db, tenant.id, kind === "tools" ? "tool" : "fixed", rows as AssetImportRow[]);
+        if (!r.ok) {
+          setPreview(applyServerErrors(preview, r.errors));
+          setOnlyProblems(true);
+          toast.error(`Máy chủ từ chối ${r.errors.length} dòng — chưa ghi gì. Sửa tệp rồi nhập lại.`);
+          return;
+        }
+        await qc.invalidateQueries({ queryKey: ["report", tenant.id] });
+        toast.success(`Đã nhập ${kind === "tools" ? "CCDC" : "TSCĐ"}: thêm ${r.inserted}, cập nhật ${r.updated ?? 0}`);
         close();
         return;
       }
@@ -416,7 +439,9 @@ export function ImportDialog({ kind, open, onClose, partnerDefault }: Props) {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge tone="green">Mới {preview.counts.new}</Badge>
-            {kind === "accounts" || kind === "partners" || kind === "items" || kind === "students" ? <Badge tone="navy">Cập nhật {preview.counts.update}</Badge> : null}
+            {kind === "accounts" || kind === "partners" || kind === "items" || kind === "students" || kind === "fixed-assets" || kind === "tools" ? (
+              <Badge tone="navy">Cập nhật {preview.counts.update}</Badge>
+            ) : null}
             <Badge tone="gray">Bỏ qua {preview.counts.skip}</Badge>
             <Badge tone={preview.counts.error ? "red" : "gray"}>Lỗi {preview.counts.error}</Badge>
             {preview.totals ? (

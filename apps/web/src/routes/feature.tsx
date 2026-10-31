@@ -2,6 +2,8 @@ import { findFeature } from "@accedu/core";
 import { Navigate, useParams } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 import type { ComponentType } from "react";
+import { AssetRunPage } from "../features/assets/AssetRunPage";
+import { AssetsPage } from "../features/assets/AssetsPage";
 import { BankStatementPage } from "../features/cash/BankStatementPage";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { ItemsPage } from "../features/catalogs/ItemsPage";
@@ -79,6 +81,10 @@ const PAGES: Record<string, ComponentType> = {
   "cash/bank-credits": () => <VoucherModule type="BC" />,
   "cash/bank-debits": () => <VoucherModule type="BN" />,
   "cash/bank-statements": BankStatementPage,
+  "assets/fixed-assets": () => <AssetsPage kind="fixed" />,
+  "assets/depreciation": () => <AssetRunPage kind="fixed" />,
+  "tools/items": () => <AssetsPage kind="tool" />,
+  "tools/allocation": () => <AssetRunPage kind="tool" />,
   "general/trial-balance": TrialBalancePage,
   "general/general-journal": GeneralJournalPage,
   "general/ledger": () => <LedgerPage />,

@@ -345,6 +345,36 @@ export function useBankReconciliation(tenantId: string | undefined, account: str
   });
 }
 
+/** Sổ TSCĐ / CCDC tại ngày */
+export function useAssets(tenantId: string | undefined, kind: "fixed" | "tool", asOf?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "assets", kind, asOf ?? ""),
+    queryFn: () => api.assets(db, tenantId as string, kind, asOf),
+    enabled: !!tenantId,
+  });
+}
+
+/** Thẻ tài sản: từng tháng đã tính */
+export function useAssetCard(tenantId: string | undefined, assetId: string | null | undefined) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "asset-card", assetId ?? ""),
+    queryFn: () => api.assetCard(db, tenantId as string, assetId as string),
+    enabled: !!tenantId && !!assetId,
+  });
+}
+
+/** Các tháng đã tính khấu hao / phân bổ */
+export function useAssetRuns(tenantId: string | undefined, kind: "fixed" | "tool") {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "asset-runs", kind),
+    queryFn: () => api.assetRuns(db, tenantId as string, kind),
+    enabled: !!tenantId,
+  });
+}
+
 export function useBankStatements(tenantId: string | undefined, account: string) {
   const db = useDb();
   return useQuery({
@@ -456,6 +486,9 @@ const SYNC_TABLES = [
   "tuition_reminders",
   "bank_statements",
   "bank_lines",
+  "assets",
+  "asset_depreciations",
+  "asset_disposals",
 ] as const;
 
 /**
@@ -552,6 +585,9 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "coach_pay":
     case "bank_statements":
     case "bank_lines":
+    case "assets":
+    case "asset_depreciations":
+    case "asset_disposals":
       return inv(["report", tenantId]);
     case "tuition_reminders":
       return inv(qk.reminders(tenantId));

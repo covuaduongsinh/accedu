@@ -898,6 +898,141 @@ export type BankReconciliation = {
   book_only: Array<{ voucher_id: string; number: string; voucher_type: string; posting_date: DateStr; amount: Numeric; description: string | null }>;
 };
 
+export type AssetKind = "fixed" | "tool";
+
+/** Thẻ TSCĐ / CCDC (bảng assets) */
+export type AssetRow = {
+  id: string;
+  tenant_id: string;
+  kind: AssetKind;
+  code: string;
+  name: string;
+  category: string | null;
+  department: string | null;
+  quantity: Numeric;
+  uom: string | null;
+  acquired_on: DateStr;
+  start_on: DateStr;
+  cost: Numeric;
+  months: number;
+  opening_accumulated: Numeric;
+  opening_months: Numeric;
+  asset_account: string;
+  accum_account: string | null;
+  expense_account: string;
+  suspended: boolean;
+  increase_voucher_id: string | null;
+  note: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+};
+
+/** Sổ tài sản tại ngày (rpt_assets) */
+export type AssetRegisterRow = Pick<
+  AssetRow,
+  | "id"
+  | "code"
+  | "name"
+  | "category"
+  | "department"
+  | "quantity"
+  | "uom"
+  | "acquired_on"
+  | "start_on"
+  | "months"
+  | "cost"
+  | "opening_accumulated"
+  | "opening_months"
+  | "asset_account"
+  | "accum_account"
+  | "expense_account"
+  | "suspended"
+  | "increase_voucher_id"
+  | "note"
+> & {
+  accumulated: Numeric;
+  remaining: Numeric;
+  months_used: Numeric;
+  months_left: Numeric;
+  /** Mức khấu hao / phân bổ ước tính tháng tới (tròn tháng) */
+  next_amount: Numeric;
+  status: "active" | "suspended" | "done" | "disposed";
+  disposed_on: DateStr | null;
+  disposal_reason: string | null;
+  disposal_voucher_id: string | null;
+  disposal_number: string | null;
+  increase_number: string | null;
+  last_month: DateStr | null;
+};
+
+/** Thẻ tài sản: từng tháng đã tính (rpt_asset_card) */
+export type AssetCardRow = {
+  month: DateStr;
+  source: "run" | "disposal";
+  months_used: Numeric;
+  amount: Numeric;
+  accumulated: Numeric;
+  remaining: Numeric;
+  voucher_id: string;
+  voucher_number: string;
+  posting_date: DateStr;
+  posted: boolean;
+};
+
+/** Các tháng đã tính khấu hao / phân bổ (rpt_asset_runs) */
+export type AssetRunRow = {
+  month: DateStr;
+  voucher_id: string;
+  number: string;
+  status: VoucherRow["status"];
+  posting_date: DateStr;
+  count: number;
+  total: Numeric;
+};
+
+/** Kết quả tính khấu hao / phân bổ tháng (run_asset_depreciation) */
+export type AssetRunResult = {
+  ok: boolean;
+  dry_run: boolean;
+  kind: AssetKind;
+  month: DateStr;
+  count: number;
+  total: Numeric;
+  voucher_id: string | null;
+  number: string | null;
+  posted: boolean;
+  /** Số phiếu cũ của tháng đã được thay */
+  replaced: string[];
+  warnings: string[];
+  items: Array<{
+    asset_id: string;
+    code: string;
+    name: string;
+    department: string | null;
+    expense_account: string;
+    credit_account: string;
+    cost: Numeric;
+    accumulated_before: Numeric;
+    months_used_before: Numeric;
+    fraction: Numeric;
+    days: number | null;
+    amount: Numeric;
+    accumulated: Numeric;
+    remaining: Numeric;
+    months_left: Numeric;
+  }>;
+};
+
+export type AssetDisposeResult = {
+  ok: boolean;
+  voucher_id: string | null;
+  number: string | null;
+  partial: Numeric;
+  accumulated: Numeric;
+  remaining: Numeric;
+  account: string;
+};
+
 /** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
 export type AllocationResult = {
   ok: boolean;
@@ -955,6 +1090,7 @@ export type Database = {
       tuition_reminders: Table<TuitionReminderRow>;
       ai_usage: Table<AiUsageRow>;
       bank_statements: Table<BankStatementRow>;
+      assets: Table<AssetRow>;
       attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
@@ -1033,6 +1169,22 @@ export type Database = {
       bank_unlink: { Args: { p_tenant: string; p_line: string }; Returns: undefined };
       bank_ignore: { Args: { p_tenant: string; p_line: string; p_ignored?: boolean }; Returns: undefined };
       rpt_bank_reconciliation: { Args: { p_tenant: string; p_account: string; p_as_of: string }; Returns: BankReconciliation };
+      save_asset: { Args: { p_tenant: string; p_asset: Record<string, unknown>; p_id?: string | null }; Returns: string };
+      delete_asset: { Args: { p_tenant: string; p_id: string }; Returns: undefined };
+      run_asset_depreciation: {
+        Args: { p_tenant: string; p_kind: AssetKind; p_month: string; p_post?: boolean; p_dry_run?: boolean };
+        Returns: AssetRunResult;
+      };
+      delete_asset_run: { Args: { p_tenant: string; p_kind: AssetKind; p_month: string }; Returns: { ok: boolean; month: DateStr; deleted: string[] } };
+      dispose_asset: {
+        Args: { p_tenant: string; p_asset: string; p_date: string; p_reason?: string | null; p_account?: string | null };
+        Returns: AssetDisposeResult;
+      };
+      restore_asset: { Args: { p_tenant: string; p_asset: string }; Returns: undefined };
+      rpt_assets: { Args: { p_tenant: string; p_kind: AssetKind; p_as_of?: string | null }; Returns: AssetRegisterRow[] };
+      rpt_asset_card: { Args: { p_tenant: string; p_asset: string }; Returns: AssetCardRow[] };
+      rpt_asset_runs: { Args: { p_tenant: string; p_kind: AssetKind }; Returns: AssetRunRow[] };
+      import_assets: { Args: { p_tenant: string; p_kind: AssetKind; p_rows: unknown[] }; Returns: ImportResult };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

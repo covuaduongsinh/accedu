@@ -1,6 +1,7 @@
 import type {
   AccountImportRow,
   AccountInput,
+  AssetImportRow,
   ClassInput,
   EnrollmentInput,
   StudentImportRow,
@@ -19,6 +20,12 @@ import type { BankStatementParse } from "@accedu/core";
 import type {
   AccountRow,
   AgingRow,
+  AssetCardRow,
+  AssetDisposeResult,
+  AssetKind,
+  AssetRegisterRow,
+  AssetRunResult,
+  AssetRunRow,
   EInvoiceImportResult,
   AllocationResult,
   AttendanceReportRow,
@@ -511,6 +518,43 @@ export const api = {
   },
   async bankReconciliation(db: AccEduClient, tenantId: string, account: string, asOf: string): Promise<BankReconciliation> {
     return unwrap(await db.rpc("rpt_bank_reconciliation", { p_tenant: tenantId, p_account: account, p_as_of: asOf }));
+  },
+  // --- TSCĐ / CCDC (P6) ---------------------------------------------------
+  /** Sổ TSCĐ / CCDC tại ngày (mặc định hôm nay) */
+  async assets(db: AccEduClient, tenantId: string, kind: AssetKind, asOf?: string | null): Promise<AssetRegisterRow[]> {
+    return unwrap(await db.rpc("rpt_assets", { p_tenant: tenantId, p_kind: kind, p_as_of: asOf ?? null }));
+  },
+  /** Thêm / sửa thẻ tài sản; increase: lập phiếu ghi tăng (Nợ TK tài sản / Có credit_account) */
+  async saveAsset(db: AccEduClient, tenantId: string, asset: Record<string, unknown>, id?: string | null): Promise<string> {
+    return unwrap(await db.rpc("save_asset", { p_tenant: tenantId, p_asset: asset, p_id: id ?? null }));
+  },
+  async deleteAsset(db: AccEduClient, tenantId: string, id: string) {
+    unwrap(await db.rpc("delete_asset", { p_tenant: tenantId, p_id: id }));
+  },
+  /** Tính khấu hao TSCĐ / phân bổ CCDC tháng (month = ngày bất kỳ trong tháng) */
+  async runAssetDepreciation(db: AccEduClient, tenantId: string, kind: AssetKind, month: string, opts: { post?: boolean; dryRun?: boolean } = {}): Promise<AssetRunResult> {
+    return unwrap(
+      await db.rpc("run_asset_depreciation", { p_tenant: tenantId, p_kind: kind, p_month: month, p_post: opts.post ?? true, p_dry_run: opts.dryRun ?? false }),
+    );
+  },
+  async deleteAssetRun(db: AccEduClient, tenantId: string, kind: AssetKind, month: string) {
+    return unwrap(await db.rpc("delete_asset_run", { p_tenant: tenantId, p_kind: kind, p_month: month }));
+  },
+  async disposeAsset(db: AccEduClient, tenantId: string, assetId: string, date: string, reason?: string | null, account?: string | null): Promise<AssetDisposeResult> {
+    return unwrap(await db.rpc("dispose_asset", { p_tenant: tenantId, p_asset: assetId, p_date: date, p_reason: reason ?? null, p_account: account ?? null }));
+  },
+  async restoreAsset(db: AccEduClient, tenantId: string, assetId: string) {
+    unwrap(await db.rpc("restore_asset", { p_tenant: tenantId, p_asset: assetId }));
+  },
+  async assetCard(db: AccEduClient, tenantId: string, assetId: string): Promise<AssetCardRow[]> {
+    return unwrap(await db.rpc("rpt_asset_card", { p_tenant: tenantId, p_asset: assetId }));
+  },
+  async assetRuns(db: AccEduClient, tenantId: string, kind: AssetKind): Promise<AssetRunRow[]> {
+    return unwrap(await db.rpc("rpt_asset_runs", { p_tenant: tenantId, p_kind: kind }));
+  },
+  /** Nhập danh sách TSCĐ / CCDC từ Excel — nguyên khối, lỗi theo dòng; không lập chứng từ */
+  async importAssets(db: AccEduClient, tenantId: string, kind: AssetKind, rows: AssetImportRow[]): Promise<ImportResult> {
+    return unwrap(await db.rpc("import_assets", { p_tenant: tenantId, p_kind: kind, p_rows: checkBatch(rows) }));
   },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));

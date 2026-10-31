@@ -341,6 +341,40 @@ export const AI_TOOLS: AiTool[] = [
     },
   },
   {
+    name: "fixed_assets",
+    label: "Sổ TSCĐ / CCDC",
+    audience: "staff",
+    description:
+      "Sổ tài sản cố định (kind = fixed) hoặc công cụ dụng cụ (kind = tool) tại một ngày: mã, tên, bộ phận, ngày bắt đầu tính, " +
+      "nguyên giá / giá trị, hao mòn lũy kế / đã phân bổ, giá trị còn lại, số tháng còn lại, mức khấu hao / phân bổ tháng tới, " +
+      "trạng thái (active đang dùng, suspended tạm dừng, done hết khấu hao còn dùng, disposed đã ghi giảm) và tháng đã tính gần nhất.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["fixed", "tool"], description: "fixed = TSCĐ (mặc định), tool = CCDC" },
+        as_of: { type: "string", description: "Số liệu đến ngày YYYY-MM-DD (mặc định hôm nay)" },
+      },
+    },
+    async run(ctx, input) {
+      const kind = input.kind === "tool" ? "tool" : "fixed";
+      const data = await rows(ctx, "rpt_assets", { p_kind: kind, p_as_of: dateArg(input.as_of, ctx.today) });
+      const live = data.filter((r) => r.status !== "disposed");
+      return {
+        kind,
+        count: live.length,
+        cost: sum(live, "cost"),
+        accumulated: sum(live, "accumulated"),
+        remaining: sum(live, "remaining"),
+        next_month_total: sum(live, "next_amount"),
+        assets: limitRows(
+          data.map((r) =>
+            pick(r, ["code", "name", "category", "department", "start_on", "months", "cost", "accumulated", "remaining", "months_left", "next_amount", "status", "disposed_on", "last_month"]),
+          ),
+        ),
+      };
+    },
+  },
+  {
     name: "bank_reconciliation",
     label: "Sao kê ngân hàng & đối chiếu",
     audience: "staff",
@@ -472,6 +506,7 @@ Kiến thức kế toán (chế độ TT99/2025 hoặc TT133/2016):
 - 111 tiền mặt, 112 tiền gửi ngân hàng, 131 phải thu khách hàng / học viên, 331 phải trả người bán, 334 phải trả người lao động, 3335 thuế TNCN, 3387 doanh thu (học phí) nhận trước, 5113 doanh thu cung cấp dịch vụ, 632 giá vốn (gồm lương HLV), 642 chi phí quản lý.
 - Học phí: lập phiếu học phí Nợ 131 / Có 3387; thu tiền Nợ 111, 112 / Có 131; cuối tháng phân bổ 3387 → 5113 theo buổi đã học (lớp theo khóa) hoặc theo tháng.
 - Lương HLV theo buổi dạy: Nợ 632 / Có 334 (nhân viên) hoặc 331 (cộng tác viên, khấu trừ 10% TNCN khi từ 2.000.000 đ / tháng).
+- TSCĐ: nguyên giá 211 (TT99 2111–2118, TT133 2111), hao mòn 214; khấu hao đường thẳng hằng tháng Nợ 642 (TT133 6422, TT99 6424) / Có 214. CCDC: giá trị chờ phân bổ 242, phân bổ hằng tháng Nợ 642 / Có 242.
 - Cấp độ học viên: tot = Tốt, ma = Mã, tuong = Tượng, xe = Xe, hau = Hậu, vua = Vua.
 
 Cách trả lời:
