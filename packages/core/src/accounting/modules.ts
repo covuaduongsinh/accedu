@@ -123,16 +123,16 @@ export const MODULES: ModuleDef[] = [
     key: "assets",
     title: "Tài sản",
     features: [
-      { path: "assets/fixed-assets", title: "Tài sản cố định", kind: "catalog", phase: "P6" },
-      { path: "assets/depreciation", title: "Tính khấu hao TSCĐ", kind: "process", phase: "P6" },
+      { path: "assets/fixed-assets", title: "Tài sản cố định", kind: "catalog", phase: "P6", ready: true },
+      { path: "assets/depreciation", title: "Tính khấu hao TSCĐ", kind: "process", phase: "P6", ready: true },
     ],
   },
   {
     key: "tools",
     title: "Công cụ",
     features: [
-      { path: "tools/items", title: "Công cụ dụng cụ", kind: "catalog", phase: "P6" },
-      { path: "tools/allocation", title: "Phân bổ CCDC", kind: "process", phase: "P6" },
+      { path: "tools/items", title: "Công cụ dụng cụ", kind: "catalog", phase: "P6", ready: true },
+      { path: "tools/allocation", title: "Phân bổ CCDC", kind: "process", phase: "P6", ready: true },
     ],
   },
   {

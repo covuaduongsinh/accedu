@@ -255,6 +255,41 @@ describe("Hỏi AccEdu: vòng lặp tool use", () => {
     expect(toolsFor("coach").map((t) => t.name)).not.toContain("bank_reconciliation");
   });
 
+  it("sổ TSCĐ / CCDC: tổng giá trị còn lại, mức tháng tới (không tính tài sản đã ghi giảm)", async () => {
+    const { client, calls } = fakeClient([reply([toolUse("t", "fixed_assets", {}), toolUse("u", "fixed_assets", { kind: "tool", as_of: "2026-10-31" })], "tool_use"), reply([text("ok")], "end_turn")]);
+    const asset = (code: string, status: string, cost: number, accumulated: number, next: number) => ({
+      id: code,
+      code,
+      name: `Tài sản ${code}`,
+      start_on: "2026-01-01",
+      months: 36,
+      cost,
+      accumulated,
+      remaining: cost - accumulated,
+      months_left: 10,
+      next_amount: next,
+      status,
+      asset_account: "2111",
+      note: "nội bộ",
+    });
+    const { db, calls: dbCalls } = fakeDb({
+      rpt_assets: (args) =>
+        args.p_kind === "fixed" ? [asset("MAYCHIEU", "active", 36_000_000, 1_548_387, 1_000_000), asset("CU", "disposed", 10_000_000, 10_000_000, 0)] : [asset("DONGHO", "active", 3_000_000, 250_000, 250_000)],
+    });
+    await askAccEdu({ client, db, tenantId: TENANT, role: "accountant", question: "TSCĐ còn lại bao nhiêu?", today: TODAY });
+    expect(dbCalls).toEqual([
+      { fn: "rpt_assets", args: { p_tenant: TENANT, p_kind: "fixed", p_as_of: TODAY } },
+      { fn: "rpt_assets", args: { p_tenant: TENANT, p_kind: "tool", p_as_of: "2026-10-31" } },
+    ]);
+    const results = (calls[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<Record<string, unknown>>;
+    const fixed = JSON.parse(String(results[0]!.content));
+    expect(fixed).toMatchObject({ kind: "fixed", count: 1, cost: 36_000_000, accumulated: 1_548_387, remaining: 34_451_613, next_month_total: 1_000_000 });
+    expect(fixed.assets.rows).toHaveLength(2);
+    expect(fixed.assets.rows[0]).not.toHaveProperty("note");
+    expect(JSON.parse(String(results[1]!.content))).toMatchObject({ kind: "tool", count: 1, remaining: 2_750_000 });
+    expect(toolsFor("coach").map((t) => t.name)).not.toContain("fixed_assets");
+  });
+
   it("max_tokens: báo câu trả lời bị cắt", async () => {
     const { client } = fakeClient([reply([text("Danh sách rất dài…")], "max_tokens")]);
     const r = await askAccEdu({ client, db: fakeDb({}).db, tenantId: TENANT, role: "owner", question: "?", today: TODAY });

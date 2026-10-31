@@ -1,6 +1,15 @@
 import type { FieldSpec } from "./table";
 
-export type ImportKind = "accounts" | "partners" | "opening-accounts" | "opening-partners" | "items" | "opening-stock" | "students";
+export type ImportKind =
+  | "accounts"
+  | "partners"
+  | "opening-accounts"
+  | "opening-partners"
+  | "items"
+  | "opening-stock"
+  | "students"
+  | "fixed-assets"
+  | "tools";
 
 export interface ImportSpec {
   kind: ImportKind;
@@ -40,6 +49,49 @@ const PARTNER_CODE_SYNONYMS = [
 ];
 const PARTNER_NAME_SYNONYMS = ["Tên khách hàng", "Tên khách", "Tên đối tượng", "Tên nhà cung cấp", "Tên NCC", "Họ và tên", "Họ tên", "Tên"];
 const FLAG_EXCLUDE = ["mã", "tên", "nhóm", "loại", "địa chỉ", "tài khoản", "ngân hàng"];
+
+/** Trường của mẫu danh sách TSCĐ / CCDC (TSCĐ có thêm TK hao mòn) */
+function assetFields(kind: "fixed" | "tool"): FieldSpec[] {
+  const fixed = kind === "fixed";
+  return [
+    { key: "code", label: fixed ? "Mã tài sản" : "Mã CCDC", required: true, synonyms: ["Mã tài sản", "Mã TS", "Mã TSCĐ", "Mã CCDC", "Mã công cụ", "Mã công cụ dụng cụ", "Mã"], exclude: ["loại", "nhóm", "bộ phận", "nguồn", "tk", "lý do", "đvt"] },
+    { key: "name", label: fixed ? "Tên tài sản" : "Tên CCDC", required: true, synonyms: ["Tên tài sản", "Tên TSCĐ", "Tên TS", "Tên CCDC", "Tên công cụ", "Tên công cụ dụng cụ", "Tên"], exclude: ["loại", "nhóm", "bộ phận", "nguồn", "lý do"] },
+    { key: "category", label: "Loại / nhóm", synonyms: ["Loại tài sản", "Nhóm tài sản", "Loại TSCĐ", "Nhóm TSCĐ", "Loại CCDC", "Nhóm CCDC", "Phân loại", "Loại", "Nhóm"], exclude: ["mã", "tk"] },
+    { key: "department", label: "Bộ phận sử dụng", synonyms: ["Bộ phận sử dụng", "Bộ phận", "Nơi sử dụng", "Phòng ban"], exclude: ["mã"] },
+    { key: "quantity", label: "Số lượng", synonyms: ["Số lượng", "SL"], exclude: ["tháng", "kỳ"] },
+    { key: "uom", label: "Đvt", synonyms: ["Đvt", "Đơn vị tính"] },
+    { key: "acquiredOn", label: "Ngày ghi tăng", synonyms: ["Ngày ghi tăng", "Ngày tăng", "Ngày mua", "Ngày chứng từ"] },
+    {
+      key: "startOn",
+      label: fixed ? "Ngày tính khấu hao" : "Ngày tính phân bổ",
+      required: true,
+      synonyms: ["Ngày tính khấu hao", "Ngày bắt đầu khấu hao", "Ngày tính KH", "Ngày tính phân bổ", "Ngày bắt đầu phân bổ", "Ngày đưa vào sử dụng", "Ngày sử dụng"],
+    },
+    { key: "cost", label: fixed ? "Nguyên giá" : "Giá trị", required: true, synonyms: ["Nguyên giá", "Giá trị CCDC", "Giá trị ban đầu", "Giá trị"], exclude: ["còn lại", "hao mòn", "phân bổ", "khấu hao", "lũy kế", "tháng", "kỳ"] },
+    {
+      key: "months",
+      label: fixed ? "Số tháng khấu hao" : "Số tháng phân bổ",
+      required: true,
+      synonyms: ["Số tháng khấu hao", "Số kỳ khấu hao", "Số tháng phân bổ", "Số kỳ phân bổ", "Thời gian sử dụng", "Số tháng", "Số kỳ"],
+      exclude: ["đã", "còn"],
+    },
+    {
+      key: "accumulated",
+      label: fixed ? "Hao mòn lũy kế đầu kỳ" : "Đã phân bổ đầu kỳ",
+      synonyms: ["Hao mòn lũy kế", "Khấu hao lũy kế", "Giá trị hao mòn", "Giá trị đã khấu hao", "Giá trị đã phân bổ", "Đã phân bổ", "Lũy kế"],
+      exclude: ["tháng", "số kỳ", "còn lại"],
+    },
+    {
+      key: "monthsUsed",
+      label: fixed ? "Số tháng đã khấu hao" : "Số tháng đã phân bổ",
+      synonyms: ["Số tháng đã khấu hao", "Số kỳ đã khấu hao", "Số tháng đã phân bổ", "Số kỳ đã phân bổ"],
+    },
+    { key: "assetAccount", label: fixed ? "TK nguyên giá" : "TK chờ phân bổ", synonyms: ["Tk nguyên giá", "Tk tài sản", "Tk TSCĐ", "Tk CCDC", "Tk chờ phân bổ"], exclude: ["hao mòn", "chi phí", "khấu hao"] },
+    ...(fixed ? [{ key: "accumAccount", label: "TK hao mòn", synonyms: ["Tk hao mòn", "Tk khấu hao"], exclude: ["chi phí"] }] : []),
+    { key: "expenseAccount", label: "TK chi phí", synonyms: ["Tk chi phí", "Tk chi phí khấu hao", "Tk chi phí phân bổ"] },
+    { key: "note", label: "Ghi chú", synonyms: ["Ghi chú", "Diễn giải"] },
+  ];
+}
 
 export const IMPORT_SPECS: Record<ImportKind, ImportSpec> = {
   accounts: {
@@ -198,6 +250,38 @@ export const IMPORT_SPECS: Record<ImportKind, ImportSpec> = {
       "Cấp: Tốt, Mã, Tượng, Xe, Hậu, Vua. Ngày theo dạng ngày/tháng/năm.",
       "Email phụ huynh dùng để gửi thông báo học phí có mã VietQR (Đào tạo › Học phí › Gửi email nhắc).",
       "Có Mã lớp thì AccEdu ghi danh học viên vào lớp đó (lớp phải có sẵn ở Đào tạo › Lớp học); Ngày vào lớp trống = hôm nay.",
+    ],
+  },
+  "fixed-assets": {
+    kind: "fixed-assets",
+    title: "Danh sách tài sản cố định",
+    fileName: "mau-danh-sach-tscd",
+    fields: assetFields("fixed"),
+    sample: [
+      ["MAYCHIEU-01", "Máy chiếu tương tác (mẫu)", "Máy móc thiết bị", "Phòng học 1", "1", "Chiếc", "15/10/2026", "15/10/2026", "36000000", "36", "", "", "", "", "", ""],
+      ["BANCO-DT", "Bộ bàn cờ điện tử (mẫu)", "Thiết bị giảng dạy", "Phòng học 2", "1", "Bộ", "01/07/2025", "01/07/2025", "24000000", "24", "12000000", "12", "", "", "", ""],
+    ],
+    notes: [
+      "Bắt buộc: Mã, Tên, Ngày tính khấu hao, Nguyên giá, Số tháng khấu hao. Mã không trùng; tài sản đã có (trùng mã) được cập nhật khi chưa tính khấu hao.",
+      "Tài sản dùng từ trước ngày bắt đầu nhập liệu: điền Hao mòn lũy kế và Số tháng đã khấu hao tại ngày đó. Nguyên giá và hao mòn đầu kỳ nằm trong số dư đầu kỳ TK 211 / 214 — nhập tệp này không lập chứng từ.",
+      "TK bỏ trống thì lấy mặc định: TT133 2111 / 2141 / 6422; TT99 2112 / 2141 / 6424. Khấu hao tính theo số ngày sử dụng trong tháng đầu.",
+      "Từ FAO: Tài sản › Báo cáo kiểm kê TSCĐ › Danh mục TSCĐ (hoặc Sổ TSCĐ) tại ngày đầu kỳ › Kết xuất Excel.",
+    ],
+  },
+  tools: {
+    kind: "tools",
+    title: "Danh sách công cụ dụng cụ",
+    fileName: "mau-danh-sach-ccdc",
+    fields: assetFields("tool"),
+    sample: [
+      ["DONGHO-01", "Đồng hồ cờ điện tử (mẫu)", "Dụng cụ thi đấu", "Kho CLB", "10", "Chiếc", "20/10/2026", "20/10/2026", "3000000", "12", "", "", "", "", ""],
+      ["BANGTREO-01", "Bàn cờ treo tường (mẫu)", "Dụng cụ giảng dạy", "Phòng học 1", "2", "Chiếc", "01/03/2026", "01/03/2026", "2400000", "24", "", "", "", "", ""],
+    ],
+    notes: [
+      "Bắt buộc: Mã, Tên, Ngày tính phân bổ, Giá trị, Số tháng phân bổ. CCDC phân bổ tròn tháng, bắt đầu từ tháng của Ngày tính phân bổ.",
+      "CCDC đang phân bổ từ trước ngày bắt đầu nhập liệu: điền Đã phân bổ đầu kỳ và Số tháng đã phân bổ. Giá trị chưa phân bổ nằm trong số dư đầu kỳ TK 242 — nhập tệp này không lập chứng từ.",
+      "TK bỏ trống thì lấy mặc định: TK chờ phân bổ 242; TK chi phí 6422 (TT133) / 6423 (TT99).",
+      "Từ FAO: Công cụ › Báo cáo kiểm kê CCDC › Danh mục CCDC (hoặc Sổ CCDC) › Kết xuất Excel.",
     ],
   },
   "opening-partners": {

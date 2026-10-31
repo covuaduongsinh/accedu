@@ -1,4 +1,4 @@
-import { useAccounts, useOpeningBalances, usePartners, useTrialBalance } from "@accedu/api/react";
+import { useAccounts, useAssets, useOpeningBalances, usePartners, useTrialBalance } from "@accedu/api/react";
 import { formatAmount, formatDateVN, IMPORT_SPECS, type ImportKind } from "@accedu/core";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Circle, FileDown, FileUp } from "lucide-react";
@@ -15,13 +15,15 @@ interface Step {
   fao: string;
 }
 
-/** Chuyển dữ liệu từ FAO: nhập lần lượt 4 tệp Excel rồi kiểm tra Bảng cân đối phát sinh tại ngày bắt đầu */
+/** Chuyển dữ liệu từ FAO: nhập lần lượt các tệp Excel (danh mục, số dư, TSCĐ / CCDC) rồi kiểm tra Bảng cân đối phát sinh tại ngày bắt đầu */
 export function MigrationPage() {
   const { tenant, slug, role } = useTenantCtx();
   const accounts = useAccounts(tenant.id);
   const partners = usePartners(tenant.id);
   const opening = useOpeningBalances(tenant.id);
   const tb = useTrialBalance(tenant.id, tenant.start_date, tenant.start_date, 1);
+  const fixedAssets = useAssets(tenant.id, "fixed");
+  const tools = useAssets(tenant.id, "tool");
   const [importing, setImporting] = useState<ImportKind | null>(null);
   const editable = canPost(role);
 
@@ -53,6 +55,18 @@ export function MigrationPage() {
       status: `${partnerRows.length} dòng công nợ`,
       fao: "Bán hàng / Mua hàng › Số dư đầu kỳ › Vào số dư công nợ đầu kỳ, hoặc Báo cáo số dư công nợ",
     },
+    {
+      kind: "fixed-assets",
+      done: (fixedAssets.data?.length ?? 0) > 0,
+      status: `${fixedAssets.data?.length ?? 0} TSCĐ (không bắt buộc)`,
+      fao: "Tài sản › Báo cáo kiểm kê TSCĐ › Danh mục TSCĐ tại ngày đầu kỳ → Kết xuất Excel",
+    },
+    {
+      kind: "tools",
+      done: (tools.data?.length ?? 0) > 0,
+      status: `${tools.data?.length ?? 0} CCDC (không bắt buộc)`,
+      fao: "Công cụ › Báo cáo kiểm kê CCDC › Danh mục CCDC → Kết xuất Excel",
+    },
   ];
 
   const sum = (k: "opening_debit" | "opening_credit") => (tb.data ?? []).reduce((s, r) => s + Number(r[k] ?? 0), 0);
@@ -63,7 +77,7 @@ export function MigrationPage() {
     <div className="space-y-3">
       <PageHeader
         title="Chuyển dữ liệu từ FAO"
-        subtitle={`Nhập lần lượt 4 tệp Excel xuất từ FAO (chỉ thao tác xem/kết xuất bên FAO). Số dư tính tại ngày bắt đầu nhập liệu ${formatDateVN(tenant.start_date)}.`}
+        subtitle={`Nhập lần lượt các tệp Excel xuất từ FAO (chỉ thao tác xem/kết xuất bên FAO). Số dư tính tại ngày bắt đầu nhập liệu ${formatDateVN(tenant.start_date)}.`}
       />
       <Card title="Các bước">
         <ol className="divide-y divide-line">
