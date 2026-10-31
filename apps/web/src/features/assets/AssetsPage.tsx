@@ -109,7 +109,7 @@ export function AssetsPage({ kind }: { kind: AssetKind }) {
 
   const cols = useMemo<ColDef<AssetRegisterRow>[]>(
     () => [
-      { field: "code", headerName: "Mã", width: 130, pinned: "left" },
+      { field: "code", headerName: "Mã", width: 130 },
       { field: "name", headerName: kind === "fixed" ? "Tên tài sản" : "Tên CCDC", flex: 1, minWidth: 200 },
       { field: "category", headerName: "Loại / nhóm", width: 140 },
       { field: "department", headerName: "Bộ phận", width: 130 },

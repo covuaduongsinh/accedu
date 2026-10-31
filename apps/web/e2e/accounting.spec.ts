@@ -924,4 +924,120 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByTestId("bank-unmatched")).toHaveText("0 dòng");
     await shot(page, "44-sao-ke-doi-chieu");
   });
+
+  test("TSCĐ / CCDC: khai báo có ghi tăng, khấu hao tháng đầu theo số ngày, phân bổ CCDC, ghi giảm và khôi phục, khớp sổ cái", async ({ page }) => {
+    const dbUrl = process.env.E2E_DB_URL!;
+    const sql = (query: string) => execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", query], { encoding: "utf8" }).trim();
+    const tenantSql = `(select id from public.tenants where lower(slug) = lower('${slug}'))`;
+    const glOf = (number: string) =>
+      sql(`select string_agg(account || ':' || debit::bigint || ':' || credit::bigint, ' ' order by debit desc, account) from public.gl_entries
+           where tenant_id = ${tenantSql} and voucher_number = '${number}'`);
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const ym = today.slice(0, 7);
+    const label = `${ym.slice(5, 7)}/${ym.slice(0, 4)}`;
+    const dim = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+    const monthEnd = `${ym}-${dim}`;
+    // Máy chiếu 36.000.000, 36 tháng, dùng từ ngày 15: tháng đầu tính (số ngày còn lại / số ngày của tháng)
+    const days = dim - 14;
+    const first = Math.round((36_000_000 * days) / dim / 36);
+    const row = (text: string) => page.getByRole("row").filter({ hasText: text });
+    const dialog = page.getByRole("dialog");
+
+    await signIn(page);
+    await page.goto(`/${slug}/assets/fixed-assets`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã", { exact: true }).fill("maychieu-01");
+    await dialog.getByLabel("Tên", { exact: true }).fill("Máy chiếu tương tác phòng học 1");
+    await dialog.getByLabel("Bộ phận sử dụng").fill("Phòng học 1");
+    await dialog.getByLabel("Ngày ghi tăng").fill(`${ym}-15`);
+    await dialog.getByLabel("Ngày bắt đầu tính").fill(`${ym}-15`);
+    await dialog.getByLabel("Nguyên giá", { exact: true }).fill("36000000");
+    await dialog.getByLabel("Số tháng", { exact: true }).fill("36");
+    await expect(dialog.getByLabel("TK nguyên giá")).toHaveValue("2111");
+    await expect(dialog.getByLabel("TK hao mòn")).toHaveValue("2141");
+    await expect(dialog.getByLabel("TK chi phí khấu hao")).toHaveValue("6422");
+    await dialog.getByLabel("TK đối ứng ghi tăng").selectOption("1111");
+    await expect(dialog.getByTestId("asset-schedule")).toContainText(`Tháng đầu ${label}: ${money(first)} (${days} ngày)`);
+    await shot(page, "45-tscd-khai-bao");
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByText("Đã khai báo TSCĐ MAYCHIEU-01 và lập phiếu ghi tăng")).toBeVisible();
+    const increase = sql(`select v.number from public.assets a join public.vouchers v on v.id = a.increase_voucher_id
+      where a.tenant_id = ${tenantSql} and a.code = 'MAYCHIEU-01'`);
+    expect(glOf(increase)).toBe("2111:36000000:0 1111:0:36000000");
+
+    // Cuối tháng: tính khấu hao → một phiếu kế toán Nợ 6422 / Có 2141
+    await page.goto(`/${slug}/assets/depreciation`);
+    await expect(page.getByLabel("Tháng khấu hao")).toHaveValue(ym);
+    await page.getByRole("button", { name: "Xem trước" }).click();
+    await expect(page.getByText(`Xem trước tháng ${label}: 1 TSCĐ, ${money(first)}`)).toBeVisible();
+    await expect(row("MAYCHIEU-01")).toContainText(`${days} ngày`);
+    await page.getByRole("button", { name: "Lập phiếu khấu hao" }).click();
+    await expect(page.getByText(new RegExp(`Đã lập phiếu PK\\d+: khấu hao ${money(first)}`))).toBeVisible();
+    await expect(page.getByRole("button", { name: "Xóa tháng này" })).toBeVisible();
+    await shot(page, "46-tinh-khau-hao");
+    const run = sql(`select v.number from public.asset_depreciations d join public.vouchers v on v.id = d.voucher_id
+      join public.assets a on a.id = d.asset_id where a.tenant_id = ${tenantSql} and a.code = 'MAYCHIEU-01' and d.source = 'run'`);
+    expect(glOf(run)).toBe(`6422:${first}:0 2141:0:${first}`);
+
+    // Sổ TSCĐ cuối tháng khớp sổ cái 2111 / 2141; đã tính khấu hao tháng này thì phải xóa lần tính rồi mới ghi giảm
+    await page.goto(`/${slug}/assets/fixed-assets`);
+    await page.getByLabel("Đến ngày").fill(monthEnd);
+    await expect(page.getByTestId("asset-cost")).toHaveText("36.000.000");
+    await expect(page.getByTestId("asset-accumulated")).toHaveText(money(first));
+    await expect(page.getByTestId("asset-remaining")).toHaveText(money(36_000_000 - first));
+    await expect(page.getByTestId("asset-ledger")).toContainText(`Nguyên giá trên sổ cái 36.000.000 — khớp`);
+    await expect(page.getByTestId("asset-ledger")).toContainText(`Hao mòn lũy kế trên sổ cái ${money(first)} — khớp`);
+    await shot(page, "47-so-tscd");
+    await row("MAYCHIEU-01").getByRole("gridcell").first().click();
+    await page.getByRole("button", { name: "Ghi giảm", exact: true }).click();
+    await dialog.getByLabel("Ngày ghi giảm").fill(monthEnd);
+    await dialog.getByRole("button", { name: "Ghi giảm", exact: true }).click();
+    await expect(page.getByText(`đã tính khấu hao tháng ${label} — xóa lần tính tháng đó rồi ghi giảm`)).toBeVisible();
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await page.getByRole("button", { name: "Thẻ TSCĐ" }).click();
+    await expect(dialog.getByRole("row").filter({ hasText: run })).toContainText(money(first));
+    // Thông báo lỗi ở góc phải che nút ✕ (rê chuột làm thông báo không tự tắt) → đóng bằng Esc
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    // CCDC: đồng hồ cờ 3.000.000, phân bổ 12 tháng; hỏng → ghi giảm (Nợ 6422 / Có 242), khôi phục, rồi phân bổ tháng
+    await page.goto(`/${slug}/tools/items`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã", { exact: true }).fill("DONGHO-01");
+    await dialog.getByLabel("Tên", { exact: true }).fill("Đồng hồ cờ DGT (10 chiếc)");
+    await dialog.getByLabel("Số lượng").fill("10");
+    await dialog.getByLabel("Ngày ghi tăng").fill(`${ym}-01`);
+    await dialog.getByLabel("Ngày bắt đầu tính").fill(`${ym}-01`);
+    await dialog.getByLabel("Giá trị", { exact: true }).fill("3000000");
+    await dialog.getByLabel("Số tháng", { exact: true }).fill("12");
+    await expect(dialog.getByLabel("TK chờ phân bổ")).toHaveValue("242");
+    await dialog.getByLabel("TK đối ứng ghi tăng").selectOption("1111");
+    await expect(dialog.getByTestId("asset-schedule")).toContainText("mỗi tháng ≈ 250.000");
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByText("Đã khai báo CCDC DONGHO-01 và lập phiếu ghi tăng")).toBeVisible();
+
+    await row("DONGHO-01").getByRole("gridcell").first().click();
+    await page.getByRole("button", { name: "Ghi giảm", exact: true }).click();
+    await dialog.getByLabel("Lý do").fill("Hỏng 10 chiếc");
+    await dialog.getByRole("button", { name: "Ghi giảm", exact: true }).click();
+    await expect(page.getByText(/Đã ghi giảm DONGHO-01: phiếu PK\d+, giá trị còn lại 3\.000\.000/)).toBeVisible();
+    await page.getByLabel("Hiện CCDC đã ghi giảm").check();
+    await expect(row("DONGHO-01")).toContainText("Đã ghi giảm");
+    const disposal = sql(`select v.number from public.asset_disposals x join public.vouchers v on v.id = x.voucher_id
+      join public.assets a on a.id = x.asset_id where a.tenant_id = ${tenantSql} and a.code = 'DONGHO-01'`);
+    expect(glOf(disposal)).toBe("6422:3000000:0 242:0:3000000");
+    await row("DONGHO-01").getByRole("gridcell").first().click();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Bỏ ghi giảm" }).click();
+    await expect(page.getByText("DONGHO-01 đã trở lại đang dùng")).toBeVisible();
+    await expect(row("DONGHO-01")).toContainText("Đang dùng");
+    expect(sql(`select count(*) from public.vouchers where tenant_id = ${tenantSql} and number = '${disposal}'`)).toBe("0");
+
+    await page.goto(`/${slug}/tools/allocation`);
+    await page.getByRole("button", { name: "Xem trước" }).click();
+    await expect(page.getByText(`Xem trước tháng ${label}: 1 CCDC, 250.000`)).toBeVisible();
+    await page.getByRole("button", { name: "Lập phiếu phân bổ" }).click();
+    await expect(page.getByText(/Đã lập phiếu PK\d+: phân bổ 250\.000/)).toBeVisible();
+    expect(Number(sql(`select coalesce(sum(debit - credit), 0) from public.gl_entries where tenant_id = ${tenantSql} and account = '242'`))).toBe(2_750_000);
+  });
 });
