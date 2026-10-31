@@ -32,6 +32,7 @@ Câu hỏi càng cụ thể càng nhanh và chính xác: nêu **kỳ** (tháng 1
 - Khách hàng nào nợ quá hạn trên 30 ngày?
 - Sao kê tháng này còn khoản nào chưa khớp?
 - TSCĐ nào sắp hết khấu hao, tháng này khấu hao bao nhiêu?
+- Tháng này còn việc gì trước khi khóa sổ? Tháng 10 lãi bao nhiêu?
 - Sách nào bán lãi nhất quý này?
 
 **Ví dụ cho huấn luyện viên:**
@@ -48,7 +49,7 @@ AI có thể mất 10–40 giây với câu hỏi cần tra nhiều báo cáo. T
 ## 3. AI được xem gì
 
 AI tra cứu **bằng chính quyền của người hỏi**:
-- kế toán, quản lý: cân đối phát sinh, sổ chi tiết tài khoản, công nợ, tuổi nợ, tình hình học phí, học phí chờ phân bổ, số buổi còn lại, điểm danh, lương HLV (xem trước), lãi gộp, nhập – xuất – tồn, sao kê ngân hàng & đối chiếu TK 112, sổ TSCĐ / CCDC, danh sách học viên và lớp;
+- kế toán, quản lý: cân đối phát sinh, sổ chi tiết tài khoản, công nợ, tuổi nợ, tình hình học phí, học phí chờ phân bổ, số buổi còn lại, điểm danh, lương HLV (xem trước), lãi gộp, nhập – xuất – tồn, sao kê ngân hàng & đối chiếu TK 112, sổ TSCĐ / CCDC, việc cuối tháng & kết chuyển lãi lỗ, danh sách học viên và lớp;
 - người *chỉ xem* không lập lương được thì AI cũng không xem được lương HLV;
 - **huấn luyện viên** chỉ hỏi được về lớp mình phụ trách, điểm danh và số buổi mình dạy; không xem được tiền, học phí hay sổ sách.
 

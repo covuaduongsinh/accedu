@@ -375,6 +375,26 @@ export function useAssetRuns(tenantId: string | undefined, kind: "fixed" | "tool
   });
 }
 
+/** Việc cuối tháng */
+export function usePeriodChecklist(tenantId: string | undefined, month: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "period-checklist", month),
+    queryFn: () => api.periodChecklist(db, tenantId as string, month),
+    enabled: !!tenantId && !!month,
+  });
+}
+
+/** Lịch sử kết chuyển cuối kỳ */
+export function usePeriodClosings(tenantId: string | undefined) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "period-closings"),
+    queryFn: () => api.periodClosings(db, tenantId as string),
+    enabled: !!tenantId,
+  });
+}
+
 export function useBankStatements(tenantId: string | undefined, account: string) {
   const db = useDb();
   return useQuery({
@@ -489,6 +509,7 @@ const SYNC_TABLES = [
   "assets",
   "asset_depreciations",
   "asset_disposals",
+  "period_closings",
 ] as const;
 
 /**
@@ -588,6 +609,7 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "assets":
     case "asset_depreciations":
     case "asset_disposals":
+    case "period_closings":
       return inv(["report", tenantId]);
     case "tuition_reminders":
       return inv(qk.reminders(tenantId));

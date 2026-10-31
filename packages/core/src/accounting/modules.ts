@@ -47,7 +47,7 @@ export const MODULES: ModuleDef[] = [
       { path: "general/general-journal", title: "Sổ nhật ký chung", kind: "report", phase: "P2", ready: true },
       { path: "general/ledger", title: "Sổ cái tài khoản", kind: "report", phase: "P2", ready: true, mobile: true },
       { path: "general/trial-balance", title: "Bảng cân đối phát sinh", kind: "report", phase: "P2", ready: true, mobile: true },
-      { path: "general/closing", title: "Kết chuyển cuối kỳ", kind: "process", phase: "P7" },
+      { path: "general/closing", title: "Cuối kỳ: việc cuối tháng & kết chuyển", kind: "process", phase: "P7", ready: true },
       { path: "general/financial-position", title: "Báo cáo tình hình tài chính", kind: "report", phase: "P8", mobile: true },
       { path: "general/income-statement", title: "Báo cáo kết quả kinh doanh", kind: "report", phase: "P8", mobile: true },
       { path: "general/cash-flow", title: "Báo cáo lưu chuyển tiền tệ", kind: "report", phase: "P8" },
