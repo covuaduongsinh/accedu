@@ -326,6 +326,34 @@ export function useTuitionReminders(tenantId: string | undefined) {
   return useQuery({ queryKey: qk.reminders(tenantId ?? ""), queryFn: () => api.tuitionReminders(db, tenantId as string), enabled: !!tenantId });
 }
 
+/** Sao kê ngân hàng: dòng + trạng thái + gợi ý khớp của một TK 112 trong kỳ */
+export function useBankLines(tenantId: string | undefined, account: string, from: string, to: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "bank-lines", account, from, to),
+    queryFn: () => api.bankLines(db, tenantId as string, account, from, to),
+    enabled: !!tenantId && !!account,
+  });
+}
+
+export function useBankReconciliation(tenantId: string | undefined, account: string, asOf: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "bank-reconciliation", account, asOf),
+    queryFn: () => api.bankReconciliation(db, tenantId as string, account, asOf),
+    enabled: !!tenantId && !!account,
+  });
+}
+
+export function useBankStatements(tenantId: string | undefined, account: string) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "bank-statements", account),
+    queryFn: () => api.bankStatements(db, tenantId as string, account),
+    enabled: !!tenantId && !!account,
+  });
+}
+
 /** Hỏi AccEdu: số câu còn lại hôm nay */
 export function useAiQuota(tenantId: string | undefined) {
   const db = useDb();
@@ -426,6 +454,8 @@ const SYNC_TABLES = [
   "coach_profiles",
   "coach_pay",
   "tuition_reminders",
+  "bank_statements",
+  "bank_lines",
 ] as const;
 
 /**
@@ -520,6 +550,8 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "coach_profiles":
       return inv(qk.coachProfiles(tenantId));
     case "coach_pay":
+    case "bank_statements":
+    case "bank_lines":
       return inv(["report", tenantId]);
     case "tuition_reminders":
       return inv(qk.reminders(tenantId));

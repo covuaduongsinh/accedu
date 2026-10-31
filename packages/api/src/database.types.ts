@@ -822,6 +822,82 @@ export type AiAnswer = {
   remaining?: number | undefined;
 };
 
+/** Gợi ý khớp một dòng sao kê (tính lúc đọc) */
+export type BankSuggestion =
+  | { kind: "existing"; sure: boolean; voucher_id: string; number: string; voucher_type: "BC" | "BN"; posting_date: DateStr; description: string | null }
+  | {
+      kind: "tuition" | "invoice";
+      sure: boolean;
+      partner_id: string;
+      partner_code: string | null;
+      partner_name: string | null;
+      invoice_number: string | null;
+      allocations: Array<{ invoice_id: string; number: string; account: string; remaining: Numeric; amount: Numeric }>;
+      /** Tiền thừa ghi Có 131 trả trước (không gắn hóa đơn) */
+      advance: Numeric;
+      /** Tổng còn nợ của các hóa đơn xét */
+      open: Numeric;
+    };
+
+/** Dòng sao kê ngân hàng (rpt_bank_lines) */
+export type BankLineRow = {
+  id: string;
+  statement_id: string;
+  account: string;
+  txn_date: DateStr;
+  seq: number;
+  ref: string | null;
+  description: string;
+  amount_in: Numeric;
+  amount_out: Numeric;
+  balance: Numeric | null;
+  status: "matched" | "ignored" | "suggested" | "new";
+  voucher_id: string | null;
+  voucher_number: string | null;
+  voucher_type: string | null;
+  voucher_status: VoucherRow["status"] | null;
+  suggestion: BankSuggestion | null;
+  matched_at: Timestamp | null;
+};
+
+/** Lần nhập sao kê */
+export type BankStatementRow = {
+  id: string;
+  tenant_id: string;
+  account: string;
+  file_name: string | null;
+  period_from: DateStr | null;
+  period_to: DateStr | null;
+  closing_balance: Numeric | null;
+  inserted: number;
+  duplicates: number;
+  created_by: string | null;
+  created_at: Timestamp;
+};
+
+export type BankImportResult = { ok: boolean; statement_id: string; inserted: number; duplicates: number };
+
+export type BankConfirmResult = {
+  confirmed: number;
+  failed: number;
+  results: Array<{ line_id: string; ok: boolean; kind?: string; voucher_id?: string; number?: string; error?: string }>;
+};
+
+/** Đối chiếu TK 112 với sao kê (rpt_bank_reconciliation) */
+export type BankReconciliation = {
+  account: string;
+  as_of: DateStr;
+  book_balance: Numeric;
+  statement_balance: Numeric | null;
+  statement_date: DateStr | null;
+  difference: Numeric | null;
+  statement_from: DateStr | null;
+  unmatched_count: number;
+  unmatched_in: Numeric;
+  unmatched_out: Numeric;
+  book_only: Array<{ voucher_id: string; number: string; voucher_type: string; posting_date: DateStr; amount: Numeric; description: string | null }>;
+};
+
 /** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
 export type AllocationResult = {
   ok: boolean;
@@ -878,6 +954,7 @@ export type Database = {
       coach_pay: Table<CoachPayRow>;
       tuition_reminders: Table<TuitionReminderRow>;
       ai_usage: Table<AiUsageRow>;
+      bank_statements: Table<BankStatementRow>;
       attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
     };
@@ -947,6 +1024,15 @@ export type Database = {
         Returns: Array<{ class_id: string; class_code: string; class_name: string; sessions: number }>;
       };
       ai_quota: { Args: { p_tenant: string }; Returns: AiQuota };
+      import_bank_statement: { Args: { p_tenant: string; p_account: string; p_meta: Record<string, unknown>; p_lines: unknown[] }; Returns: BankImportResult };
+      delete_bank_statement: { Args: { p_tenant: string; p_statement: string }; Returns: number };
+      rpt_bank_lines: { Args: { p_tenant: string; p_account: string; p_from: string; p_to: string }; Returns: BankLineRow[] };
+      bank_confirm: { Args: { p_tenant: string; p_lines: string[] }; Returns: BankConfirmResult };
+      bank_create_voucher: { Args: { p_tenant: string; p_line: string; p_row: Record<string, unknown> }; Returns: { voucher_id: string; number: string } };
+      bank_link: { Args: { p_tenant: string; p_line: string; p_voucher: string }; Returns: undefined };
+      bank_unlink: { Args: { p_tenant: string; p_line: string }; Returns: undefined };
+      bank_ignore: { Args: { p_tenant: string; p_line: string; p_ignored?: boolean }; Returns: undefined };
+      rpt_bank_reconciliation: { Args: { p_tenant: string; p_account: string; p_as_of: string }; Returns: BankReconciliation };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

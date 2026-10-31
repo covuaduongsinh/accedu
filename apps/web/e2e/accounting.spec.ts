@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
@@ -24,6 +24,7 @@ const parentEmail = `phuhuynh-${stamp}@duongsinh.test`;
 const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
 const SMTP_HOST = process.env.E2E_SMTP_HOST ?? "supabase_inbucket_accedu";
 const SMTP_PORT = process.env.E2E_SMTP_PORT ?? "1025";
+const money = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
 /** Claude API giả cho "Hỏi AccEdu": cổng trên máy chạy test, Edge Function gọi tới qua host.docker.internal */
 const AI_MOCK_PORT = Number(process.env.E2E_AI_MOCK_PORT ?? 54398);
 const AI_MOCK_URL = process.env.E2E_AI_MOCK_URL ?? `http://host.docker.internal:${AI_MOCK_PORT}`;
@@ -852,5 +853,75 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
       await mock.close();
       clearAi();
     }
+  });
+
+  test("sao kê ngân hàng: nhập tệp, tự khớp học phí chuyển khoản theo nội dung VietQR, lập BN phí / BC lãi, đối chiếu số dư TK 112", async ({ page }) => {
+    const dbUrl = process.env.E2E_DB_URL!;
+    const sql = (query: string) => execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", query], { encoding: "utf8" }).trim();
+    const tenantSql = `(select id from public.tenants where lower(slug) = lower('${slug}'))`;
+    // Phiếu học phí HV102 còn nợ (nội dung chuyển khoản VietQR: "HP HV102 <số hóa đơn>") và số dư sổ 1121 hiện tại
+    const invoice = sql(`select v.number from public.vouchers v join public.tuition_bills t on t.invoice_id = v.id
+      join public.enrollments e on e.id = t.enrollment_id join public.partners p on p.id = e.student_id
+      where v.tenant_id = ${tenantSql} and p.code = 'HV102' and app.invoice_remaining(v.id) > 0 order by v.posting_date limit 1`);
+    expect(invoice).toMatch(/^DV\d+$/);
+    // TK ngân hàng chi tiết đầu tiên (trang chọn sẵn): 11211 do bước chuyển dữ liệu FAO đã mở tiểu khoản dưới 1121
+    const bank = sql(`select code from public.accounts where tenant_id = ${tenantSql} and code like '112%' and is_postable and is_active order by code limit 1`);
+    const opening = Number(
+      sql(`select coalesce(sum(net), 0) from app.leaf_net_before(${tenantSql}, (now() at time zone 'Asia/Ho_Chi_Minh')::date + 1) where account = '${bank}'`),
+    );
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const d = `${today.slice(8, 10)}/${today.slice(5, 7)}/${today.slice(0, 4)}`;
+    // Tệp sao kê giả kiểu internet banking: thông tin tài khoản phía trên, cột ghi nợ / ghi có, dấu chấm phẩy
+    const csv = join(fixtures, "saoke.csv");
+    writeFileSync(
+      csv,
+      [
+        "SAO KÊ TÀI KHOẢN",
+        "Số tài khoản: 0123456789",
+        "Ngày giao dịch;Số tham chiếu;Nội dung;Ghi nợ;Ghi có;Số dư",
+        `${d} 09:15:00;FT001;MBVCB.1.HP HV102 ${invoice}.CT tu PHU HUYNH KHANG;;600.000;${money(opening + 600_000)}`,
+        `${d};FEE01;PHI QUAN LY TAI KHOAN;11.000;;${money(opening + 589_000)}`,
+        `${d};INT01;TRA LAI TIEN GUI;;5.000;${money(opening + 594_000)}`,
+        `${d};X01;CHUYEN TIEN KHONG RO NOI DUNG;;50.000;${money(opening + 644_000)}`,
+      ].join("\r\n"),
+    );
+
+    await signIn(page);
+    await page.goto(`/${slug}/cash/bank-statements`);
+    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Nhập sao kê" }).click();
+    await dialog.getByLabel("Tệp sao kê").setInputFiles(csv);
+    await expect(dialog.getByTestId("bank-preview")).toContainText("4 giao dịch");
+    await expect(dialog.getByTestId("bank-preview")).toContainText("tiền vào 655.000");
+    await dialog.getByRole("button", { name: "Nhập 4 giao dịch" }).click();
+    await expect(page.getByText("Đã nhập 4 giao dịch")).toBeVisible();
+
+    // Học phí: gợi ý chắc chắn theo nội dung VietQR → xác nhận lập BC Nợ 1121 / Có 131 trừ đúng hóa đơn
+    const row = (text: string) => page.getByRole("row").filter({ hasText: text });
+    await expect(row("HP HV102")).toContainText(`Học phí HV102 Học viên Mẫu Khang · ${invoice} — đủ tiền`);
+    await shot(page, "43-sao-ke-goi-y");
+    await page.getByRole("button", { name: "Xác nhận 1 gợi ý chắc chắn" }).click();
+    await expect(page.getByText(/Đã xác nhận 1 dòng sao kê: BC\d+/)).toBeVisible();
+    await expect(row("HP HV102")).toContainText("Đã khớp");
+    expect(Number(sql(`select app.invoice_remaining(id) from public.vouchers where tenant_id = ${tenantSql} and number = '${invoice}'`))).toBe(0);
+
+    // Phí quản lý tài khoản → BN Nợ 6422 (TT133); lãi tiền gửi → BC Có 515; khoản lạ → bỏ qua
+    await row("PHI QUAN LY").getByRole("button", { name: "Lập chứng từ" }).click();
+    await expect(dialog.getByLabel("Tài khoản đối ứng")).toHaveValue("6422");
+    await dialog.getByRole("button", { name: "Lập và ghi sổ" }).click();
+    await expect(page.getByText(/Đã lập BN\d+/)).toBeVisible();
+    await row("TRA LAI").getByRole("button", { name: "Lập chứng từ" }).click();
+    await expect(dialog.getByLabel("Tài khoản đối ứng")).toHaveValue("515");
+    await dialog.getByRole("button", { name: "Lập và ghi sổ" }).click();
+    await expect(page.getByText(/Đã lập BC\d+/)).toBeVisible();
+    await row("KHONG RO").getByRole("button", { name: "Bỏ qua" }).click();
+    await expect(row("KHONG RO")).toContainText("Bỏ qua");
+
+    // Đối chiếu: sổ = số dư trước + 600.000 − 11.000 + 5.000; sao kê cao hơn 50.000 (khoản bỏ qua), không còn dòng chưa khớp
+    await expect(page.getByTestId("bank-book")).toHaveText(money(opening + 594_000));
+    await expect(page.getByTestId("bank-statement")).toHaveText(money(opening + 644_000));
+    await expect(page.getByTestId("bank-diff")).toHaveText("50.000");
+    await expect(page.getByTestId("bank-unmatched")).toHaveText("0 dòng");
+    await shot(page, "44-sao-ke-doi-chieu");
   });
 });

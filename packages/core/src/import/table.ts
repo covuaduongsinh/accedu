@@ -47,16 +47,24 @@ function guessDelimiter(text: string): string {
     .replace(/"(?:[^"]|"")*"/g, "")
     .split(/\r?\n/)
     .filter((l) => l.trim() !== "")
-    .slice(0, 5);
+    .slice(0, 30);
   let best: string = ",";
-  let bestScore = 0;
+  let bestLines = 0;
+  let bestWidth = 0;
   for (const d of DELIMS) {
-    // Ưu tiên dấu phân cách xuất hiện đều đặn trên các dòng đầu
-    const counts = firstLines.map((l) => l.split(d).length - 1);
-    const min = counts.length ? Math.min(...counts) : 0;
-    if (min > bestScore) {
-      best = d;
-      bestScore = min;
+    // Dấu phân cách xuất hiện cùng số lần trên nhiều dòng nhất. Bỏ qua các dòng không có dấu nào (tên báo cáo, số tài
+    // khoản… phía trên tiêu đề của sao kê ngân hàng / tệp FAO); hòa thì chọn dấu chia được nhiều cột hơn.
+    const freq = new Map<number, number>();
+    for (const l of firstLines) {
+      const c = l.split(d).length - 1;
+      if (c > 0) freq.set(c, (freq.get(c) ?? 0) + 1);
+    }
+    for (const [width, lines] of freq) {
+      if (lines > bestLines || (lines === bestLines && width > bestWidth)) {
+        best = d;
+        bestLines = lines;
+        bestWidth = width;
+      }
     }
   }
   return best;
@@ -192,7 +200,8 @@ export function detectHeader(rows: Table, fields: readonly FieldSpec[]): HeaderG
     if (i + 1 < rows.length && single.some(Boolean)) {
       const double = combine(rows[i] ?? [], rows[i + 1] ?? []);
       const s2 = evaluate(double);
-      if (s2 > bestScore) {
+      // Tiêu đề 2 tầng chỉ khi nhận thêm được cột so với dòng dưới đứng một mình (không ghép dòng ghi chú phía trên)
+      if (s2 > bestScore && s2 > evaluate((rows[i + 1] ?? []).map(cellText))) {
         best = { row: i, height: 2, headers: double };
         bestScore = s2;
       }
