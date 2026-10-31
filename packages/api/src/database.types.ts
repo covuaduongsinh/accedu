@@ -1033,6 +1033,72 @@ export type AssetDisposeResult = {
   account: string;
 };
 
+/** Kết chuyển xác định kết quả kinh doanh tháng (close_period) */
+export type PeriodCloseResult = {
+  ok: boolean;
+  dry_run: boolean;
+  month: DateStr;
+  count: number;
+  /** Doanh thu, thu nhập thuần (TK loại doanh thu, đã trừ giảm trừ) */
+  revenue: Numeric;
+  expense: Numeric;
+  /** Số dư 911 hạch toán tay trước khi kết chuyển (dư Có dương) */
+  other: Numeric;
+  profit: Numeric;
+  voucher_id: string | null;
+  number: string | null;
+  posted: boolean;
+  replaced: string[];
+  warnings: string[];
+  items: Array<{
+    account: string;
+    name: string;
+    kind: "revenue" | "expense" | "result";
+    balance: Numeric | null;
+    debit_account: string;
+    credit_account: string;
+    amount: Numeric;
+  }>;
+};
+
+/** Chuyển lợi nhuận năm trước 4212 → 4211 (carry_forward_profit) */
+export type CarryForwardResult = {
+  ok: boolean;
+  dry_run: boolean;
+  year_start: DateStr;
+  profit: Numeric;
+  voucher_id: string | null;
+  number: string | null;
+  posted: boolean;
+  replaced: string[];
+  warnings: string[];
+};
+
+export type PeriodClosingRow = {
+  kind: "pl" | "carry";
+  month: DateStr;
+  voucher_id: string;
+  number: string;
+  status: VoucherRow["status"];
+  posting_date: DateStr;
+  revenue: Numeric | null;
+  expense: Numeric | null;
+  profit: Numeric;
+  created_at: Timestamp;
+};
+
+/** Việc cuối tháng (rpt_period_checklist) */
+export type PeriodChecklistItem = {
+  key: "drafts" | "tuition" | "coach_pay" | "depreciation" | "tools" | "stock" | "bank" | "closing" | "lock";
+  label: string;
+  status: "done" | "pending" | "na";
+  detail: string;
+  count: number;
+  /** Màn hình cần mở (đường dẫn chức năng) */
+  path: string;
+};
+export type PeriodChecklist = { month: DateStr; pending: number; items: PeriodChecklistItem[] };
+
 /** Kết quả phân bổ doanh thu học phí tháng (allocate_tuition_revenue) */
 export type AllocationResult = {
   ok: boolean;
@@ -1185,6 +1251,11 @@ export type Database = {
       rpt_asset_card: { Args: { p_tenant: string; p_asset: string }; Returns: AssetCardRow[] };
       rpt_asset_runs: { Args: { p_tenant: string; p_kind: AssetKind }; Returns: AssetRunRow[] };
       import_assets: { Args: { p_tenant: string; p_kind: AssetKind; p_rows: unknown[] }; Returns: ImportResult };
+      close_period: { Args: { p_tenant: string; p_month: string; p_post?: boolean; p_dry_run?: boolean }; Returns: PeriodCloseResult };
+      carry_forward_profit: { Args: { p_tenant: string; p_date: string; p_post?: boolean; p_dry_run?: boolean }; Returns: CarryForwardResult };
+      delete_period_closing: { Args: { p_tenant: string; p_kind: "pl" | "carry"; p_month: string }; Returns: { ok: boolean; number: string } };
+      rpt_period_closings: { Args: { p_tenant: string }; Returns: PeriodClosingRow[] };
+      rpt_period_checklist: { Args: { p_tenant: string; p_month: string }; Returns: PeriodChecklist };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

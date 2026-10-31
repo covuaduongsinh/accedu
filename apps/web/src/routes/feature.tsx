@@ -5,6 +5,7 @@ import type { ComponentType } from "react";
 import { AssetRunPage } from "../features/assets/AssetRunPage";
 import { AssetsPage } from "../features/assets/AssetsPage";
 import { BankStatementPage } from "../features/cash/BankStatementPage";
+import { ClosingPage } from "../features/closing/ClosingPage";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { ItemsPage } from "../features/catalogs/ItemsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
@@ -81,6 +82,7 @@ const PAGES: Record<string, ComponentType> = {
   "cash/bank-credits": () => <VoucherModule type="BC" />,
   "cash/bank-debits": () => <VoucherModule type="BN" />,
   "cash/bank-statements": BankStatementPage,
+  "general/closing": ClosingPage,
   "assets/fixed-assets": () => <AssetsPage kind="fixed" />,
   "assets/depreciation": () => <AssetRunPage kind="fixed" />,
   "tools/items": () => <AssetsPage kind="tool" />,

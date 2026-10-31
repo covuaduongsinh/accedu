@@ -1040,4 +1040,41 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await expect(page.getByText(/Đã lập phiếu PK\d+: phân bổ 250\.000/)).toBeVisible();
     expect(Number(sql(`select coalesce(sum(debit - credit), 0) from public.gl_entries where tenant_id = ${tenantSql} and account = '242'`))).toBe(2_750_000);
   });
+
+  test("cuối kỳ: việc cuối tháng tự kiểm tra trạng thái, kết chuyển doanh thu – chi phí sang 911 → 4212", async ({ page }) => {
+    const dbUrl = process.env.E2E_DB_URL!;
+    const sql = (query: string) => execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", query], { encoding: "utf8" }).trim();
+    const tenantSql = `(select id from public.tenants where lower(slug) = lower('${slug}'))`;
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const ym = today.slice(0, 7);
+    const dim = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+    const monthEnd = `${ym}-${dim}`;
+    // Lãi lỗ dự kiến = −(tổng số dư Nợ − Có các TK doanh thu / chi phí) − số dư 911 tại cuối tháng
+    const profit = Number(
+      sql(`select -(coalesce((select sum(net) from app.closing_balances(${tenantSql}, '${monthEnd}')), 0)
+                  + coalesce((select sum(net) from app.leaf_net_before(${tenantSql}, '${monthEnd}'::date + 1) where account = '911'), 0))`),
+    );
+    expect(profit).not.toBe(0);
+
+    await signIn(page);
+    await page.goto(`/${slug}/general/closing`);
+    await page.getByLabel("Tháng cuối kỳ").fill(ym);
+    // Khấu hao TSCĐ, phân bổ CCDC tháng này đã làm ở bước trước; chưa kết chuyển, chưa khóa sổ
+    await expect(page.getByTestId("check-depreciation")).toContainText("Đã xong");
+    await expect(page.getByTestId("check-tools")).toContainText("Đã xong");
+    await expect(page.getByTestId("check-closing")).toContainText("Cần làm");
+    await expect(page.getByTestId("check-lock")).toContainText("Cần làm");
+
+    await page.getByRole("button", { name: "Xem trước" }).click();
+    await expect(page.getByTestId("closing-profit")).toHaveText(money(Math.abs(profit)));
+    await expect(page.getByRole("row").filter({ hasText: "4212" })).toContainText(money(Math.abs(profit)));
+    await page.getByRole("button", { name: "Kết chuyển & ghi sổ" }).click();
+    await expect(page.getByText(new RegExp(`Đã kết chuyển tháng ${ym.slice(5, 7)}/${ym.slice(0, 4)}: phiếu PK\\d+, ${profit >= 0 ? "lãi" : "lỗ"} ${money(Math.abs(profit))}`))).toBeVisible();
+    await expect(page.getByTestId("check-closing")).toContainText("Đã xong");
+    await expect(page.getByRole("row").filter({ hasText: "Kết chuyển 911" })).toContainText(money(profit));
+    await shot(page, "48-cuoi-ky");
+    // Sau kết chuyển: TK doanh thu / chi phí và 911 hết số dư, lãi lỗ nằm ở 4212
+    expect(sql(`select count(*) from app.closing_balances(${tenantSql}, '${monthEnd}')`)).toBe("0");
+    expect(Number(sql(`select coalesce(sum(net), 0) from app.leaf_net_before(${tenantSql}, '${monthEnd}'::date + 1) where account = '911'`))).toBe(0);
+  });
 });

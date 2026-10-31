@@ -341,6 +341,33 @@ export const AI_TOOLS: AiTool[] = [
     },
   },
   {
+    name: "period_checklist",
+    label: "Việc cuối tháng & kết chuyển",
+    audience: "staff",
+    description:
+      "Việc cuối tháng trước khi khóa sổ của một tháng: 9 bước (ghi sổ chứng từ nháp, phân bổ doanh thu học phí, lương HLV, " +
+      "khấu hao TSCĐ, phân bổ CCDC, tồn kho khớp sổ cái, khớp sao kê ngân hàng, kết chuyển 911, khóa sổ) với trạng thái " +
+      "done / pending (cần làm) / na (không áp dụng) và diễn giải; kèm kết quả kết chuyển của tháng (doanh thu, chi phí, lãi lỗ) nếu đã kết chuyển.",
+    input_schema: {
+      type: "object",
+      properties: { month: { type: "string", description: "Ngày bất kỳ trong tháng, YYYY-MM-DD (mặc định tháng hiện tại)" } },
+    },
+    async run(ctx, input) {
+      const month = monthStart(dateArg(input.month, ctx.today));
+      const list = (await ctx.db.rpc("rpt_period_checklist", { p_tenant: ctx.tenantId, p_month: month })) as {
+        pending: number;
+        items: Array<Record<string, unknown>>;
+      };
+      const closing = (await rows(ctx, "rpt_period_closings", {})).find((c) => c.kind === "pl" && c.month === month);
+      return {
+        month,
+        pending: list.pending,
+        items: list.items.map((i) => pick(i, ["label", "status", "detail"])),
+        closing: closing ? pick(closing, ["number", "revenue", "expense", "profit"]) : null,
+      };
+    },
+  },
+  {
     name: "fixed_assets",
     label: "Sổ TSCĐ / CCDC",
     audience: "staff",
@@ -506,6 +533,7 @@ Kiến thức kế toán (chế độ TT99/2025 hoặc TT133/2016):
 - 111 tiền mặt, 112 tiền gửi ngân hàng, 131 phải thu khách hàng / học viên, 331 phải trả người bán, 334 phải trả người lao động, 3335 thuế TNCN, 3387 doanh thu (học phí) nhận trước, 5113 doanh thu cung cấp dịch vụ, 632 giá vốn (gồm lương HLV), 642 chi phí quản lý.
 - Học phí: lập phiếu học phí Nợ 131 / Có 3387; thu tiền Nợ 111, 112 / Có 131; cuối tháng phân bổ 3387 → 5113 theo buổi đã học (lớp theo khóa) hoặc theo tháng.
 - Lương HLV theo buổi dạy: Nợ 632 / Có 334 (nhân viên) hoặc 331 (cộng tác viên, khấu trừ 10% TNCN khi từ 2.000.000 đ / tháng).
+- Cuối tháng: kết chuyển doanh thu, chi phí (TK đầu 5–8) sang 911, lãi lỗ sang 4212; đầu năm chuyển 4212 sang 4211. Lãi lỗ của tháng đã kết chuyển xem ở công cụ việc cuối tháng; tháng chưa kết chuyển thì tính từ bảng cân đối phát sinh (doanh thu − chi phí).
 - TSCĐ: nguyên giá 211 (TT99 2111–2118, TT133 2111), hao mòn 214; khấu hao đường thẳng hằng tháng Nợ 642 (TT133 6422, TT99 6424) / Có 214. CCDC: giá trị chờ phân bổ 242, phân bổ hằng tháng Nợ 642 / Có 242.
 - Cấp độ học viên: tot = Tốt, ma = Mã, tuong = Tượng, xe = Xe, hau = Hậu, vua = Vua.
 

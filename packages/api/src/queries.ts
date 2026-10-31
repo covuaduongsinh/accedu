@@ -26,6 +26,10 @@ import type {
   AssetRegisterRow,
   AssetRunResult,
   AssetRunRow,
+  CarryForwardResult,
+  PeriodChecklist,
+  PeriodCloseResult,
+  PeriodClosingRow,
   EInvoiceImportResult,
   AllocationResult,
   AttendanceReportRow,
@@ -555,6 +559,25 @@ export const api = {
   /** Nhập danh sách TSCĐ / CCDC từ Excel — nguyên khối, lỗi theo dòng; không lập chứng từ */
   async importAssets(db: AccEduClient, tenantId: string, kind: AssetKind, rows: AssetImportRow[]): Promise<ImportResult> {
     return unwrap(await db.rpc("import_assets", { p_tenant: tenantId, p_kind: kind, p_rows: checkBatch(rows) }));
+  },
+  // --- Cuối kỳ (P7a) --------------------------------------------------------
+  /** Việc cuối tháng: 9 bước, trạng thái done / pending / na */
+  async periodChecklist(db: AccEduClient, tenantId: string, month: string): Promise<PeriodChecklist> {
+    return unwrap(await db.rpc("rpt_period_checklist", { p_tenant: tenantId, p_month: month }));
+  },
+  /** Kết chuyển xác định kết quả kinh doanh tháng (TK đầu 5–8 → 911 → 4212) */
+  async closePeriod(db: AccEduClient, tenantId: string, month: string, opts: { post?: boolean; dryRun?: boolean } = {}): Promise<PeriodCloseResult> {
+    return unwrap(await db.rpc("close_period", { p_tenant: tenantId, p_month: month, p_post: opts.post ?? true, p_dry_run: opts.dryRun ?? false }));
+  },
+  /** Chuyển lợi nhuận năm trước 4212 → 4211 (date: ngày bất kỳ trong năm tài chính) */
+  async carryForwardProfit(db: AccEduClient, tenantId: string, date: string, opts: { post?: boolean; dryRun?: boolean } = {}): Promise<CarryForwardResult> {
+    return unwrap(await db.rpc("carry_forward_profit", { p_tenant: tenantId, p_date: date, p_post: opts.post ?? true, p_dry_run: opts.dryRun ?? false }));
+  },
+  async deletePeriodClosing(db: AccEduClient, tenantId: string, kind: "pl" | "carry", month: string) {
+    return unwrap(await db.rpc("delete_period_closing", { p_tenant: tenantId, p_kind: kind, p_month: month }));
+  },
+  async periodClosings(db: AccEduClient, tenantId: string): Promise<PeriodClosingRow[]> {
+    return unwrap(await db.rpc("rpt_period_closings", { p_tenant: tenantId }));
   },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));

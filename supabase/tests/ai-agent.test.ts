@@ -290,6 +290,38 @@ describe("Hỏi AccEdu: vòng lặp tool use", () => {
     expect(toolsFor("coach").map((t) => t.name)).not.toContain("fixed_assets");
   });
 
+  it("việc cuối tháng: trạng thái từng bước và kết quả kết chuyển của tháng", async () => {
+    const { client, calls } = fakeClient([reply([toolUse("t", "period_checklist", { month: "2026-10-15" })], "tool_use"), reply([text("ok")], "end_turn")]);
+    const { db, calls: dbCalls } = fakeDb({
+      rpt_period_checklist: () => ({
+        month: "2026-10-01",
+        pending: 1,
+        items: [
+          { key: "drafts", label: "Ghi sổ các chứng từ trong tháng", status: "done", detail: "Mọi chứng từ trong tháng đã ghi sổ", count: 0, path: "general/journal" },
+          { key: "lock", label: "Khóa sổ", status: "pending", detail: "Chưa khóa sổ", count: 0, path: "system/periods" },
+        ],
+      }),
+      rpt_period_closings: () => [
+        { kind: "pl", month: "2026-10-01", number: "PK0042", voucher_id: "v", revenue: 49200000, expense: 28500000, profit: 20700000 },
+        { kind: "pl", month: "2026-09-01", number: "PK0030", voucher_id: "w", revenue: 1, expense: 1, profit: 0 },
+      ],
+    });
+    await askAccEdu({ client, db, tenantId: TENANT, role: "accountant", question: "Tháng 10 còn việc gì trước khi khóa sổ?", today: TODAY });
+    expect(dbCalls.map((c) => c.fn)).toEqual(["rpt_period_checklist", "rpt_period_closings"]);
+    expect(dbCalls[0]!.args).toEqual({ p_tenant: TENANT, p_month: "2026-10-01" });
+    const out = JSON.parse(String(((calls[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<Record<string, unknown>>)[0]!.content));
+    expect(out).toEqual({
+      month: "2026-10-01",
+      pending: 1,
+      items: [
+        { label: "Ghi sổ các chứng từ trong tháng", status: "done", detail: "Mọi chứng từ trong tháng đã ghi sổ" },
+        { label: "Khóa sổ", status: "pending", detail: "Chưa khóa sổ" },
+      ],
+      closing: { number: "PK0042", revenue: 49200000, expense: 28500000, profit: 20700000 },
+    });
+    expect(toolsFor("coach").map((t) => t.name)).not.toContain("period_checklist");
+  });
+
   it("max_tokens: báo câu trả lời bị cắt", async () => {
     const { client } = fakeClient([reply([text("Danh sách rất dài…")], "max_tokens")]);
     const r = await askAccEdu({ client, db: fakeDb({}).db, tenantId: TENANT, role: "owner", question: "?", today: TODAY });
