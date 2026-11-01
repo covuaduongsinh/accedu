@@ -50,7 +50,7 @@ export function Select({ className = "", children, ...rest }: SelectHTMLAttribut
   );
 }
 
-export function Field({ label, children, className = "", hint }: { label: string; children: ReactNode; className?: string; hint?: string }) {
+export function Field({ label, children, className = "", hint }: { label: string; children: ReactNode; className?: string; hint?: string | undefined }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-xs font-medium text-muted">{label}</span>

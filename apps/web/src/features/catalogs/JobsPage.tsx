@@ -1,15 +1,16 @@
 import { api, friendlyError, qk, type JobRow } from "@accedu/api";
 import { useDb, useJobs } from "@accedu/api/react";
+import { formatAmount, parseAmount } from "@accedu/core";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ColDef } from "ag-grid-community";
 import { Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { DataGrid, dateCol } from "../../components/DataGrid";
+import { DataGrid, amountCol, dateCol } from "../../components/DataGrid";
 import { Button, Field, Input, Modal, PageHeader, Select } from "../../components/ui";
 import { useTenantCtx } from "../../lib/tenant";
 
-const KIND: Record<JobRow["kind"], string> = {
+export const JOB_KIND: Record<JobRow["kind"], string> = {
   class: "Lớp học",
   course: "Khóa học",
   event: "Sự kiện / giải đấu",
@@ -29,9 +30,10 @@ export function JobsPage() {
     () => [
       { field: "code", headerName: "Mã", width: 130 },
       { field: "name", headerName: "Tên", flex: 2, minWidth: 240 },
-      { field: "kind", headerName: "Loại", width: 170, valueFormatter: (p) => KIND[p.value as JobRow["kind"]] },
+      { field: "kind", headerName: "Loại", width: 170, valueFormatter: (p) => JOB_KIND[p.value as JobRow["kind"]] },
       dateCol("start_date", "Bắt đầu"),
       dateCol("end_date", "Kết thúc"),
+      amountCol("budget", "Ngân sách", { width: 130 }),
       { field: "is_active", headerName: "Đang dùng", width: 110, valueFormatter: (p) => (p.value ? "✓" : "") },
     ],
     [],
@@ -82,6 +84,7 @@ function JobForm({ job, onDone }: { job: JobRow | null; onDone: () => void }) {
     start_date: job?.start_date ?? "",
     end_date: job?.end_date ?? "",
     is_active: job?.is_active ?? true,
+    budget: job?.budget === null || job?.budget === undefined ? "" : formatAmount(Number(job.budget)),
   });
 
   async function submit() {
@@ -89,7 +92,7 @@ function JobForm({ job, onDone }: { job: JobRow | null; onDone: () => void }) {
       await api.saveJob(
         db,
         tenant.id,
-        { ...form, start_date: form.start_date || null, end_date: form.end_date || null },
+        { ...form, start_date: form.start_date || null, end_date: form.end_date || null, budget: parseAmount(form.budget) },
         job?.id,
       );
       await qc.invalidateQueries({ queryKey: qk.jobs(tenant.id) });
@@ -107,7 +110,7 @@ function JobForm({ job, onDone }: { job: JobRow | null; onDone: () => void }) {
       </Field>
       <Field label="Loại">
         <Select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as JobRow["kind"] })}>
-          {Object.entries(KIND).map(([k, v]) => (
+          {Object.entries(JOB_KIND).map(([k, v]) => (
             <option key={k} value={k}>
               {v}
             </option>
@@ -122,6 +125,9 @@ function JobForm({ job, onDone }: { job: JobRow | null; onDone: () => void }) {
       </Field>
       <Field label="Kết thúc">
         <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+      </Field>
+      <Field label="Ngân sách (chi phí dự kiến)" className="col-span-2" hint="Dùng để so với chi phí thực tế ở báo cáo Lãi lỗ theo vụ việc">
+        <Input aria-label="Ngân sách" inputMode="numeric" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} placeholder="15.000.000" />
       </Field>
       <label className="col-span-2 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Đang sử dụng

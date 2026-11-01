@@ -1087,6 +1087,127 @@ export type PeriodClosingRow = {
   created_at: Timestamp;
 };
 
+/** Hợp đồng bán / mua (gắn 1-1 với vụ việc) */
+export type ContractDirection = "sale" | "purchase";
+export type ContractStatus = "draft" | "active" | "done" | "cancelled";
+export type ContractRow = {
+  id: string;
+  tenant_id: string;
+  job_id: string;
+  direction: ContractDirection;
+  number: string | null;
+  partner_id: string;
+  signed_date: DateStr | null;
+  value: Numeric;
+  status: ContractStatus;
+  note: string | null;
+  created_by: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+};
+
+/** Dữ liệu lưu hợp đồng (save_contract) — mã không đổi được sau khi tạo */
+export type ContractInput = {
+  code: string;
+  name: string;
+  direction: ContractDirection;
+  number?: string | null;
+  partner_id: string;
+  signed_date?: DateStr | null;
+  start_date?: DateStr | null;
+  end_date?: DateStr | null;
+  value: number;
+  status: ContractStatus;
+  note?: string | null;
+};
+
+/** Theo dõi hợp đồng (rpt_contracts) */
+export type ContractReportRow = {
+  id: string;
+  job_id: string;
+  code: string;
+  name: string;
+  number: string | null;
+  direction: ContractDirection;
+  partner_id: string;
+  partner_code: string;
+  partner_name: string;
+  signed_date: DateStr | null;
+  start_date: DateStr | null;
+  end_date: DateStr | null;
+  value: Numeric;
+  status: ContractStatus;
+  note: string | null;
+  /** Đã xuất hóa đơn (tiền hàng + thuế) */
+  invoiced: Numeric;
+  /** Đã thu (hợp đồng bán) / đã trả (hợp đồng mua) */
+  settled: Numeric;
+  /** Còn phải thu / phải trả = invoiced − settled (âm: đối tác ứng trước) */
+  balance: Numeric;
+  /** Giá trị chưa xuất hóa đơn = value − invoiced */
+  not_invoiced: Numeric;
+  revenue: Numeric;
+  cost: Numeric;
+  profit: Numeric;
+  overdue: boolean;
+};
+
+/** Hóa đơn / khoản thu, trả không theo hóa đơn của một hợp đồng (rpt_contract_detail) */
+export type ContractDocumentRow = {
+  kind: "invoice" | "advance";
+  voucher_id: string;
+  voucher_type: string;
+  number: string;
+  posting_date: DateStr;
+  invoice_number: string | null;
+  description: string | null;
+  /** Số tiền thuộc hợp đồng */
+  amount: Numeric;
+  /** Đã thanh toán (phần của hợp đồng) */
+  paid: Numeric;
+};
+
+/** Lãi lỗ theo vụ việc (rpt_job_pnl); job_id null = (Không gắn vụ việc) */
+export type JobPnlRow = {
+  job_id: string | null;
+  code: string | null;
+  name: string;
+  kind: JobRow["kind"] | null;
+  partner_name: string | null;
+  start_date: DateStr | null;
+  end_date: DateStr | null;
+  is_active: boolean | null;
+  budget: Numeric | null;
+  revenue: Numeric;
+  deductions: Numeric;
+  net_revenue: Numeric;
+  cost: Numeric;
+  profit: Numeric;
+  margin: Numeric | null;
+  /** Doanh thu chưa thực hiện (3387) còn lại đến cuối kỳ */
+  deferred: Numeric;
+};
+
+/** Sổ chi tiết vụ việc (rpt_job_ledger) */
+export type JobLedgerRow = {
+  row_kind: "opening" | "entry" | "total" | "closing";
+  posting_date: DateStr;
+  voucher_number: string | null;
+  voucher_type: string | null;
+  voucher_id: string | null;
+  description: string | null;
+  account: string | null;
+  account_name: string | null;
+  contra_account: string | null;
+  partner_code: string | null;
+  debit: Numeric | null;
+  credit: Numeric | null;
+  revenue: Numeric | null;
+  cost: Numeric | null;
+  /** Lãi lỗ lũy kế */
+  profit: Numeric;
+};
+
 /** Việc cuối tháng (rpt_period_checklist) */
 export type PeriodChecklistItem = {
   key: "drafts" | "tuition" | "coach_pay" | "depreciation" | "tools" | "stock" | "bank" | "closing" | "lock";
@@ -1159,6 +1280,7 @@ export type Database = {
       assets: Table<AssetRow>;
       attendance: Table<AttendanceRow>;
       period_locks: Table<PeriodLockRow>;
+      contracts: Table<ContractRow>;
     };
     Views: {
       my_tenants: { Row: MyTenantRow; Relationships: [] };
@@ -1256,6 +1378,15 @@ export type Database = {
       delete_period_closing: { Args: { p_tenant: string; p_kind: "pl" | "carry"; p_month: string }; Returns: { ok: boolean; number: string } };
       rpt_period_closings: { Args: { p_tenant: string }; Returns: PeriodClosingRow[] };
       rpt_period_checklist: { Args: { p_tenant: string; p_month: string }; Returns: PeriodChecklist };
+      save_contract: { Args: { p_tenant: string; p_contract: Record<string, unknown>; p_id?: string | null }; Returns: string };
+      delete_contract: { Args: { p_tenant: string; p_id: string }; Returns: { ok: boolean; job_deleted: boolean } };
+      rpt_contracts: { Args: { p_tenant: string; p_as_of?: string | null }; Returns: ContractReportRow[] };
+      rpt_contract_detail: { Args: { p_tenant: string; p_contract: string }; Returns: ContractDocumentRow[] };
+      rpt_job_pnl: { Args: { p_tenant: string; p_from: string; p_to: string; p_kind?: string | null }; Returns: JobPnlRow[] };
+      rpt_job_ledger: {
+        Args: { p_tenant: string; p_job: string | null; p_from: string; p_to: string; p_pl_only?: boolean };
+        Returns: JobLedgerRow[];
+      };
       stock_balances: { Args: { p_tenant: string; p_as_of?: string | null; p_warehouse?: string | null }; Returns: StockBalanceRow[] };
       rpt_stock_summary: { Args: { p_tenant: string; p_from: string; p_to: string; p_warehouse?: string | null }; Returns: StockSummaryRow[] };
       rpt_stock_card: {

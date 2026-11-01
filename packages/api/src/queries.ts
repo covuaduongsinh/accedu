@@ -27,6 +27,11 @@ import type {
   AssetRunResult,
   AssetRunRow,
   CarryForwardResult,
+  ContractDocumentRow,
+  ContractInput,
+  ContractReportRow,
+  JobLedgerRow,
+  JobPnlRow,
   PeriodChecklist,
   PeriodCloseResult,
   PeriodClosingRow,
@@ -578,6 +583,28 @@ export const api = {
   },
   async periodClosings(db: AccEduClient, tenantId: string): Promise<PeriodClosingRow[]> {
     return unwrap(await db.rpc("rpt_period_closings", { p_tenant: tenantId }));
+  },
+  /** Lãi lỗ theo vụ việc trong kỳ (kind: lọc loại vụ việc; null = tất cả, có dòng không gắn vụ việc) */
+  async jobPnl(db: AccEduClient, tenantId: string, from: string, to: string, kind?: JobRow["kind"] | null): Promise<JobPnlRow[]> {
+    return unwrap(await db.rpc("rpt_job_pnl", { p_tenant: tenantId, p_from: from, p_to: to, p_kind: kind ?? null }));
+  },
+  /** Sổ chi tiết vụ việc (jobId null = bút toán không gắn vụ việc); plOnly = false: cả bút toán công nợ, tiền */
+  async jobLedger(db: AccEduClient, tenantId: string, jobId: string | null, from: string, to: string, plOnly = true): Promise<JobLedgerRow[]> {
+    return unwrap(await db.rpc("rpt_job_ledger", { p_tenant: tenantId, p_job: jobId, p_from: from, p_to: to, p_pl_only: plOnly }));
+  },
+  /** Theo dõi hợp đồng đến ngày (null: mọi chứng từ đã ghi sổ) */
+  async contracts(db: AccEduClient, tenantId: string, asOf?: string | null): Promise<ContractReportRow[]> {
+    return unwrap(await db.rpc("rpt_contracts", { p_tenant: tenantId, p_as_of: asOf ?? null }));
+  },
+  async contractDetail(db: AccEduClient, tenantId: string, contractId: string): Promise<ContractDocumentRow[]> {
+    return unwrap(await db.rpc("rpt_contract_detail", { p_tenant: tenantId, p_contract: contractId }));
+  },
+  /** Thêm / sửa hợp đồng (mã mới tạo vụ việc loại hợp đồng; mã có sẵn gắn vào vụ việc đó) */
+  async saveContract(db: AccEduClient, tenantId: string, c: ContractInput, id?: string | null): Promise<string> {
+    return unwrap(await db.rpc("save_contract", { p_tenant: tenantId, p_contract: { ...c }, p_id: id ?? null }));
+  },
+  async deleteContract(db: AccEduClient, tenantId: string, id: string): Promise<{ ok: boolean; job_deleted: boolean }> {
+    return unwrap(await db.rpc("delete_contract", { p_tenant: tenantId, p_id: id }));
   },
   async stockOpenings(db: AccEduClient, tenantId: string): Promise<StockOpeningRow[]> {
     return unwrap(await db.from("stock_openings").select("*").eq("tenant_id", tenantId));

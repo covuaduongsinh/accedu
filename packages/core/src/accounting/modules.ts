@@ -115,8 +115,9 @@ export const MODULES: ModuleDef[] = [
     title: "Dự án",
     features: [
       { path: "project/jobs", title: "Công trình, vụ việc", kind: "catalog", phase: "P2", ready: true },
-      { path: "project/contracts", title: "Hợp đồng", kind: "catalog", phase: "P7" },
-      { path: "project/job-ledger", title: "Sổ chi tiết vụ việc", kind: "report", phase: "P7" },
+      { path: "project/contracts", title: "Hợp đồng", kind: "catalog", phase: "P7", ready: true },
+      { path: "project/job-pnl", title: "Lãi lỗ theo vụ việc", kind: "report", phase: "P7", ready: true },
+      { path: "project/job-ledger", title: "Sổ chi tiết vụ việc", kind: "report", phase: "P7", ready: true },
     ],
   },
   {

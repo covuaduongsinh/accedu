@@ -1077,4 +1077,105 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     expect(sql(`select count(*) from app.closing_balances(${tenantSql}, '${monthEnd}')`)).toBe("0");
     expect(Number(sql(`select coalesce(sum(net), 0) from app.leaf_net_before(${tenantSql}, '${monthEnd}'::date + 1) where account = '911'`))).toBe(0);
   });
+
+  test("vụ việc & hợp đồng: hợp đồng với trường, hóa đơn và phiếu chi gắn vụ việc, thu một phần, lãi lỗ theo vụ việc", async ({ page }) => {
+    const dbUrl = process.env.E2E_DB_URL!;
+    const sql = (query: string) => execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", query], { encoding: "utf8" }).trim();
+    const tenantSql = `(select id from public.tenants where lower(slug) = lower('${slug}'))`;
+    const dialog = page.getByRole("dialog");
+    await signIn(page);
+
+    // Trường học là khách hàng
+    await page.goto(`/${slug}/sales/customers`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await page.getByLabel("Mã", { exact: true }).fill("TH-KD");
+    await page.getByLabel("Tên", { exact: true }).fill("Trường Tiểu học Kim Đồng (giả lập)");
+    await page.getByRole("button", { name: "Lưu" }).click();
+    await expect(page.getByRole("gridcell", { name: "Trường Tiểu học Kim Đồng (giả lập)" })).toBeVisible();
+
+    // Hợp đồng bán 120 triệu: tạo luôn vụ việc HD-KD
+    await page.goto(`/${slug}/project/contracts`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã hợp đồng").fill("HD-KD");
+    await dialog.getByLabel("Số hợp đồng").fill("15/2026/HĐ-DS");
+    await dialog.getByLabel("Tên hợp đồng").fill("Dạy cờ vua ngoại khóa năm học 2026–2027");
+    await dialog.getByLabel("Đối tác").fill("TH-KD");
+    await expect(dialog.locator("span", { hasText: "Trường Tiểu học Kim Đồng (giả lập)" })).toBeVisible();
+    await dialog.getByLabel("Giá trị hợp đồng").fill("120.000.000");
+    await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
+    await expect(page.getByText("Đã lưu hợp đồng")).toBeVisible();
+    await expect(page.locator(".ag-row", { hasText: "HD-KD" })).toContainText("120.000.000");
+    expect(sql(`select kind from public.jobs where tenant_id = ${tenantSql} and code = 'HD-KD'`)).toBe("contract");
+
+    // Hóa đơn dịch vụ 40 triệu cho hợp đồng (cột Vụ việc)
+    await page.goto(`/${slug}/sales/service-invoices`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã khách").first().fill("TH-KD");
+    await dialog.getByLabel("Diễn giải dòng 1").fill("Dạy cờ vua ngoại khóa đợt 1");
+    await dialog.getByLabel("Thành tiền dòng 1").fill("40000000");
+    await dialog.getByLabel("Vụ việc dòng 1").fill("HD-KD");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "40.000.000" }).first()).toBeVisible();
+
+    // Thu 25 triệu theo hóa đơn
+    await page.goto(`/${slug}/cash/receipts`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Mã khách").first().fill("TH-KD");
+    await dialog.getByRole("button", { name: "Thu theo hóa đơn" }).click();
+    const panel = dialog.getByRole("region", { name: "thu theo hóa đơn" });
+    await panel.getByLabel("Số tiền thu theo hóa đơn").fill("25000000");
+    await panel.getByRole("button", { name: "Phân bổ tự động" }).click();
+    await panel.getByRole("button", { name: "Đưa vào phiếu" }).click();
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "25.000.000" }).first()).toBeVisible();
+
+    // Phiếu chi mua bàn cờ cho lớp ở trường: cột Vụ việc mới trên phiếu chi
+    await page.goto(`/${slug}/cash/payments`);
+    await page.getByRole("button", { name: "Mới", exact: true }).click();
+    await dialog.getByLabel("Lý do chi").fill("Mua bàn cờ cho lớp trường Kim Đồng");
+    await dialog.getByLabel("Tài khoản dòng 1").fill("6422");
+    await dialog.getByLabel("Số tiền dòng 1").fill("2000000");
+    await dialog.getByLabel("Vụ việc dòng 1").fill("XYZ");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByText(/Vụ việc “XYZ” không có trong danh mục/)).toBeVisible();
+    await dialog.getByLabel("Vụ việc dòng 1").fill("hd-kd");
+    await shot(page, "49-phieu-chi-vu-viec");
+    await dialog.getByRole("button", { name: "Lưu & ghi sổ" }).click();
+    await expect(page.getByRole("gridcell", { name: "Mua bàn cờ cho lớp trường Kim Đồng" })).toBeVisible();
+    expect(
+      sql(`select count(*) from public.gl_entries g join public.jobs j on j.id = g.job_id
+           where g.tenant_id = ${tenantSql} and j.code = 'HD-KD' and g.account = '6422' and g.debit = 2000000`),
+    ).toBe("1");
+
+    // Theo dõi hợp đồng: đã xuất 40 tr, đã thu 25 tr, còn phải thu 15 tr, chưa xuất 80 tr, lãi 38 tr
+    await page.goto(`/${slug}/project/contracts`);
+    const row = page.locator(".ag-row", { hasText: "HD-KD" });
+    await expect(row).toContainText("40.000.000");
+    await expect(row).toContainText("80.000.000");
+    await expect(row).toContainText("38.000.000");
+    await shot(page, "50-hop-dong");
+    await row.dblclick();
+    await expect(dialog.getByTestId("contract-invoiced")).toHaveText("40.000.000");
+    await expect(dialog.getByTestId("contract-settled")).toHaveText("25.000.000");
+    await expect(dialog.getByTestId("contract-balance")).toHaveText("15.000.000");
+    await expect(dialog.locator(".ag-row", { hasText: "Hóa đơn" })).toContainText("40.000.000");
+    await page.keyboard.press("Escape");
+
+    // Lãi lỗ theo vụ việc tháng này: tổng các dòng = lãi lỗ toàn đơn vị (không tính phiếu kết chuyển 911)
+    // Trang mặc định cả tháng hiện tại (ngày 1 → cuối tháng, giờ Việt Nam)
+    const ym = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 7);
+    const from = `${ym}-01`;
+    const to = `${ym}-${new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate()}`;
+    const total = Number(sql(`select coalesce(sum(profit), 0) from public.rpt_job_pnl(${tenantSql}, '${from}', '${to}')`));
+    await page.goto(`/${slug}/project/job-pnl`);
+    const hd = page.locator(".ag-row", { hasText: "HD-KD" });
+    await expect(hd).toContainText("40.000.000");
+    await expect(hd).toContainText("2.000.000");
+    await expect(hd).toContainText("38.000.000");
+    await expect(page.locator(".ag-row", { hasText: "Tổng cộng toàn đơn vị" })).toContainText(money(Math.abs(total)));
+    await shot(page, "51-lai-lo-vu-viec");
+    await hd.dblclick();
+    await expect(dialog.locator(".ag-row", { hasText: "Lũy kế đến cuối kỳ" })).toContainText("38.000.000");
+    await expect(dialog.locator(".ag-row", { hasText: "Mua bàn cờ" })).toContainText("6422");
+  });
 });

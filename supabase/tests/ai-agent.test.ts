@@ -322,6 +322,45 @@ describe("Hỏi AccEdu: vòng lặp tool use", () => {
     expect(toolsFor("coach").map((t) => t.name)).not.toContain("period_checklist");
   });
 
+  it("lãi lỗ theo vụ việc (kèm bút toán một lớp) và hợp đồng", async () => {
+    const { client, calls } = fakeClient([
+      reply([toolUse("t", "job_pnl", { kind: "class", code: "tot-k12" }), toolUse("u", "contracts", { direction: "sale" })], "tool_use"),
+      reply([text("ok")], "end_turn"),
+    ]);
+    const { db, calls: dbCalls } = fakeDb({
+      rpt_job_pnl: () => [
+        { job_id: "j1", code: "TOT-K12", name: "Lớp Tốt K12", kind: "class", revenue: "2000000.00", deductions: "0.00", cost: "1100000.00", profit: "900000.00", margin: "45.0", deferred: "4000000.00", budget: null },
+        { job_id: "j2", code: "MA-K3", name: "Lớp Mã K3", kind: "class", revenue: "1000000.00", deductions: "0.00", cost: "1200000.00", profit: "-200000.00", margin: "-20.0", deferred: "0.00", budget: null },
+      ],
+      rpt_job_ledger: () => [
+        { row_kind: "opening", profit: 0 },
+        { row_kind: "entry", posting_date: "2026-10-31", voucher_number: "PK0001", description: "Phân bổ học phí", account: "5113", revenue: "2000000.00", cost: null, profit: 2000000 },
+        { row_kind: "total", profit: 900000 },
+      ],
+      rpt_contracts: () => [
+        { code: "HD-KD", name: "Dạy cờ vua TH Kim Đồng", direction: "sale", status: "active", overdue: false, value: "120000000.00", invoiced: "40000000.00", settled: "25000000.00", balance: "15000000.00", not_invoiced: "80000000.00", profit: "40000000.00" },
+        { code: "HD-IN", name: "In sách", direction: "purchase", status: "active", overdue: false, value: "30000000.00", balance: "8000000.00", not_invoiced: "8000000.00" },
+      ],
+    });
+    await askAccEdu({ client, db, tenantId: TENANT, role: "owner", question: "Lớp Tốt K12 tháng này lãi bao nhiêu? Hợp đồng còn phải thu bao nhiêu?", today: TODAY });
+    // Hai tool chạy song song: so theo tên RPC, không theo thứ tự
+    const args = (fn: string) => dbCalls.find((c) => c.fn === fn)?.args;
+    expect(dbCalls.map((c) => c.fn).toSorted()).toEqual(["rpt_contracts", "rpt_job_ledger", "rpt_job_pnl"]);
+    expect(args("rpt_job_pnl")).toEqual({ p_tenant: TENANT, p_from: "2026-10-01", p_to: TODAY, p_kind: "class" });
+    expect(args("rpt_job_ledger")).toEqual({ p_tenant: TENANT, p_job: "j1", p_from: "2026-10-01", p_to: TODAY, p_pl_only: true });
+    expect(args("rpt_contracts")).toEqual({ p_tenant: TENANT, p_as_of: null });
+    const results = (calls[1]!.messages as Array<{ content: unknown }>)[2]!.content as Array<Record<string, unknown>>;
+    const pnl = JSON.parse(String(results[0]!.content));
+    expect(pnl.total).toEqual({ revenue: 3_000_000, deductions: 0, cost: 2_300_000, profit: 700_000 });
+    expect(pnl.jobs.rows[0]).toEqual({ code: "TOT-K12", name: "Lớp Tốt K12", kind: "class", revenue: 2_000_000, deductions: 0, cost: 1_100_000, profit: 900_000, margin: 45, deferred: 4_000_000 });
+    expect(pnl.entries.rows).toEqual([{ posting_date: "2026-10-31", voucher_number: "PK0001", description: "Phân bổ học phí", account: "5113", revenue: 2_000_000 }]);
+    const contracts = JSON.parse(String(results[1]!.content));
+    expect(contracts).toMatchObject({ count: 1, open_value: 120_000_000, open_balance: 15_000_000, open_not_invoiced: 80_000_000 });
+    expect(contracts.contracts.rows[0]).toMatchObject({ code: "HD-KD", overdue: false, settled: 25_000_000 });
+    expect(toolsFor("coach").map((t) => t.name)).not.toContain("job_pnl");
+    expect(toolsFor("coach").map((t) => t.name)).not.toContain("contracts");
+  });
+
   it("max_tokens: báo câu trả lời bị cắt", async () => {
     const { client } = fakeClient([reply([text("Danh sách rất dài…")], "max_tokens")]);
     const r = await askAccEdu({ client, db: fakeDb({}).db, tenantId: TENANT, role: "owner", question: "?", today: TODAY });
