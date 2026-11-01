@@ -1,5 +1,5 @@
-import { friendlyError, fromVoucherRow, type AccountRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
-import { useAccounts, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
+import { friendlyError, fromVoucherRow, type AccountRow, type JobRow, type PartnerRow, type VoucherRow, type VoucherWithLines } from "@accedu/api";
+import { useAccounts, useJobs, usePartners, useSaveVoucher, useVoucher } from "@accedu/api/react";
 import { SETTLEMENT_ACCOUNT, amountInWords, buildLedgerEntries, formatAmount, parseAmount, paymentSide, todayVN, type VoucherInput } from "@accedu/core";
 import { FileCheck2, Plus, Save, Send, Trash2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
@@ -18,6 +18,8 @@ interface LineDraft {
   amount: string;
   description: string;
   partnerCode: string;
+  /** Mã vụ việc (lớp, giải đấu, hợp đồng…) */
+  jobCode: string;
   /** Hóa đơn mà dòng thu/chi trừ vào */
   invoiceId: string;
   /** Dòng sinh từ "Thu/chi theo hóa đơn" — thay lại khi phân bổ lần nữa */
@@ -37,7 +39,7 @@ interface HeaderDraft {
 }
 
 let seq = 0;
-const newLine = (): LineDraft => ({ key: `l${++seq}`, account: "", debit: "", credit: "", amount: "", description: "", partnerCode: "", invoiceId: "" });
+const newLine = (): LineDraft => ({ key: `l${++seq}`, account: "", debit: "", credit: "", amount: "", description: "", partnerCode: "", jobCode: "", invoiceId: "" });
 
 interface Initial {
   header: HeaderDraft;
@@ -65,9 +67,10 @@ function blankInitial(cfg: VoucherUiConfig): Initial {
 }
 
 /** Chuyển chứng từ đã lưu thành trạng thái form */
-function initialFromVoucher(row: VoucherWithLines, partners: PartnerRow[], cfg: VoucherUiConfig): Initial {
+function initialFromVoucher(row: VoucherWithLines, partners: PartnerRow[], jobs: JobRow[], cfg: VoucherUiConfig): Initial {
   const v = fromVoucherRow(row);
   const codeOf = (pid: string | null | undefined) => (pid && partners.find((p) => p.id === pid)?.code) || "";
+  const jobCodeOf = (jid: string | null | undefined) => (jid && jobs.find((j) => j.id === jid)?.code) || "";
   return {
     version: v.version,
     status: v.status,
@@ -93,6 +96,7 @@ function initialFromVoucher(row: VoucherWithLines, partners: PartnerRow[], cfg: 
         amount: cfg.style === "pair" ? formatAmount(l.amount) : "",
         description: l.description ?? "",
         partnerCode: codeOf(l.partnerId),
+        jobCode: jobCodeOf(l.jobId),
         invoiceId: l.invoiceId ?? "",
       };
     }),
@@ -103,9 +107,10 @@ function initialFromVoucher(row: VoucherWithLines, partners: PartnerRow[], cfg: 
 export function VoucherEditor({ cfg, id, onClose }: { cfg: VoucherUiConfig; id: string | null; onClose: () => void }) {
   const { tenant } = useTenantCtx();
   const partners = usePartners(tenant.id);
+  const jobs = useJobs(tenant.id);
   const existing = useVoucher(id ?? undefined);
-  if (id && (!existing.data || !partners.data)) return <Empty>Đang tải chứng từ...</Empty>;
-  const initial = id && existing.data ? initialFromVoucher(existing.data, partners.data ?? [], cfg) : blankInitial(cfg);
+  if (id && (!existing.data || !partners.data || !jobs.data)) return <Empty>Đang tải chứng từ...</Empty>;
+  const initial = id && existing.data ? initialFromVoucher(existing.data, partners.data ?? [], jobs.data ?? [], cfg) : blankInitial(cfg);
   return <VoucherForm cfg={cfg} id={id} initial={initial} onClose={onClose} />;
 }
 
@@ -113,6 +118,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
   const { tenant, role } = useTenantCtx();
   const accounts = useAccounts(tenant.id);
   const partners = usePartners(tenant.id);
+  const jobs = useJobs(tenant.id);
   const save = useSaveVoucher(tenant.id, platform);
   const listId = useId();
 
@@ -123,6 +129,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
   const postable = useMemo(() => (accounts.data ?? []).filter((a) => a.is_postable && a.is_active), [accounts.data]);
   const byCode = useMemo(() => new Map((accounts.data ?? []).map((a) => [a.code, a])), [accounts.data]);
   const partnerByCode = useMemo(() => new Map((partners.data ?? []).map((p) => [p.code, p])), [partners.data]);
+  const jobByCode = useMemo(() => new Map((jobs.data ?? []).map((j) => [j.code.toUpperCase(), j])), [jobs.data]);
 
   const status = initial.status;
   const readOnly = status === "posted" || status === "cancelled" || role === "viewer";
@@ -155,6 +162,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
             lineNo: i + 1,
             description: l.description || header.description,
             partnerId: lp?.id ?? partner?.id ?? null,
+            jobId: jobByCode.get(l.jobCode.trim().toUpperCase())?.id ?? null,
             ...(side && l.invoiceId ? { invoiceId: l.invoiceId } : {}),
           };
           if (cfg.style === "pair") {
@@ -182,6 +190,11 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
   const total = preview.ok ? preview.totalDebit : 0;
 
   async function submit(post: boolean) {
+    const unknownJob = lines.find((l) => l.account.trim() && l.jobCode.trim() && !jobByCode.has(l.jobCode.trim().toUpperCase()));
+    if (unknownJob) {
+      toast.error(`Vụ việc “${unknownJob.jobCode.trim()}” không có trong danh mục Công trình, vụ việc`);
+      return;
+    }
     try {
       await save.mutateAsync({ voucher: toInput(), post });
       toast.success(post ? "Đã lưu và ghi sổ" : "Đã lưu chứng từ");
@@ -228,6 +241,15 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
             {a.name}
           </option>
         ))}
+      </datalist>
+      <datalist id={`${listId}-job`}>
+        {(jobs.data ?? [])
+          .filter((j) => j.is_active)
+          .map((j) => (
+            <option key={j.id} value={j.code}>
+              {j.name}
+            </option>
+          ))}
       </datalist>
       <datalist id={`${listId}-partner`}>
         {(partners.data ?? []).map((p) => (
@@ -299,6 +321,7 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
               <th className="w-40 px-2 text-left">{cfg.style === "pair" ? cfg.lineAccountLabel : "Tài khoản"}</th>
               <th className="px-2 text-left">Tên tài khoản</th>
               <th className="w-32 px-2 text-left">Mã khách</th>
+              <th className="w-32 px-2 text-left">Vụ việc</th>
               {side ? <th className="w-64 px-2 text-left">Trừ hóa đơn</th> : null}
               {cfg.style === "pair" ? (
                 <th className="w-40 px-2 text-right">Số tiền</th>
@@ -322,6 +345,16 @@ function VoucherForm({ cfg, id, initial, onClose }: { cfg: VoucherUiConfig; id: 
                 <td className="px-2 text-xs text-muted">{byCode.get(l.account)?.name}</td>
                 <td className="px-1">
                   <Input list={`${listId}-partner`} value={l.partnerCode} disabled={readOnly} onChange={(e) => setLine(l.key, { partnerCode: e.target.value, invoiceId: "" })} />
+                </td>
+                <td className="px-1">
+                  <Input
+                    list={`${listId}-job`}
+                    value={l.jobCode}
+                    disabled={readOnly}
+                    aria-label={`Vụ việc dòng ${i + 1}`}
+                    title={jobByCode.get(l.jobCode.trim().toUpperCase())?.name}
+                    onChange={(e) => setLine(l.key, { jobCode: e.target.value.toUpperCase() })}
+                  />
                 </td>
                 {side ? (
                   <td className="px-1">

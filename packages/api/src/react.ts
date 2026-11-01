@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { AccEduClient } from "./client";
+import type { JobRow } from "./database.types";
 import { api, qk } from "./queries";
 
 const ClientContext = createContext<AccEduClient | null>(null);
@@ -395,6 +396,45 @@ export function usePeriodClosings(tenantId: string | undefined) {
   });
 }
 
+/** Lãi lỗ theo vụ việc */
+export function useJobPnl(tenantId: string | undefined, from: string, to: string, kind?: JobRow["kind"] | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "job-pnl", from, to, kind ?? ""),
+    queryFn: () => api.jobPnl(db, tenantId as string, from, to, kind),
+    enabled: !!tenantId && !!from && !!to,
+  });
+}
+
+/** Sổ chi tiết vụ việc (jobId null = không gắn vụ việc; undefined = chưa chọn) */
+export function useJobLedger(tenantId: string | undefined, jobId: string | null | undefined, from: string, to: string, plOnly = true) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "job-ledger", jobId ?? "__none", from, to, String(plOnly)),
+    queryFn: () => api.jobLedger(db, tenantId as string, jobId ?? null, from, to, plOnly),
+    enabled: !!tenantId && jobId !== undefined && !!from && !!to,
+  });
+}
+
+/** Theo dõi hợp đồng */
+export function useContracts(tenantId: string | undefined, asOf?: string | null) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "contracts", asOf ?? ""),
+    queryFn: () => api.contracts(db, tenantId as string, asOf),
+    enabled: !!tenantId,
+  });
+}
+
+export function useContractDetail(tenantId: string | undefined, contractId: string | undefined) {
+  const db = useDb();
+  return useQuery({
+    queryKey: qk.report(tenantId ?? "", "contract-detail", contractId ?? ""),
+    queryFn: () => api.contractDetail(db, tenantId as string, contractId as string),
+    enabled: !!tenantId && !!contractId,
+  });
+}
+
 export function useBankStatements(tenantId: string | undefined, account: string) {
   const db = useDb();
   return useQuery({
@@ -510,6 +550,7 @@ const SYNC_TABLES = [
   "asset_depreciations",
   "asset_disposals",
   "period_closings",
+  "contracts",
 ] as const;
 
 /**
@@ -588,6 +629,7 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
       return inv(qk.partners(tenantId));
     case "jobs":
       inv(qk.classes(tenantId));
+      inv(["report", tenantId]);
       return inv(qk.jobs(tenantId));
     case "student_profiles":
       return inv(qk.students(tenantId));
@@ -610,6 +652,7 @@ function applyChange(qc: QueryClient, tenantId: string, table: string, id: strin
     case "asset_depreciations":
     case "asset_disposals":
     case "period_closings":
+    case "contracts":
       return inv(["report", tenantId]);
     case "tuition_reminders":
       return inv(qk.reminders(tenantId));

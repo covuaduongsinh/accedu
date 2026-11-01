@@ -368,6 +368,83 @@ export const AI_TOOLS: AiTool[] = [
     },
   },
   {
+    name: "job_pnl",
+    label: "Lãi lỗ theo vụ việc",
+    audience: "staff",
+    description:
+      "Lãi lỗ theo vụ việc trong kỳ — vụ việc là lớp học (class), khóa học (course), giải đấu / sự kiện (event), dự án (project), " +
+      "hợp đồng (contract): doanh thu (511, 515, 711), giảm trừ (521), chi phí (632 gồm lương HLV, 635, 641, 642, 811, 821), lãi lỗ, " +
+      "tỷ suất trên doanh thu thuần, học phí đã lập chưa ghi nhận doanh thu (3387) còn lại, ngân sách. Không lọc loại thì có dòng " +
+      "\"(Không gắn vụ việc)\" và tổng các dòng bằng lãi lỗ toàn đơn vị. Có code thì kèm các bút toán doanh thu / chi phí của vụ việc đó.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ...PERIOD,
+        kind: { type: "string", enum: ["class", "course", "event", "project", "contract"], description: "Lọc loại vụ việc (bỏ trống: tất cả)" },
+        code: { type: "string", description: "Mã một vụ việc / lớp / hợp đồng để xem chi tiết bút toán (tùy chọn)" },
+      },
+    },
+    async run(ctx, input) {
+      const p = period(ctx, input);
+      const kind = ["class", "course", "event", "project", "contract"].includes(String(input.kind)) ? String(input.kind) : null;
+      const data = await rows(ctx, "rpt_job_pnl", { ...p, p_kind: kind });
+      const cols = ["code", "name", "kind", "revenue", "deductions", "cost", "profit", "margin", "deferred", "budget"];
+      const code = textArg(input.code).toUpperCase();
+      const out: Record<string, unknown> = {
+        from: p.p_from,
+        to: p.p_to,
+        total: { revenue: sum(data, "revenue"), deductions: sum(data, "deductions"), cost: sum(data, "cost"), profit: sum(data, "profit") },
+        jobs: limitRows(data.map((r) => pick(r, cols))),
+      };
+      if (code) {
+        const job = data.find((r) => String(r.code ?? "").toUpperCase() === code);
+        if (!job) throw new Error(`Vụ việc ${code} không có doanh thu / chi phí trong kỳ (hoặc sai mã)`);
+        const entries = await rows(ctx, "rpt_job_ledger", { p_job: job.job_id, ...p, p_pl_only: true });
+        out.entries = limitRows(
+          entries
+            .filter((e) => e.row_kind === "entry")
+            .map((e) => pick(e, ["posting_date", "voucher_number", "description", "account", "account_name", "partner_code", "revenue", "cost"])),
+          50,
+        );
+      }
+      return out;
+    },
+  },
+  {
+    name: "contracts",
+    label: "Hợp đồng",
+    audience: "staff",
+    description:
+      "Hợp đồng bán (sale: trường học, nhà tài trợ…) và mua (purchase): số hợp đồng, đối tác, ngày ký, thời hạn, trạng thái " +
+      "(draft đang thỏa thuận, active đang thực hiện, done đã thanh lý, cancelled đã hủy), giá trị, đã xuất hóa đơn, đã thu / đã trả, " +
+      "còn phải thu / phải trả (âm = đối tác ứng trước), giá trị chưa xuất hóa đơn, doanh thu, chi phí, lãi lỗ, quá hạn.",
+    input_schema: {
+      type: "object",
+      properties: {
+        as_of: { type: "string", description: "Số liệu đến ngày YYYY-MM-DD (bỏ trống: mọi chứng từ đã ghi sổ)" },
+        direction: { type: "string", enum: ["sale", "purchase"], description: "Chỉ hợp đồng bán hoặc mua (bỏ trống: cả hai)" },
+      },
+    },
+    async run(ctx, input) {
+      const asOf = input.as_of ? dateArg(input.as_of, ctx.today) : null;
+      const all = await rows(ctx, "rpt_contracts", { p_as_of: asOf });
+      const data = input.direction === "sale" || input.direction === "purchase" ? all.filter((r) => r.direction === input.direction) : all;
+      const open = data.filter((r) => r.status === "draft" || r.status === "active");
+      return {
+        as_of: asOf ?? "mọi chứng từ đã ghi sổ",
+        count: data.length,
+        open_value: sum(open, "value"),
+        open_balance: sum(open, "balance"),
+        open_not_invoiced: sum(open, "not_invoiced"),
+        contracts: limitRows(
+          data.map((r) =>
+            pick(r, ["code", "number", "name", "direction", "partner_name", "signed_date", "end_date", "status", "overdue", "value", "invoiced", "settled", "balance", "not_invoiced", "profit"]),
+          ),
+        ),
+      };
+    },
+  },
+  {
     name: "fixed_assets",
     label: "Sổ TSCĐ / CCDC",
     audience: "staff",
@@ -533,6 +610,7 @@ Kiến thức kế toán (chế độ TT99/2025 hoặc TT133/2016):
 - 111 tiền mặt, 112 tiền gửi ngân hàng, 131 phải thu khách hàng / học viên, 331 phải trả người bán, 334 phải trả người lao động, 3335 thuế TNCN, 3387 doanh thu (học phí) nhận trước, 5113 doanh thu cung cấp dịch vụ, 632 giá vốn (gồm lương HLV), 642 chi phí quản lý.
 - Học phí: lập phiếu học phí Nợ 131 / Có 3387; thu tiền Nợ 111, 112 / Có 131; cuối tháng phân bổ 3387 → 5113 theo buổi đã học (lớp theo khóa) hoặc theo tháng.
 - Lương HLV theo buổi dạy: Nợ 632 / Có 334 (nhân viên) hoặc 331 (cộng tác viên, khấu trừ 10% TNCN khi từ 2.000.000 đ / tháng).
+- Vụ việc: mỗi lớp học là một vụ việc (mã lớp); giải đấu, dự án, hợp đồng cũng là vụ việc. Lãi lỗ một lớp / giải đấu / hợp đồng xem ở công cụ lãi lỗ theo vụ việc; tình hình thực hiện, thu tiền hợp đồng xem ở công cụ hợp đồng.
 - Cuối tháng: kết chuyển doanh thu, chi phí (TK đầu 5–8) sang 911, lãi lỗ sang 4212; đầu năm chuyển 4212 sang 4211. Lãi lỗ của tháng đã kết chuyển xem ở công cụ việc cuối tháng; tháng chưa kết chuyển thì tính từ bảng cân đối phát sinh (doanh thu − chi phí).
 - TSCĐ: nguyên giá 211 (TT99 2111–2118, TT133 2111), hao mòn 214; khấu hao đường thẳng hằng tháng Nợ 642 (TT133 6422, TT99 6424) / Có 214. CCDC: giá trị chờ phân bổ 242, phân bổ hằng tháng Nợ 642 / Có 242.
 - Cấp độ học viên: tot = Tốt, ma = Mã, tuong = Tượng, xe = Xe, hau = Hậu, vua = Vua.

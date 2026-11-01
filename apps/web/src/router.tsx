@@ -47,7 +47,7 @@ export const featureRoute = createRoute({
   component: FeaturePage,
   validateSearch: (
     s: Record<string, unknown>,
-  ): { edit?: string; account?: string; partner?: string; from?: string; to?: string; item?: string; warehouse?: string } => ({
+  ): { edit?: string; account?: string; partner?: string; from?: string; to?: string; item?: string; warehouse?: string; job?: string } => ({
     ...(typeof s.edit === "string" ? { edit: s.edit } : {}),
     ...(typeof s.account === "string" ? { account: s.account } : {}),
     ...(typeof s.partner === "string" ? { partner: s.partner } : {}),
@@ -55,6 +55,7 @@ export const featureRoute = createRoute({
     ...(typeof s.to === "string" ? { to: s.to } : {}),
     ...(typeof s.item === "string" ? { item: s.item } : {}),
     ...(typeof s.warehouse === "string" ? { warehouse: s.warehouse } : {}),
+    ...(typeof s.job === "string" ? { job: s.job } : {}),
   }),
 });
 

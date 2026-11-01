@@ -9,6 +9,8 @@ import { ClosingPage } from "../features/closing/ClosingPage";
 import { AccountsPage } from "../features/catalogs/AccountsPage";
 import { ItemsPage } from "../features/catalogs/ItemsPage";
 import { JobsPage } from "../features/catalogs/JobsPage";
+import { ContractsPage } from "../features/projects/ContractsPage";
+import { JobLedgerPage, JobPnlPage } from "../features/projects/JobReports";
 import { WarehousesPage } from "../features/catalogs/WarehousesPage";
 import { OpeningBalancesPage } from "../features/catalogs/OpeningBalancesPage";
 import { InputInvoicesPage } from "../features/einvoice/InputInvoicesPage";
@@ -45,6 +47,9 @@ const PAGES: Record<string, ComponentType> = {
   "general/opening-balances": OpeningBalancesPage,
   "system/import": MigrationPage,
   "project/jobs": JobsPage,
+  "project/contracts": ContractsPage,
+  "project/job-pnl": JobPnlPage,
+  "project/job-ledger": JobLedgerPage,
   "general/accounts": AccountsPage,
   "sales/customers": () => <PartnersPage kind="customer" />,
   "purchase/suppliers": () => <PartnersPage kind="supplier" />,
