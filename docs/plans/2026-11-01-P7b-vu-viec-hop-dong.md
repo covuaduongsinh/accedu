@@ -156,3 +156,35 @@ Ngoài ra:
 ## Lộ trình sau P7b
 
 **P8a** BCTC: Bảng cân đối kế toán (B01), Kết quả kinh doanh (B02), xuất Excel → **P10** phát hành. Khế ước vay để đợt riêng khi Dương Sinh có khoản vay.
+
+---
+
+## Kết quả đợt P7b (01/11/2026)
+
+**Đã làm đủ phạm vi trên:**
+- CSDL: migration `20261103000021_jobs_contracts.sql`.
+- API, hook, đồng bộ realtime bảng `contracts`.
+- Web:
+  - cột *Vụ việc* trên PT / PC / BC / BN / PK;
+  - trang *Dự án › Hợp đồng*, *Lãi lỗ theo vụ việc*, *Sổ chi tiết vụ việc*;
+  - ô *Ngân sách* ở danh mục vụ việc.
+- Hỏi AccEdu: tool `job_pnl`, `contracts`.
+- Sửa lãi gộp không tính phiếu kết chuyển 911.
+
+**Hướng dẫn sử dụng:** [`docs/huong-dan/vu-viec-hop-dong.md`](../huong-dan/vu-viec-hop-dong.md).
+
+### Kiểm thử
+
+| Bộ test | Số lượng |
+|---|---|
+| CSDL (trong đó `jobs.test.ts`: 14 test) | 182 |
+| AI tool | 1 test mới |
+| E2E | 20/20 |
+
+Kịch bản E2E mới trên đơn vị E2E:
+1. tạo hợp đồng với trường (tự tạo vụ việc loại *Hợp đồng*);
+2. hóa đơn dịch vụ 40 triệu gắn hợp đồng;
+3. thu 25 triệu theo hóa đơn;
+4. phiếu chi 2 triệu gắn vụ việc (mã sai thì báo lỗi);
+5. trang Hợp đồng: đã xuất HĐ 40 tr, đã thu 25 tr, còn phải thu 15 tr, chưa xuất 80 tr;
+6. *Lãi lỗ theo vụ việc*: hợp đồng lãi 38 tr, tổng các dòng khớp lãi lỗ toàn đơn vị; sổ chi tiết lũy kế.

@@ -1100,7 +1100,7 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await dialog.getByLabel("Số hợp đồng").fill("15/2026/HĐ-DS");
     await dialog.getByLabel("Tên hợp đồng").fill("Dạy cờ vua ngoại khóa năm học 2026–2027");
     await dialog.getByLabel("Đối tác").fill("TH-KD");
-    await expect(dialog.getByText("Trường Tiểu học Kim Đồng (giả lập)")).toBeVisible();
+    await expect(dialog.locator("span", { hasText: "Trường Tiểu học Kim Đồng (giả lập)" })).toBeVisible();
     await dialog.getByLabel("Giá trị hợp đồng").fill("120.000.000");
     await dialog.getByRole("button", { name: "Lưu", exact: true }).click();
     await expect(page.getByText("Đã lưu hợp đồng")).toBeVisible();
@@ -1162,9 +1162,11 @@ test.describe.serial("Luồng kế toán cơ bản", () => {
     await page.keyboard.press("Escape");
 
     // Lãi lỗ theo vụ việc tháng này: tổng các dòng = lãi lỗ toàn đơn vị (không tính phiếu kết chuyển 911)
-    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
-    const from = `${today.slice(0, 7)}-01`;
-    const total = Number(sql(`select coalesce(sum(profit), 0) from public.rpt_job_pnl(${tenantSql}, '${from}', '${today}')`));
+    // Trang mặc định cả tháng hiện tại (ngày 1 → cuối tháng, giờ Việt Nam)
+    const ym = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 7);
+    const from = `${ym}-01`;
+    const to = `${ym}-${new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate()}`;
+    const total = Number(sql(`select coalesce(sum(profit), 0) from public.rpt_job_pnl(${tenantSql}, '${from}', '${to}')`));
     await page.goto(`/${slug}/project/job-pnl`);
     const hd = page.locator(".ag-row", { hasText: "HD-KD" });
     await expect(hd).toContainText("40.000.000");
